@@ -26,6 +26,7 @@ await Promise.all([
   build({ ...common, entryPoints: [resolve(root, "src/background.js")], outfile: resolve(output, "background.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/content.js")], outfile: resolve(output, "content.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/sidepanel.js")], outfile: resolve(output, "sidepanel.js") }),
+  build({ ...common, entryPoints: [resolve(root, "src/microphone-permission.js")], outfile: resolve(output, "microphone-permission.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/offscreen.js")], outfile: resolve(output, "offscreen.js") }),
 ]);
 
@@ -47,6 +48,8 @@ await Promise.all([
   cp(resolve(root, "manifest.json"), resolve(output, "manifest.json")),
   cp(resolve(root, "src/sidepanel.html"), resolve(output, "sidepanel.html")),
   cp(resolve(root, "src/sidepanel.css"), resolve(output, "sidepanel.css")),
+  cp(resolve(root, "src/microphone-permission.html"), resolve(output, "microphone-permission.html")),
+  cp(resolve(root, "src/microphone-permission.css"), resolve(output, "microphone-permission.css")),
   cp(resolve(root, "src/offscreen.html"), resolve(output, "offscreen.html")),
   cp(
     resolve(root, "node_modules/@transcribe/shout/src/shout/shout.wasm.js"),

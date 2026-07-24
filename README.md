@@ -30,7 +30,7 @@ npm run build
 ## 使用流程
 
 1. 打开受支持的视频页，点击工具栏中的“视频笔记”图标打开侧边栏。
-2. 首次使用时，“权限、语音与快捷键”会自动展开。分别点击“播放器截图”的“启用”和“麦克风”的“授权”，完成两个一次性授权。
+2. 首次使用时，“权限、语音与快捷键”会自动展开。点击“播放器截图”的“启用”；再点击“麦克风”的“授权”，插件会打开独立授权页，请在该页点击“允许麦克风”并确认 Edge 权限提示。
 3. 点击输入框。插件记录当前时点、字幕与截图并暂停视频；输入内容后移开光标即可保存和续播。
 4. 页面焦点位于视频时，按住右 Option/Alt 说话，松开后视频立即恢复。未启用 Whisper 时仍会保留原始录音。
 5. 首次需要转写时，在“本地 Whisper”中点击“启用”，同意一次模型下载权限。
@@ -42,7 +42,7 @@ npm run build
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-0.1.0.zip
+unzip -t artifacts/video-notes-edge-0.1.2.zip
 ```
 
 网课声伴的协作测试位于 `/Users/psh/codes/browser_always_play/tests`，覆盖固定发送者校验、A/B 全暂停、全局暂停保护、心跳续租和超时恢复。

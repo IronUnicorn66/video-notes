@@ -20,6 +20,8 @@ let voiceStartPromise = null;
 let voiceStopPromise = null;
 let activeVoiceNote = null;
 let whisperRecoveryPromise = Promise.resolve();
+let microphonePermissionPagePromise = null;
+let microphonePermissionTabId = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -42,6 +44,39 @@ async function activeSupportedTab() {
 
 async function targetTab(sender) {
   return sender.tab?.id ? sender.tab : activeSupportedTab();
+}
+
+async function openMicrophonePermissionPage() {
+  if (!microphonePermissionPagePromise) {
+    microphonePermissionPagePromise = (async () => {
+      const url = chrome.runtime.getURL("microphone-permission.html");
+      if (microphonePermissionTabId !== null) {
+        try {
+          return await chrome.tabs.update(microphonePermissionTabId, { active: true });
+        } catch {
+          microphonePermissionTabId = null;
+        }
+      }
+      const [existing] = await chrome.runtime.getContexts({
+        contextTypes: ["TAB"],
+        documentUrls: [url],
+      });
+      if (existing?.tabId >= 0) {
+        microphonePermissionTabId = existing.tabId;
+        await chrome.tabs.update(existing.tabId, { active: true });
+        if (existing.windowId >= 0) {
+          await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
+        }
+        return { tabId: existing.tabId };
+      }
+      const tab = await chrome.tabs.create({ url, active: true });
+      microphonePermissionTabId = tab.id ?? null;
+      return tab;
+    })().finally(() => {
+      microphonePermissionPagePromise = null;
+    });
+  }
+  return microphonePermissionPagePromise;
 }
 
 async function sendToTab(tabId, message) {
@@ -337,11 +372,15 @@ async function startVoice(tab) {
 async function startVoiceUnlocked(tab) {
   cancelPendingVoice = false;
   const { microphoneReady = false } = await chrome.storage.local.get({ microphoneReady: false });
-  if (!microphoneReady) throw new Error("请先在侧栏的权限设置中授权麦克风");
+  if (!microphoneReady) {
+    await openMicrophonePermissionPage();
+    throw new Error("请在新页面完成麦克风授权");
+  }
   const microphonePermission = await sendToOffscreen({ type: "GET_MICROPHONE_PERMISSION" });
   if (!canUseMicrophone(microphoneReady, microphonePermission.state)) {
     await chrome.storage.local.set({ microphoneReady: false });
-    throw new Error("请先在侧栏的权限设置中授权麦克风");
+    await openMicrophonePermissionPage();
+    throw new Error("请在新页面完成麦克风授权");
   }
   const recording = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
   if (recording.recording) throw new Error("已有录音正在进行");
@@ -366,7 +405,8 @@ async function startVoiceUnlocked(tab) {
     void chrome.runtime.sendMessage({ type: "VOICE_STATE_CHANGED", recording: true, noteId: note.id }).catch(() => {});
     return { note, session };
   } catch (error) {
-    if (isMicrophonePermissionError(error)) {
+    const permissionError = isMicrophonePermissionError(error);
+    if (permissionError) {
       await chrome.storage.local.set({ microphoneReady: false });
     }
     const state = await sendToOffscreen({ type: "GET_RECORDING_STATE" }).catch(() => ({}));
@@ -374,6 +414,7 @@ async function startVoiceUnlocked(tab) {
     if (state.recording) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
     if (noteId) await cancelNote(noteId, preparedNote);
     activeVoiceNote = null;
+    if (permissionError) await openMicrophonePermissionPage().catch(() => {});
     throw new Error(friendlyMicrophoneError(error));
   }
 }
@@ -544,6 +585,8 @@ async function handleMessage(message, sender) {
       const tab = await targetTab(sender);
       return startVoice(tab);
     }
+    case "OPEN_MICROPHONE_PERMISSION_PAGE":
+      return openMicrophonePermissionPage();
     case "VOICE_STOP_REQUEST":
       return stopVoice(message.reason);
     case "CANCEL_PENDING_VOICE": {

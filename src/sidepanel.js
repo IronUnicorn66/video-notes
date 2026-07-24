@@ -1,9 +1,6 @@
 import { formatTimestamp } from "./core/note-format.js";
 import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
-import {
-  SCREENSHOT_ORIGINS,
-  friendlyMicrophoneError,
-} from "./core/media-permissions.js";
+import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -100,8 +97,8 @@ async function renderPermissionStatus({ expandIfNeeded = false } = {}) {
   elements.microphonePermissionDetail.textContent = microphone.ready
     ? "已授权。只在按住说话期间录音。"
     : microphone.state === "denied"
-      ? "权限已被拒绝，请在 Edge 的扩展权限中允许后重试。"
-      : "尚未授权。授权后才能使用按钮和页面快捷键录音。";
+      ? "权限已被拒绝，请打开授权页，在 Edge 地址栏权限设置中允许后重试。"
+      : "点击授权会打开独立页面，请在那里确认 Edge 的麦克风权限。";
   elements.microphonePermissionButton.textContent = microphone.ready ? "已授权" : "授权";
   elements.microphonePermissionButton.disabled = microphone.ready;
 
@@ -110,28 +107,8 @@ async function renderPermissionStatus({ expandIfNeeded = false } = {}) {
   }
 }
 
-async function grantMicrophonePermission() {
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error("当前 Edge 无法访问麦克风");
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
-    microphoneReady = true;
-    await chrome.storage.local.set({ microphoneReady: true });
-  } catch (error) {
-    microphoneReady = false;
-    await chrome.storage.local.set({ microphoneReady: false });
-    throw new Error(friendlyMicrophoneError(error));
-  } finally {
-    for (const track of stream?.getTracks() ?? []) track.stop();
-  }
-  await renderPermissionStatus();
+async function openMicrophonePermissionPage() {
+  await request({ type: "OPEN_MICROPHONE_PERMISSION_PAGE" });
 }
 
 function autoGrow() {
@@ -335,9 +312,9 @@ async function startVoice() {
   voiceStarting = true;
   try {
     if (!microphoneReady) {
-      await grantMicrophonePermission();
+      await openMicrophonePermissionPage();
       pendingVoiceStopReason = null;
-      showToast("麦克风已授权，请再次按住说话");
+      showToast("请在新页面完成麦克风授权");
       return;
     }
     await request({ type: "VOICE_START_REQUEST" });
@@ -349,7 +326,7 @@ async function startVoice() {
     }
   } catch (error) {
     pendingVoiceStopReason = null;
-    showToast(friendlyMicrophoneError(error));
+    showToast(error.message);
   } finally {
     voiceStarting = false;
   }
@@ -454,10 +431,10 @@ elements.screenshotPermissionButton.addEventListener("click", async () => {
 elements.microphonePermissionButton.addEventListener("click", async () => {
   elements.microphonePermissionButton.disabled = true;
   try {
-    await grantMicrophonePermission();
-    showToast("麦克风已授权");
+    await openMicrophonePermissionPage();
+    showToast("请在新页面完成麦克风授权");
   } catch (error) {
-    showToast(friendlyMicrophoneError(error));
+    showToast(error.message);
   } finally {
     await renderPermissionStatus();
   }

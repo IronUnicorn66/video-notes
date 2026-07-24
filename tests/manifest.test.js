@@ -84,10 +84,29 @@ test("侧栏提供可见的截图和麦克风授权入口", async () => {
   assert.match(html, /id="screenshot-permission-button"/);
   assert.match(html, /id="microphone-permission-button"/);
   assert.match(source, /chrome\.permissions\.request/);
-  assert.match(source, /navigator\.mediaDevices\.getUserMedia/);
 });
 
-test("页面快捷键在麦克风未初始化时给出可见提示", async () => {
+test("首次麦克风授权从普通扩展页发起", async () => {
+  const sidepanel = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
+  const permissionHtml = await readFile(
+    new URL("../src/microphone-permission.html", import.meta.url),
+    "utf8",
+  ).catch(() => "");
+  const permissionSource = await readFile(
+    new URL("../src/microphone-permission.js", import.meta.url),
+    "utf8",
+  ).catch(() => "");
+  const build = await readFile(new URL("../scripts/build-extension.mjs", import.meta.url), "utf8");
+
+  assert.doesNotMatch(sidepanel, /navigator\.mediaDevices\.getUserMedia/);
+  assert.doesNotMatch(sidepanel, /chrome\.tabs\.create/);
+  assert.match(sidepanel, /OPEN_MICROPHONE_PERMISSION_PAGE/);
+  assert.match(permissionHtml, /id="grant-microphone-button"/);
+  assert.match(permissionSource, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(build, /microphone-permission\.html/);
+});
+
+test("页面快捷键在麦克风未初始化时打开授权页并给出可见提示", async () => {
   const content = await readFile(new URL("../src/content.js", import.meta.url), "utf8");
   const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
   const offscreen = await readFile(new URL("../src/offscreen.js", import.meta.url), "utf8");
@@ -96,5 +115,26 @@ test("页面快捷键在麦克风未初始化时给出可见提示", async () =>
   assert.match(background, /microphoneReady/);
   assert.match(background, /GET_MICROPHONE_PERMISSION/);
   assert.match(offscreen, /navigator\.permissions\.query\(\{ name: "microphone" \}\)/);
-  assert.match(background, /请先在侧栏的权限设置中授权麦克风/);
+  assert.match(background, /openMicrophonePermissionPage/);
+  assert.match(background, /microphone-permission\.html/);
+  assert.match(background, /chrome\.runtime\.getContexts/);
+  assert.match(background, /chrome\.tabs\.update/);
+  assert.match(background, /请在新页面完成麦克风授权/);
+});
+
+test("录音启动权限失败时先释放资源再打开授权页", async () => {
+  const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
+  const catchStart = background.indexOf(
+    "const permissionError = isMicrophonePermissionError(error)",
+    background.indexOf("async function startVoiceUnlocked"),
+  );
+  const catchEnd = background.indexOf("async function stopVoice", catchStart);
+  const failureCleanup = background.slice(catchStart, catchEnd);
+
+  assert.ok(failureCleanup.indexOf("activeVoiceNote = null") >= 0);
+  assert.ok(
+    failureCleanup.indexOf("activeVoiceNote = null")
+      < failureCleanup.lastIndexOf("openMicrophonePermissionPage"),
+  );
+  assert.match(failureCleanup, /openMicrophonePermissionPage\(\)\.catch/);
 });
