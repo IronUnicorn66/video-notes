@@ -19,6 +19,13 @@ test("Manifest V3 权限保持在计划范围内", () => {
   assert.ok(manifest.content_security_policy.extension_pages.includes("wasm-unsafe-eval"));
 });
 
+test("Edge MV3 扩展页 CSP 只允许打包内 Worker", () => {
+  assert.equal(
+    manifest.content_security_policy.extension_pages,
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self'",
+  );
+});
+
 test("可执行入口全部来自扩展包", () => {
   const serialized = JSON.stringify({
     background: manifest.background.service_worker,
