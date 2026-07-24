@@ -5,9 +5,13 @@ import test from "node:test";
 const manifest = JSON.parse(
   await readFile(new URL("../manifest.json", import.meta.url), "utf8"),
 );
+const packageJson = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
 
 test("Manifest V3 权限保持在计划范围内", () => {
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.version, packageJson.version);
   assert.deepEqual(manifest.permissions, [
     "storage",
     "activeTab",
@@ -17,6 +21,11 @@ test("Manifest V3 权限保持在计划范围内", () => {
     "downloads",
   ]);
   assert.ok(manifest.content_security_policy.extension_pages.includes("wasm-unsafe-eval"));
+});
+
+test("播放器截图权限保持可选并由用户单独授权", () => {
+  assert.ok(manifest.optional_host_permissions.includes("<all_urls>"));
+  assert.ok(!manifest.host_permissions.includes("<all_urls>"));
 });
 
 test("Edge MV3 扩展页 CSP 只允许打包内 Worker", () => {
@@ -67,4 +76,25 @@ test("本地转写使用串行队列并恢复浏览器重启前的待办", async
   assert.match(offscreen, /transcriptionTail/);
   assert.match(background, /recoverTransientWhisperState/);
   assert.match(background, /listPendingTranscriptions/);
+});
+
+test("侧栏提供可见的截图和麦克风授权入口", async () => {
+  const html = await readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
+  assert.match(html, /id="screenshot-permission-button"/);
+  assert.match(html, /id="microphone-permission-button"/);
+  assert.match(source, /chrome\.permissions\.request/);
+  assert.match(source, /navigator\.mediaDevices\.getUserMedia/);
+});
+
+test("页面快捷键在麦克风未初始化时给出可见提示", async () => {
+  const content = await readFile(new URL("../src/content.js", import.meta.url), "utf8");
+  const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
+  const offscreen = await readFile(new URL("../src/offscreen.js", import.meta.url), "utf8");
+  assert.match(content, /showShortcutError\(error\.message\)/);
+  assert.match(content, /document\.fullscreenElement \?\? document\.documentElement/);
+  assert.match(background, /microphoneReady/);
+  assert.match(background, /GET_MICROPHONE_PERMISSION/);
+  assert.match(offscreen, /navigator\.permissions\.query\(\{ name: "microphone" \}\)/);
+  assert.match(background, /请先在侧栏的权限设置中授权麦克风/);
 });

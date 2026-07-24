@@ -1,5 +1,9 @@
 import { formatTimestamp } from "./core/note-format.js";
 import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
+import {
+  SCREENSHOT_ORIGINS,
+  friendlyMicrophoneError,
+} from "./core/media-permissions.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -15,6 +19,11 @@ const elements = {
   exportButton: document.querySelector("#export-button"),
   whisperButton: document.querySelector("#whisper-button"),
   whisperDetail: document.querySelector("#whisper-detail"),
+  settings: document.querySelector("#permission-settings"),
+  screenshotPermissionButton: document.querySelector("#screenshot-permission-button"),
+  screenshotPermissionDetail: document.querySelector("#screenshot-permission-detail"),
+  microphonePermissionButton: document.querySelector("#microphone-permission-button"),
+  microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
   keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
 };
@@ -33,6 +42,8 @@ let recordingTimeout = null;
 let toastTimeout = null;
 let editingNoteId = null;
 let refreshAfterEdit = false;
+let microphoneReady = false;
+let microphonePermissionStatus = null;
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -47,6 +58,80 @@ async function request(message) {
   const response = await chrome.runtime.sendMessage(message);
   if (!response?.ok) throw new Error(response?.error ?? "操作失败");
   return response;
+}
+
+async function readMicrophonePermission() {
+  const { microphoneReady: savedReady = false } = await chrome.storage.local.get({
+    microphoneReady: false,
+  });
+  try {
+    const status = await navigator.permissions.query({ name: "microphone" });
+    if (microphonePermissionStatus !== status) {
+      if (microphonePermissionStatus) microphonePermissionStatus.onchange = null;
+      microphonePermissionStatus = status;
+      microphonePermissionStatus.onchange = () => {
+        microphoneReady = microphonePermissionStatus.state === "granted";
+        void chrome.storage.local
+          .set({ microphoneReady })
+          .then(() => renderPermissionStatus());
+      };
+    }
+    const ready = status.state === "granted";
+    if (ready !== savedReady) await chrome.storage.local.set({ microphoneReady: ready });
+    return { ready, state: status.state };
+  } catch {
+    return { ready: savedReady, state: savedReady ? "granted" : "prompt" };
+  }
+}
+
+async function renderPermissionStatus({ expandIfNeeded = false } = {}) {
+  const [screenshotGranted, microphone] = await Promise.all([
+    chrome.permissions.contains({ origins: SCREENSHOT_ORIGINS }),
+    readMicrophonePermission(),
+  ]);
+  microphoneReady = microphone.ready;
+
+  elements.screenshotPermissionDetail.textContent = screenshotGranted
+    ? "已授权。只在 YouTube 和哔哩哔哩标记时截取可见播放器。"
+    : "Edge 截图接口需要一次额外授权；插件仍只在支持的视频页运行。";
+  elements.screenshotPermissionButton.textContent = screenshotGranted ? "已启用" : "启用";
+  elements.screenshotPermissionButton.disabled = screenshotGranted;
+
+  elements.microphonePermissionDetail.textContent = microphone.ready
+    ? "已授权。只在按住说话期间录音。"
+    : microphone.state === "denied"
+      ? "权限已被拒绝，请在 Edge 的扩展权限中允许后重试。"
+      : "尚未授权。授权后才能使用按钮和页面快捷键录音。";
+  elements.microphonePermissionButton.textContent = microphone.ready ? "已授权" : "授权";
+  elements.microphonePermissionButton.disabled = microphone.ready;
+
+  if (expandIfNeeded && (!screenshotGranted || !microphone.ready)) {
+    elements.settings.open = true;
+  }
+}
+
+async function grantMicrophonePermission() {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error("当前 Edge 无法访问麦克风");
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    microphoneReady = true;
+    await chrome.storage.local.set({ microphoneReady: true });
+  } catch (error) {
+    microphoneReady = false;
+    await chrome.storage.local.set({ microphoneReady: false });
+    throw new Error(friendlyMicrophoneError(error));
+  } finally {
+    for (const track of stream?.getTracks() ?? []) track.stop();
+  }
+  await renderPermissionStatus();
 }
 
 function autoGrow() {
@@ -249,6 +334,12 @@ async function startVoice() {
   if (recording || voiceStarting || !activeContext) return;
   voiceStarting = true;
   try {
+    if (!microphoneReady) {
+      await grantMicrophonePermission();
+      pendingVoiceStopReason = null;
+      showToast("麦克风已授权，请再次按住说话");
+      return;
+    }
     await request({ type: "VOICE_START_REQUEST" });
     setRecordingUi(true);
     if (pendingVoiceStopReason) {
@@ -257,7 +348,8 @@ async function startVoice() {
       await stopVoice(reason);
     }
   } catch (error) {
-    showToast(error.message);
+    pendingVoiceStopReason = null;
+    showToast(friendlyMicrophoneError(error));
   } finally {
     voiceStarting = false;
   }
@@ -346,6 +438,31 @@ elements.voiceButton.addEventListener("pointerup", (event) => {
 });
 elements.voiceButton.addEventListener("pointercancel", () => void stopVoice("pointer-cancel"));
 
+elements.screenshotPermissionButton.addEventListener("click", async () => {
+  elements.screenshotPermissionButton.disabled = true;
+  try {
+    const granted = await chrome.permissions.request({ origins: SCREENSHOT_ORIGINS });
+    if (!granted) throw new Error("截图授权已取消");
+    showToast("播放器截图已启用");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    await renderPermissionStatus();
+  }
+});
+
+elements.microphonePermissionButton.addEventListener("click", async () => {
+  elements.microphonePermissionButton.disabled = true;
+  try {
+    await grantMicrophonePermission();
+    showToast("麦克风已授权");
+  } catch (error) {
+    showToast(friendlyMicrophoneError(error));
+  } finally {
+    await renderPermissionStatus();
+  }
+});
+
 elements.exportButton.addEventListener("click", async () => {
   if (!activeContext) return;
   elements.exportButton.disabled = true;
@@ -419,6 +536,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.shortcutCode?.newValue) {
     elements.keyButton.textContent = shortcutLabel(changes.shortcutCode.newValue);
   }
+  if (area === "local" && changes.microphoneReady) {
+    microphoneReady = changes.microphoneReady.newValue === true;
+    void renderPermissionStatus();
+  }
 });
 
 window.addEventListener("pagehide", () => {
@@ -437,4 +558,8 @@ window.addEventListener("pagehide", () => {
 
 const { shortcutCode = "AltRight" } = await chrome.storage.local.get("shortcutCode");
 elements.keyButton.textContent = shortcutLabel(shortcutCode);
-await Promise.all([refresh(), renderWhisperStatus()]);
+await Promise.all([
+  refresh(),
+  renderWhisperStatus(),
+  renderPermissionStatus({ expandIfNeeded: true }),
+]);

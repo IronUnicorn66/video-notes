@@ -479,6 +479,14 @@ async function exportSession(sessionId) {
 
 async function handleMessage(message) {
   switch (message.type) {
+    case "GET_MICROPHONE_PERMISSION": {
+      try {
+        const status = await navigator.permissions.query({ name: "microphone" });
+        return { state: status.state };
+      } catch {
+        return { state: "unknown" };
+      }
+    }
     case "GET_RECORDING_STATE":
       return {
         recording: recorder?.state === "recording",

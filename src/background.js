@@ -5,6 +5,12 @@ import {
   noteHoldMessage,
 } from "./core/study-sound-protocol.js";
 import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
+import {
+  canUseMicrophone,
+  friendlyCaptureError,
+  friendlyMicrophoneError,
+  isMicrophonePermissionError,
+} from "./core/media-permissions.js";
 
 const repository = new VideoNotesRepository();
 const heartbeatTimers = new Map();
@@ -213,7 +219,7 @@ async function beginMarker(tab, inputType, { beforePause, onPrepared } = {}) {
     note.screenshotKey = `images/${markerId}`;
     await repository.putAsset(note.screenshotKey, screenshot);
   } catch (error) {
-    note.warnings.push(`截图失败：${error.message}`);
+    note.warnings.push(`截图失败：${friendlyCaptureError(error)}`);
   }
   await repository.putNote(note);
   await preparedTask;
@@ -330,6 +336,13 @@ async function startVoice(tab) {
 
 async function startVoiceUnlocked(tab) {
   cancelPendingVoice = false;
+  const { microphoneReady = false } = await chrome.storage.local.get({ microphoneReady: false });
+  if (!microphoneReady) throw new Error("请先在侧栏的权限设置中授权麦克风");
+  const microphonePermission = await sendToOffscreen({ type: "GET_MICROPHONE_PERMISSION" });
+  if (!canUseMicrophone(microphoneReady, microphonePermission.state)) {
+    await chrome.storage.local.set({ microphoneReady: false });
+    throw new Error("请先在侧栏的权限设置中授权麦克风");
+  }
   const recording = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
   if (recording.recording) throw new Error("已有录音正在进行");
   let preparedNote = null;
@@ -353,12 +366,15 @@ async function startVoiceUnlocked(tab) {
     void chrome.runtime.sendMessage({ type: "VOICE_STATE_CHANGED", recording: true, noteId: note.id }).catch(() => {});
     return { note, session };
   } catch (error) {
+    if (isMicrophonePermissionError(error)) {
+      await chrome.storage.local.set({ microphoneReady: false });
+    }
     const state = await sendToOffscreen({ type: "GET_RECORDING_STATE" }).catch(() => ({}));
     const noteId = state.noteId ?? preparedNote?.id;
     if (state.recording) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
     if (noteId) await cancelNote(noteId, preparedNote);
     activeVoiceNote = null;
-    throw error;
+    throw new Error(friendlyMicrophoneError(error));
   }
 }
 

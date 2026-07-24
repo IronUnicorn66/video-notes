@@ -48,9 +48,23 @@
         <p id="empty-notes" class="empty-state">这个视频还没有标记。</p>
       </section>
 
-      <details class="settings">
-        <summary>本地语音与快捷键</summary>
+      <details id="permission-settings" class="settings">
+        <summary>权限、语音与快捷键</summary>
         <div class="settings-content">
+          <div class="setting-row">
+            <div>
+              <strong>播放器截图</strong>
+              <p id="screenshot-permission-detail">正在检查权限…</p>
+            </div>
+            <button id="screenshot-permission-button" class="secondary-button" type="button">启用</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>麦克风</strong>
+              <p id="microphone-permission-detail">正在检查权限…</p>
+            </div>
+            <button id="microphone-permission-button" class="secondary-button" type="button">授权</button>
+          </div>
           <div class="setting-row">
             <div>
               <strong>本地 Whisper</strong>
@@ -65,7 +79,7 @@
             </div>
             <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
           </div>
-          <p class="privacy-note">录音、截图、笔记和转写都保存在本机。启用语音后只联网下载模型。</p>
+          <p class="privacy-note">录音、截图、笔记和转写都保存在本机。截图权限只用于 YouTube 和哔哩哔哩播放器；启用语音后只联网下载模型。</p>
         </div>
       </details>
 
@@ -74,4 +88,3 @@
     <script type="module" src="sidepanel.js"></script>
   </body>
 </html>
-

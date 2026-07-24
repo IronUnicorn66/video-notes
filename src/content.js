@@ -10,6 +10,8 @@ let activeLeaseTimer = null;
 let expectedPlaybackEvent = null;
 let currentUrl = location.href;
 let recordingOverlay = null;
+let shortcutError = null;
+let shortcutErrorTimer = null;
 let shortcutCode = "AltRight";
 
 function videoTitle(platform) {
@@ -179,7 +181,7 @@ function showRecordingOverlay() {
     font: "600 13px -apple-system, BlinkMacSystemFont, sans-serif",
     pointerEvents: "none",
   });
-  document.documentElement.append(recordingOverlay);
+  (document.fullscreenElement ?? document.documentElement).append(recordingOverlay);
 }
 
 function hideRecordingOverlay() {
@@ -187,9 +189,39 @@ function hideRecordingOverlay() {
   recordingOverlay = null;
 }
 
+function hideShortcutError() {
+  clearTimeout(shortcutErrorTimer);
+  shortcutError?.remove();
+  shortcutError = null;
+}
+
+function showShortcutError(message) {
+  hideShortcutError();
+  shortcutError = document.createElement("div");
+  shortcutError.setAttribute("role", "status");
+  shortcutError.textContent = `视频笔记：${message}`;
+  Object.assign(shortcutError.style, {
+    position: "fixed",
+    right: "18px",
+    bottom: "18px",
+    zIndex: "2147483647",
+    maxWidth: "360px",
+    padding: "10px 13px",
+    borderRadius: "10px",
+    color: "#fff",
+    background: "rgba(36, 42, 39, .94)",
+    boxShadow: "0 8px 28px rgba(0, 0, 0, .24)",
+    font: "500 13px/1.45 -apple-system, BlinkMacSystemFont, sans-serif",
+    pointerEvents: "none",
+  });
+  (document.fullscreenElement ?? document.documentElement).append(shortcutError);
+  shortcutErrorTimer = setTimeout(hideShortcutError, 4200);
+}
+
 const pushToTalk = new PushToTalkController({
   keyCode: shortcutCode,
   onStart: async () => {
+    hideShortcutError();
     const response = await chrome.runtime.sendMessage({ type: "VOICE_START_REQUEST" });
     if (!response?.ok) throw new Error(response?.error ?? "录音启动失败");
     if (response.canceled) throw new Error("录音已取消");
@@ -211,6 +243,7 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   void pushToTalk.keyDown(event).catch((error) => {
     hideRecordingOverlay();
+    showShortcutError(error.message);
     console.warn("视频笔记录音启动失败", error);
   });
 }, true);

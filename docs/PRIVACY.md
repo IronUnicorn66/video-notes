@@ -9,10 +9,11 @@
 ## 权限用途
 
 - `storage`：保存快捷键、Whisper 状态和一次性联动提示状态。
-- `activeTab`、站点权限：读取当前 YouTube/哔哩哔哩视频状态并截取当前可见播放器。
+- `activeTab`、站点权限：读取当前 YouTube/哔哩哔哩视频状态。
+- 可选 `<all_urls>` 权限：Edge 的可见页面截图接口需要此权限或一次临时 `activeTab` 授权。用户在侧栏单独启用后，插件只会在受支持的 YouTube 和哔哩哔哩视频页截取当前可见播放器。
 - `scripting`：为受支持页面建立内容脚本连接。
 - `sidePanel`：提供持续可见的笔记输入和时间线。
-- `offscreen`：在隐藏扩展页面中取得麦克风、运行本地 WASM/Worker、生成下载 Blob。
+- `offscreen`：在用户已从可见侧栏授权麦克风后，由隐藏扩展页面持续录音、运行本地 WASM/Worker、生成下载 Blob。
 - `downloads`：保存用户主动导出的 ZIP。
 - 可选模型主机权限：只用于用户主动发起的模型下载，缓存成功后撤销。
 
