@@ -5,6 +5,7 @@ import {
   noteHoldMessage,
 } from "./core/study-sound-protocol.js";
 import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
+import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
   canUseMicrophone,
   friendlyCaptureError,
@@ -13,6 +14,11 @@ import {
 } from "./core/media-permissions.js";
 
 const repository = new VideoNotesRepository();
+const microphoneNavigation = createMicrophoneNavigation({
+  storageSession: chrome.storage.session,
+  tabs: chrome.tabs,
+  windows: chrome.windows,
+});
 const heartbeatTimers = new Map();
 let cancelPendingVoice = false;
 let offscreenCreationPromise = null;
@@ -46,7 +52,8 @@ async function targetTab(sender) {
   return sender.tab?.id ? sender.tab : activeSupportedTab();
 }
 
-async function openMicrophonePermissionPage() {
+async function openMicrophonePermissionPage(returnTab) {
+  await microphoneNavigation.rememberSource(returnTab);
   if (!microphonePermissionPagePromise) {
     microphonePermissionPagePromise = (async () => {
       const url = chrome.runtime.getURL("microphone-permission.html");
@@ -373,13 +380,13 @@ async function startVoiceUnlocked(tab) {
   cancelPendingVoice = false;
   const { microphoneReady = false } = await chrome.storage.local.get({ microphoneReady: false });
   if (!microphoneReady) {
-    await openMicrophonePermissionPage();
+    await openMicrophonePermissionPage(tab);
     throw new Error("请在新页面完成麦克风授权");
   }
   const microphonePermission = await sendToOffscreen({ type: "GET_MICROPHONE_PERMISSION" });
   if (!canUseMicrophone(microphoneReady, microphonePermission.state)) {
     await chrome.storage.local.set({ microphoneReady: false });
-    await openMicrophonePermissionPage();
+    await openMicrophonePermissionPage(tab);
     throw new Error("请在新页面完成麦克风授权");
   }
   const recording = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
@@ -414,7 +421,7 @@ async function startVoiceUnlocked(tab) {
     if (state.recording) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
     if (noteId) await cancelNote(noteId, preparedNote);
     activeVoiceNote = null;
-    if (permissionError) await openMicrophonePermissionPage().catch(() => {});
+    if (permissionError) await openMicrophonePermissionPage(tab).catch(() => {});
     throw new Error(friendlyMicrophoneError(error));
   }
 }
@@ -585,8 +592,15 @@ async function handleMessage(message, sender) {
       const tab = await targetTab(sender);
       return startVoice(tab);
     }
-    case "OPEN_MICROPHONE_PERMISSION_PAGE":
-      return openMicrophonePermissionPage();
+    case "OPEN_MICROPHONE_PERMISSION_PAGE": {
+      const tab = await targetTab(sender);
+      return openMicrophonePermissionPage(tab);
+    }
+    case "MICROPHONE_PERMISSION_GRANTED":
+      if (sender.url !== chrome.runtime.getURL("microphone-permission.html")) {
+        throw new Error("麦克风授权完成消息来源无效");
+      }
+      return microphoneNavigation.returnToSource();
     case "VOICE_STOP_REQUEST":
       return stopVoice(message.reason);
     case "CANCEL_PENDING_VOICE": {

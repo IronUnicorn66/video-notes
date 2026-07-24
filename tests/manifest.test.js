@@ -136,5 +136,30 @@ test("录音启动权限失败时先释放资源再打开授权页", async () =>
     failureCleanup.indexOf("activeVoiceNote = null")
       < failureCleanup.lastIndexOf("openMicrophonePermissionPage"),
   );
-  assert.match(failureCleanup, /openMicrophonePermissionPage\(\)\.catch/);
+  assert.match(failureCleanup, /openMicrophonePermissionPage\(tab\)\.catch/);
+});
+
+test("麦克风授权成功后返回发起授权的网课标签", async () => {
+  const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
+  const permissionSource = await readFile(
+    new URL("../src/microphone-permission.js", import.meta.url),
+    "utf8",
+  );
+  const navigation = await readFile(
+    new URL("../src/core/microphone-navigation.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(background, /createMicrophoneNavigation/);
+  assert.match(background, /storageSession: chrome\.storage\.session/);
+  assert.match(background, /microphoneNavigation\.rememberSource\(returnTab\)/);
+  assert.match(background, /MICROPHONE_PERMISSION_GRANTED/);
+  assert.match(background, /microphoneNavigation\.returnToSource\(\)/);
+  assert.match(navigation, /tabs\.update\(returnTabId, \{ active: true \}\)/);
+  assert.match(navigation, /windows\.update\(tab\.windowId, \{ focused: true \}\)/);
+  assert.match(permissionSource, /MICROPHONE_PERMISSION_GRANTED/);
+  assert.ok(
+    permissionSource.indexOf("MICROPHONE_PERMISSION_GRANTED")
+      < permissionSource.lastIndexOf("closePermissionTab"),
+  );
 });

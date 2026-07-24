@@ -20,6 +20,18 @@ async function closePermissionTab() {
   if (tab?.id) await chrome.tabs.remove(tab.id);
 }
 
+async function returnToSourceTab() {
+  const response = await chrome.runtime.sendMessage({ type: "MICROPHONE_PERMISSION_GRANTED" });
+  if (!response?.ok) throw new Error(response?.error ?? "无法返回原视频页面");
+  if (!response.returned) {
+    setStatus("麦克风已授权，但原视频页面已经关闭，请手动返回课程页面。", { error: true });
+    return false;
+  }
+  setStatus("授权成功，正在返回视频页面…");
+  setTimeout(() => void closePermissionTab(), 700);
+  return true;
+}
+
 async function readPermission() {
   try {
     const permission = await navigator.permissions.query({ name: "microphone" });
@@ -27,7 +39,7 @@ async function readPermission() {
       await saveReady(true);
       button.disabled = true;
       button.textContent = "已授权";
-      setStatus("麦克风已经授权，可以关闭本页并开始录音。");
+      await returnToSourceTab();
     } else if (permission.state === "denied") {
       await saveReady(false, "麦克风权限已被拒绝");
       setStatus("Edge 已拒绝麦克风权限，请在地址栏权限设置中改为允许后重试。", {
@@ -49,8 +61,7 @@ button.addEventListener("click", async () => {
     );
     await saveReady(true);
     button.textContent = "授权成功";
-    setStatus("授权成功，正在返回视频页面…");
-    setTimeout(() => void closePermissionTab(), 700);
+    await returnToSourceTab();
   } catch (error) {
     const message = String(error?.message ?? error ?? "授权失败");
     await saveReady(false, message);
