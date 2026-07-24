@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>视频笔记</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="video-header">
+        <div class="eyebrow">当前视频</div>
+        <h1 id="video-title">等待打开视频…</h1>
+        <a id="video-url" class="video-url" href="#" target="_blank" hidden>打开原视频</a>
+      </header>
+
+      <section class="composer" aria-labelledby="composer-title">
+        <div class="section-row">
+          <h2 id="composer-title">快速标记</h2>
+          <span id="marker-time" class="time-chip" hidden></span>
+        </div>
+        <textarea
+          id="note-input"
+          rows="3"
+          placeholder="点这里即暂停视频。输入后移开光标自动保存…"
+          disabled
+        ></textarea>
+        <div class="composer-hint">
+          <span>⌘/Ctrl + Enter 保存 · Esc 取消</span>
+          <button id="voice-button" class="voice-button" type="button" disabled>
+            <span class="voice-dot"></span>
+            <span id="voice-button-label">按住说话</span>
+          </button>
+        </div>
+        <div id="recording-status" class="recording-status" hidden>
+          <span class="recording-pulse"></span>
+          <span>录音中</span>
+          <span id="recording-timer">00:00</span>
+        </div>
+      </section>
+
+      <section class="timeline" aria-labelledby="timeline-title">
+        <div class="section-row">
+          <h2 id="timeline-title">标记时间线</h2>
+          <button id="export-button" class="secondary-button" type="button" disabled>导出 ZIP</button>
+        </div>
+        <ol id="note-list" class="note-list"></ol>
+        <p id="empty-notes" class="empty-state">这个视频还没有标记。</p>
+      </section>
+
+      <details class="settings">
+        <summary>本地语音与快捷键</summary>
+        <div class="settings-content">
+          <div class="setting-row">
+            <div>
+              <strong>本地 Whisper</strong>
+              <p id="whisper-detail">尚未启用。首次下载约 57 MiB。</p>
+            </div>
+            <button id="whisper-button" class="secondary-button" type="button">启用</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>按住说话键</strong>
+              <p>仅在视频页面且光标不在输入控件中生效。</p>
+            </div>
+            <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
+          </div>
+          <p class="privacy-note">录音、截图、笔记和转写都保存在本机。启用语音后只联网下载模型。</p>
+        </div>
+      </details>
+
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </main>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
+

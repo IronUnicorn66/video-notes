@@ -1,0 +1,313 @@
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2530;
+  background: #f5f3ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+textarea:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 18px 16px 28px;
+}
+
+.video-header {
+  padding: 4px 2px 16px;
+}
+
+.eyebrow {
+  color: #737065;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 7px 0 6px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.video-url {
+  color: #476357;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.composer,
+.timeline,
+.settings {
+  border: 1px solid #dedbd2;
+  border-radius: 14px;
+  background: #fffdf8;
+  box-shadow: 0 7px 24px rgba(44, 40, 32, 0.055);
+}
+
+.composer,
+.timeline {
+  padding: 14px;
+}
+
+.timeline,
+.settings {
+  margin-top: 12px;
+}
+
+.section-row,
+.composer-hint,
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.time-chip {
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #476357;
+  background: #e8f0eb;
+  font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  max-height: 260px;
+  margin-top: 11px;
+  padding: 11px 12px;
+  resize: none;
+  overflow-y: auto;
+  border: 1px solid #d5d1c7;
+  border-radius: 10px;
+  outline: 0;
+  color: #20262f;
+  background: #fff;
+  line-height: 1.5;
+}
+
+textarea:focus {
+  border-color: #607c6f;
+  box-shadow: 0 0 0 3px rgba(96, 124, 111, 0.15);
+}
+
+.composer-hint {
+  margin-top: 9px;
+  color: #858174;
+  font-size: 11px;
+}
+
+.voice-button,
+.secondary-button,
+.key-button {
+  border: 1px solid #cfcabe;
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: #34463e;
+  background: #f8f7f2;
+}
+
+.voice-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  user-select: none;
+  touch-action: none;
+}
+
+.voice-button.is-recording {
+  color: #8b2929;
+  border-color: #d8a9a2;
+  background: #fff1ef;
+}
+
+.voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.recording-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #8b2929;
+  background: #fff1ef;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.recording-status[hidden] {
+  display: none;
+}
+
+.recording-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c3453a;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.35; }
+}
+
+.note-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-card {
+  padding: 11px 0;
+  border-top: 1px solid #ebe7de;
+}
+
+.note-card:first-child {
+  border-top: 0;
+}
+
+.note-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.note-time {
+  color: #476357;
+  font: 650 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-decoration: none;
+}
+
+.note-kind {
+  color: #8a8578;
+  font-size: 11px;
+}
+
+.note-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-edit-button {
+  border: 0;
+  padding: 2px 0;
+  color: #607c6f;
+  background: transparent;
+  font-size: 11px;
+}
+
+.note-body {
+  margin: 7px 0 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.note-body.is-editing {
+  min-height: 54px;
+  border: 1px solid #607c6f;
+  border-radius: 8px;
+  padding: 7px 8px;
+  outline: 0;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(96, 124, 111, 0.12);
+}
+
+.note-pending {
+  color: #8a6829;
+  font-size: 11px;
+}
+
+.empty-state {
+  margin: 18px 0 6px;
+  color: #918c80;
+  text-align: center;
+  font-size: 12px;
+}
+
+.settings summary {
+  padding: 13px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.settings-content {
+  padding: 0 14px 14px;
+}
+
+.setting-row {
+  align-items: flex-start;
+  padding: 11px 0;
+  border-top: 1px solid #ebe7de;
+}
+
+.setting-row p,
+.privacy-note {
+  margin: 4px 0 0;
+  color: #858174;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.key-button {
+  flex: 0 0 auto;
+  font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.key-button.is-listening {
+  border-color: #607c6f;
+  box-shadow: 0 0 0 3px rgba(96, 124, 111, 0.15);
+}
+
+.toast {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  z-index: 10;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #fff;
+  background: rgba(36, 42, 39, 0.94);
+  font-size: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}

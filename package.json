@@ -1,0 +1,23 @@
+{
+  "name": "video-notes-edge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-extension.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "package": "node scripts/package-extension.mjs"
+  },
+  "dependencies": {
+    "@transcribe/shout": "1.0.7",
+    "@transcribe/transcriber": "3.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.6",
+    "fake-indexeddb": "6.0.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
