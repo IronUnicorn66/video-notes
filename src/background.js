@@ -22,7 +22,7 @@ import {
   friendlyMicrophoneError,
   isMicrophonePermissionError,
 } from "./core/media-permissions.js";
-import { sidePanelOptionsForTab } from "./core/sidepanel-scope.js";
+import { contextChangedSenderTab, sidePanelOptionsForTab } from "./core/sidepanel-scope.js";
 
 const repository = new VideoNotesRepository();
 const microphoneNavigation = createMicrophoneNavigation({
@@ -878,11 +878,16 @@ async function handleMessage(message, sender) {
       return { code: message.code };
     case "EXPORT_SESSION":
       return sendToOffscreen({ type: "EXPORT_SESSION", sessionId: message.sessionId });
-    case "CONTEXT_CHANGED":
-      if (sender.tab) await configureSidePanelForTab(sender.tab);
-      else console.warn("视频上下文变化缺少发送标签页");
+    case "CONTEXT_CHANGED": {
+      const tab = contextChangedSenderTab(sender);
+      if (!tab) {
+        console.warn("视频上下文变化缺少有效发送标签页");
+        return {};
+      }
+      await configureSidePanelForTab(tab);
       notifyActiveContextChanged();
       return {};
+    }
     default:
       return undefined;
   }

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { sidePanelOptionsForTab } from "../src/core/sidepanel-scope.js";
+import {
+  contextChangedSenderTab,
+  sidePanelOptionsForTab,
+} from "../src/core/sidepanel-scope.js";
 
 test("YouTube 和哔哩哔哩视频标签启用侧栏", () => {
   assert.deepEqual(sidePanelOptionsForTab({ id: 7, url: "https://www.youtube.com/watch?v=abc123" }), {
@@ -26,4 +29,21 @@ test("普通网页和无 URL 标签禁用侧栏", () => {
 
 test("没有数字 tabId 时拒绝配置", () => {
   assert.throws(() => sidePanelOptionsForTab({ url: "https://example.com/" }), /tabId/);
+});
+
+test("视频内容脚本发送者提供有效标签页", () => {
+  const tab = {
+    id: 11,
+    url: "https://www.youtube.com/watch?v=course-a",
+  };
+
+  assert.equal(contextChangedSenderTab({ tab, url: tab.url }), tab);
+});
+
+test("扩展页发送者没有有效标签页时不触发上下文刷新", () => {
+  assert.equal(
+    contextChangedSenderTab({ url: "chrome-extension://extension-id/sidepanel.html" }),
+    null,
+  );
+  assert.equal(contextChangedSenderTab({ tab: { id: "11" } }), null);
 });
