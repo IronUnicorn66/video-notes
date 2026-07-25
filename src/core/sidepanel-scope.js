@@ -13,11 +13,17 @@ export function sidePanelTabIdForSender(sender, contexts) {
   return context?.tabId ?? null;
 }
 
-export function createSidePanelRefreshController(refresh, { shouldDeferRefresh = () => false } = {}) {
+export function createSidePanelRefreshController(refresh, {
+  onContextEvent = () => {},
+  shouldRefresh = () => true,
+  shouldDeferRefresh = () => false,
+} = {}) {
   let tabId = null;
   let deferredMessage = null;
 
   function refreshOrDefer(message) {
+    onContextEvent(message);
+    if (!shouldRefresh(message)) return false;
     if (shouldDeferRefresh(message)) {
       deferredMessage = message;
       return false;

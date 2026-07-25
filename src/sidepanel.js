@@ -60,16 +60,17 @@ let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
 
-const sidePanelRefresh = createSidePanelRefreshController((message) => {
-  if (message.type === "VOICE_STATE_CHANGED") {
-    setRecordingUi(message.recording);
-    if (!message.recording) void refresh();
-    return;
-  }
+const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refresh();
 }, {
+  onContextEvent(message) {
+    if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
+  },
+  shouldRefresh(message) {
+    return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
+  },
   shouldDeferRefresh(message) {
-    if (message.type === "VOICE_STATE_CHANGED" || !editingNoteId) return false;
+    if (!editingNoteId) return false;
     refreshAfterEdit = true;
     return true;
   },

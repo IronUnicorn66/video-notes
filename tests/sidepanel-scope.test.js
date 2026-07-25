@@ -97,6 +97,41 @@ test("编辑中重新可见延后刷新，并在编辑完成后只刷新一次",
   assert.equal(refreshes, 2);
 });
 
+test("编辑中录音结束只延后列表刷新，录音 UI 仍立即更新", () => {
+  let editing = true;
+  let refreshes = 0;
+  let voiceUiEffects = 0;
+  const panel = createSidePanelRefreshController(
+    () => { refreshes += 1; },
+    {
+      onContextEvent(message) {
+        if (message.type === "VOICE_STATE_CHANGED") voiceUiEffects += 1;
+      },
+      shouldRefresh: (message) => (
+        message.type !== "VOICE_STATE_CHANGED" || message.recording === false
+      ),
+      shouldDeferRefresh: () => editing,
+    },
+  );
+  panel.setTabId(1);
+
+  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: true });
+  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: false });
+  panel.handleVisibilityChange(true);
+  panel.handleContextChanged({ type: "NOTE_TRANSCRIBED", tabId: 1 });
+  assert.equal(voiceUiEffects, 2);
+  assert.equal(refreshes, 0);
+
+  editing = false;
+  assert.equal(panel.flushDeferredRefresh(), true);
+  assert.equal(refreshes, 1);
+  assert.equal(panel.flushDeferredRefresh(), false);
+
+  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: false });
+  assert.equal(voiceUiEffects, 3);
+  assert.equal(refreshes, 2);
+});
+
 test("侧栏通过自身文档标识解析所属标签页", () => {
   assert.equal(
     sidePanelTabIdForSender(
