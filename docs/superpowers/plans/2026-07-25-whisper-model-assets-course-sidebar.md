@@ -524,6 +524,20 @@ test("用户编辑后的重复转写只更新候选和历史", () => {
   assert.equal(note.transcriptionRuns.length, 2);
   assert.equal(note.transcriptionRuns[1].modelId, "small-q5_1");
 });
+
+test("用户未编辑时用最新转写更新正文", () => {
+  const note = applyTranscript(
+    {
+      body: "第一版",
+      userEditVersion: 0,
+      transcriptionRuns: [{ modelId: "base-q5_1", text: "第一版", source: "automatic", createdAt: 100 }],
+    },
+    "第二版",
+    { modelId: "small-q5_1", source: "manual", createdAt: 200 },
+  );
+  assert.equal(note.body, "第二版");
+  assert.equal(note.transcriptCandidate, "");
+});
 ```
 
 再给 `tests/note-format.test.js` 增加导出断言：个人正文出现在模型对比之前，每次转写都标注模型，结果放入可折叠 `<details>` 区域。
@@ -551,8 +565,9 @@ export function applyTranscript(note, transcript, {
     transcriptionStatus: "complete",
     transcriptionModelId: modelId,
     transcriptionRuns: [...(note.transcriptionRuns ?? []), run],
+    pendingTranscription: null,
   };
-  if ((note.userEditVersion ?? 0) === 0 && !note.body?.trim()) {
+  if ((note.userEditVersion ?? 0) === 0) {
     return { ...next, body: text, transcriptCandidate: "" };
   }
   return { ...next, transcriptCandidate: text };
@@ -565,10 +580,11 @@ export function applyTranscript(note, transcript, {
 {
   transcriptionModelId: "",
   transcriptionRuns: [],
+  pendingTranscription: null,
 }
 ```
 
-读取旧笔记时允许字段缺失，通过 `?? []` 和 `?? ""` 兼容，不执行一次性 IndexedDB 批量迁移。
+读取旧笔记时允许字段缺失，通过 `?? []`、`?? ""` 和 `?? null` 兼容，不执行一次性 IndexedDB 批量迁移。
 
 - [ ] **Step 4: 让每个任务固定模型 ID**
 
@@ -586,9 +602,9 @@ async function enqueueTranscription(noteId, modelId, source) {
 }
 ```
 
-初次录音停止时读取当时的 `whisperSelectedModel`，用 `source: "automatic"` 入队。侧栏发 `RETRANSCRIBE_NOTE` 时，后台验证笔记是语音笔记且存在 `audioKey`，再用当前模型和 `source: "manual"` 入队。入队前把目标 `modelId` 写入笔记的 `transcriptionModelId` 并将状态置为 `pending`，确保服务工作线程重启后仍能恢复正确模型。隐藏页的队列项保存 `{ noteId, modelId, source }`，不得在实际执行时重新读取当前选择。
+初次录音停止时读取当时的 `whisperSelectedModel`，用 `source: "automatic"` 入队。侧栏发 `RETRANSCRIBE_NOTE` 时，后台验证笔记是语音笔记且存在 `audioKey`，再用当前模型和 `source: "manual"` 入队。入队前写入 `pendingTranscription: { modelId, source, queuedAt }` 并将状态置为 `pending`，确保服务工作线程重启后仍能恢复正确模型，同时让 `transcriptionModelId` 始终表示最后一次成功结果。隐藏页的队列项保存 `{ noteId, modelId, source }`，不得在实际执行时重新读取当前选择。
 
-恢复未完成任务时使用笔记的 `transcriptionModelId`；旧笔记缺失该字段时回退到当前选择，并立刻写回笔记。恢复来源根据历史推断：没有成功记录时为 `automatic`，已有记录时为 `manual`。
+恢复未完成任务时优先使用笔记的 `pendingTranscription`；旧笔记缺失该字段时回退到当前选择，来源根据历史推断为 `automatic` 或 `manual`，并立刻写回笔记。转写成功时清空待办字段；失败时同样清空待办并保留最后一次成功模型、正文和历史。
 
 - [ ] **Step 5: 在侧栏提供重新转写和结果对比**
 
