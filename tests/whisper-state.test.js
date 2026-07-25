@@ -5,6 +5,7 @@ import {
   assertModelSwitchAllowed,
   applyTranscript,
   canTranscribeWithWhisper,
+  createNoteTaskCoordinator,
   isWhisperModelSwitchBlocked,
   transitionWhisperState,
 } from "../src/core/whisper-state.js";
@@ -90,6 +91,34 @@ test("用户未编辑时用最新转写更新正文", () => {
   );
   assert.equal(note.body, "第二版");
   assert.equal(note.transcriptCandidate, "");
+});
+
+test("同一标记的重转写请求串行检查待办状态", async () => {
+  const coordinate = createNoteTaskCoordinator();
+  let pending = false;
+  let releaseFirst;
+  const firstStarted = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  let firstEntered;
+  const entered = new Promise((resolve) => {
+    firstEntered = resolve;
+  });
+
+  const first = coordinate("note-1", async () => {
+    assert.equal(pending, false);
+    pending = true;
+    firstEntered();
+    await firstStarted;
+  });
+  await entered;
+  const second = coordinate("note-1", async () => {
+    if (pending) throw new Error("该标记正在转写");
+  });
+
+  releaseFirst();
+  await first;
+  await assert.rejects(second, /正在转写/);
 });
 
 test("未启用时即使内置 Base 已缓存也不转写", () => {

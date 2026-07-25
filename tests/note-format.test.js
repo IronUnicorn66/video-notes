@@ -48,6 +48,44 @@ test("Markdown 以个人内容优先并使用相对资产链接", () => {
   assert.match(markdown, /<details>\n<summary>本地转写结果（2 个模型）<\/summary>/);
   assert.match(markdown, /- Base · 57 MiB：第一版文本/);
   assert.match(markdown, /- Small · 181 MiB：第二版文本/);
+  assert.doesNotMatch(markdown, /语音转写候选/);
+  assert.doesNotMatch(markdown, /候选文本/);
+});
+
+test("旧版候选转写在没有历史时仍会导出", () => {
+  const markdown = buildMarkdown(
+    { title: "课程", canonicalUrl: "https://example.com", platform: "youtube" },
+    [{
+      seconds: 1,
+      jumpUrl: "https://example.com?t=1",
+      body: "我的笔记",
+      transcriptCandidate: "旧版候选文本",
+      warnings: [],
+    }],
+  );
+
+  assert.match(markdown, /<summary>语音转写候选<\/summary>/);
+  assert.match(markdown, /旧版候选文本/);
+});
+
+test("转写历史的多行文本不会破坏 details 结构", () => {
+  const markdown = buildMarkdown(
+    { title: "课程", canonicalUrl: "https://example.com", platform: "youtube" },
+    [{
+      seconds: 1,
+      jumpUrl: "https://example.com?t=1",
+      transcriptionRuns: [{
+        modelId: "base-q5_1",
+        text: "第一行\n- 列表项\n</details>\n最后一行",
+        source: "automatic",
+        createdAt: 100,
+      }],
+      warnings: [],
+    }],
+  );
+
+  assert.match(markdown, /- Base · 57 MiB：第一行\n  - 列表项\n  &lt;\/details&gt;\n  最后一行/);
+  assert.equal((markdown.match(/<\/details>/g) ?? []).length, 1);
 });
 
 test("缺失资产时省略对应块并保留告警", () => {

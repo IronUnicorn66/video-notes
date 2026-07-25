@@ -42,6 +42,18 @@ function whisperModelLabel(modelId) {
   }
 }
 
+function escapeTranscriptText(value) {
+  return String(value ?? "")
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatTranscriptListItem(value) {
+  return escapeTranscriptText(value).replace(/\n/g, "\n  ");
+}
+
 export function buildMarkdown(session, entries) {
   const lines = [
     `# ${escapeHeading(session.title)}`,
@@ -70,9 +82,19 @@ export function buildMarkdown(session, entries) {
         "",
       );
       for (const run of transcriptionRuns) {
-        lines.push(`- ${whisperModelLabel(run.modelId)}：${String(run.text ?? "").trim()}`);
+        lines.push(`- ${whisperModelLabel(run.modelId)}：${formatTranscriptListItem(run.text)}`);
       }
       lines.push("", "</details>", "");
+    } else if (entry.transcriptCandidate?.trim()) {
+      lines.push(
+        "<details>",
+        "<summary>语音转写候选</summary>",
+        "",
+        escapeTranscriptText(entry.transcriptCandidate),
+        "",
+        "</details>",
+        "",
+      );
     }
     for (const warning of entry.warnings ?? []) {
       lines.push(`> ⚠ ${warning}`, "");

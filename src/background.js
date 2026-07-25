@@ -10,7 +10,10 @@ import {
   WHISPER_ORIGINS,
   getWhisperModel,
 } from "./core/model-config.js";
-import { assertModelSwitchAllowed } from "./core/whisper-state.js";
+import {
+  assertModelSwitchAllowed,
+  createNoteTaskCoordinator,
+} from "./core/whisper-state.js";
 import { createWhisperOperationLock } from "./core/whisper-operation.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
@@ -36,6 +39,7 @@ let whisperRecoveryPromise = Promise.resolve();
 let microphonePermissionPagePromise = null;
 let microphonePermissionTabId = null;
 const whisperModelOperationLock = createWhisperOperationLock();
+const coordinateNoteTranscription = createNoteTaskCoordinator();
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -728,32 +732,37 @@ async function handleMessage(message, sender) {
       return stopVoice("timeout");
     case "RETRANSCRIBE_NOTE": {
       await whisperRecoveryPromise;
-      const note = await repository.getNote(message.noteId);
-      if (note?.inputType !== "voice" || !note.audioKey) {
-        throw new Error("该标记没有可重新转写的原始录音");
-      }
-      const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
-      if (
-        processing.downloading
-        || processing.recording
-        || processing.starting
-        || processing.stopping
-        || processing.transcriptionNoteIds.length > 0
-      ) {
-        throw new Error("请等待当前语音任务结束后再重新转写");
-      }
-      const [settings, cacheStatus] = await Promise.all([
-        chrome.storage.local.get({ whisperSelectedModel: "" }),
-        sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
-      ]);
-      const modelId = getWhisperModel(
-        settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
-      ).id;
-      if (!cacheStatus.cachedModelIds.includes(modelId)) {
-        throw new Error("当前模型尚未缓存，请先下载并启用");
-      }
-      await queueTranscription(note.id, modelId, "manual");
-      return {};
+      return coordinateNoteTranscription(message.noteId, async () => {
+        const note = await repository.getNote(message.noteId);
+        if (note?.inputType !== "voice" || !note.audioKey) {
+          throw new Error("该标记没有可重新转写的原始录音");
+        }
+        if (note.pendingTranscription || ["pending", "transcribing"].includes(note.transcriptionStatus)) {
+          throw new Error("该标记正在转写，请等待完成后再试");
+        }
+        const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
+        if (
+          processing.downloading
+          || processing.recording
+          || processing.starting
+          || processing.stopping
+          || processing.transcriptionNoteIds.length > 0
+        ) {
+          throw new Error("请等待当前语音任务结束后再重新转写");
+        }
+        const [settings, cacheStatus] = await Promise.all([
+          chrome.storage.local.get({ whisperSelectedModel: "" }),
+          sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
+        ]);
+        const modelId = getWhisperModel(
+          settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
+        ).id;
+        if (!cacheStatus.cachedModelIds.includes(modelId)) {
+          throw new Error("当前模型尚未缓存，请先下载并启用");
+        }
+        await queueTranscription(note.id, modelId, "manual");
+        return {};
+      });
     }
     case "ENABLE_WHISPER":
       return enableWhisper(message.modelId);

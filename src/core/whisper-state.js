@@ -43,6 +43,19 @@ export function canTranscribeWithWhisper({ whisperState, modelCached }) {
   return whisperState === "ready" && modelCached === true;
 }
 
+export function createNoteTaskCoordinator() {
+  const tails = new Map();
+  return (noteId, operation) => {
+    const previous = tails.get(noteId) ?? Promise.resolve();
+    const task = previous.then(operation);
+    const tracked = task.then(() => {}, () => {}).finally(() => {
+      if (tails.get(noteId) === tracked) tails.delete(noteId);
+    });
+    tails.set(noteId, tracked);
+    return task;
+  };
+}
+
 export function applyTranscript(note, transcript, {
   modelId,
   source,
