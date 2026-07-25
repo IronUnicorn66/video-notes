@@ -6,7 +6,12 @@ import { createModelDownloader } from "./core/model-download.js";
 import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { createTranscriberManager } from "./core/transcriber-manager.js";
-import { applyTranscript, assertModelSwitchAllowed } from "./core/whisper-state.js";
+import { createWhisperOperationLock } from "./core/whisper-operation.js";
+import {
+  applyTranscript,
+  assertModelSwitchAllowed,
+  canTranscribeWithWhisper,
+} from "./core/whisper-state.js";
 import { createZip } from "./core/zip.js";
 
 const repository = new VideoNotesRepository();
@@ -25,6 +30,7 @@ let recordingStopPromise = null;
 let modelDownloading = false;
 let transcriptionTail = Promise.resolve();
 const transcriptionJobs = new Map();
+const whisperModelOperationLock = createWhisperOperationLock();
 
 async function backgroundRequest(type, payload = {}) {
   const response = await chrome.runtime.sendMessage({ type, target: "background", ...payload });
@@ -188,11 +194,17 @@ async function startRecording(noteId) {
   recordingAbortRequested = false;
   recordingNoteId = noteId;
   try {
-    const { whisperSelectedModel = "" } = await getLocalStorage({ whisperSelectedModel: "" });
+    const { whisperSelectedModel = "", whisperState = "disabled" } = await getLocalStorage({
+      whisperSelectedModel: "",
+      whisperState: "disabled",
+    });
     recordingWhisperModel = whisperSelectedModel ? getWhisperModel(whisperSelectedModel) : null;
     const model = recordingWhisperModel && await cachedModelResponse(recordingWhisperModel);
-    recordingCanTranscribe = Boolean(recordingWhisperModel && model);
-    if (recordingWhisperModel && !model) {
+    recordingCanTranscribe = canTranscribeWithWhisper({
+      whisperState,
+      modelCached: Boolean(recordingWhisperModel && model),
+    });
+    if (whisperState === "ready" && recordingWhisperModel && !model) {
       await setWhisperState("error", {
         whisperError: "本地语音模型缓存已丢失，请重新启用",
       }).catch(() => {});
@@ -466,9 +478,9 @@ async function handleMessage(message) {
     case "ABORT_RECORDING":
       return abortRecording();
     case "DOWNLOAD_MODEL":
-      return downloadAndEnableModel(message.modelId);
+      return whisperModelOperationLock.run(() => downloadAndEnableModel(message.modelId));
     case "SELECT_WHISPER_MODEL":
-      return selectWhisperModel(message.modelId);
+      return whisperModelOperationLock.run(() => selectWhisperModel(message.modelId));
     case "CHECK_BUNDLED_MODEL":
       return { bundled: Boolean(await bundledModelResponse()) };
     case "TRANSCRIBE_NOTE":

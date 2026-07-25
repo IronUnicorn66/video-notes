@@ -11,6 +11,7 @@ import {
   getWhisperModel,
 } from "./core/model-config.js";
 import { assertModelSwitchAllowed } from "./core/whisper-state.js";
+import { createWhisperOperationLock } from "./core/whisper-operation.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
   canUseMicrophone,
@@ -32,9 +33,9 @@ let voiceStartPromise = null;
 let voiceStopPromise = null;
 let activeVoiceNote = null;
 let whisperRecoveryPromise = Promise.resolve();
-let whisperEnablePromise = null;
 let microphonePermissionPagePromise = null;
 let microphonePermissionTabId = null;
+const whisperModelOperationLock = createWhisperOperationLock();
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -532,13 +533,7 @@ async function currentContextAndNotes(sender) {
 }
 
 async function enableWhisper(modelId = DEFAULT_WHISPER_MODEL_ID) {
-  if (whisperEnablePromise) throw new Error("模型正在下载");
-  whisperEnablePromise = enableWhisperCore(modelId);
-  try {
-    return await whisperEnablePromise;
-  } finally {
-    whisperEnablePromise = null;
-  }
+  return whisperModelOperationLock.run(() => enableWhisperCore(modelId));
 }
 
 async function enableWhisperCore(modelId) {
@@ -571,6 +566,10 @@ async function enableWhisperCore(modelId) {
 }
 
 async function selectWhisperModel(modelId) {
+  return whisperModelOperationLock.run(() => selectWhisperModelCore(modelId));
+}
+
+async function selectWhisperModelCore(modelId) {
   await whisperRecoveryPromise;
   getWhisperModel(modelId);
   const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });

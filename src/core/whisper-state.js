@@ -39,6 +39,10 @@ export function assertModelSwitchAllowed({
   }
 }
 
+export function canTranscribeWithWhisper({ whisperState, modelCached }) {
+  return whisperState === "ready" && modelCached === true;
+}
+
 export function applyTranscript(note, transcript) {
   const text = String(transcript ?? "").trim();
   if ((note.userEditVersion ?? 0) === 0 && !note.body?.trim()) {

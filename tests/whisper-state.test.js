@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertModelSwitchAllowed,
   applyTranscript,
+  canTranscribeWithWhisper,
   isWhisperModelSwitchBlocked,
   transitionWhisperState,
 } from "../src/core/whisper-state.js";
@@ -56,4 +57,24 @@ test("用户已编辑时保留正文并将迟到转写存为候选", () => {
   const note = applyTranscript({ body: "用户内容", userEditVersion: 2 }, "口述内容");
   assert.equal(note.body, "用户内容");
   assert.equal(note.transcriptCandidate, "口述内容");
+});
+
+test("未启用时即使内置 Base 已缓存也不转写", () => {
+  assert.equal(canTranscribeWithWhisper({
+    whisperState: "disabled",
+    modelCached: true,
+  }), false);
+});
+
+test("旧模型选择迁移后仍需启用才允许转写", () => {
+  assert.equal(canTranscribeWithWhisper({
+    whisperState: "disabled",
+    modelCached: true,
+    selectedModelId: "base-q5_1",
+  }), false);
+  assert.equal(canTranscribeWithWhisper({
+    whisperState: "ready",
+    modelCached: true,
+    selectedModelId: "base-q5_1",
+  }), true);
 });
