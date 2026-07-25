@@ -1,6 +1,8 @@
 import { formatTimestamp } from "./core/note-format.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
+import { createAssetUrlRegistry } from "./core/asset-url-registry.js";
+import { VideoNotesRepository } from "./core/storage.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -25,7 +27,13 @@ const elements = {
   microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
   keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
+  screenshotDialog: document.querySelector("#screenshot-dialog"),
+  screenshotDialogClose: document.querySelector("#screenshot-dialog-close"),
+  screenshotDialogImage: document.querySelector("#screenshot-dialog-image"),
 };
+
+const repository = new VideoNotesRepository();
+const assetUrls = createAssetUrlRegistry();
 
 let activeContext = null;
 let currentDraft = null;
@@ -45,6 +53,7 @@ let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
 let whisperStatus = null;
+let renderGeneration = 0;
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -144,7 +153,65 @@ function autoGrow() {
   elements.input.style.height = `${Math.min(elements.input.scrollHeight, 260)}px`;
 }
 
+function closeScreenshotDialog() {
+  if (elements.screenshotDialog.open) elements.screenshotDialog.close();
+  elements.screenshotDialogImage.removeAttribute("src");
+}
+
+function appendAssetWarning(container, message) {
+  const warning = document.createElement("span");
+  warning.className = "note-asset-warning";
+  warning.textContent = message;
+  container.append(warning);
+}
+
+async function renderNoteAssets(note, container, generation) {
+  const [screenshot, audio] = await Promise.all([
+    note.screenshotKey ? repository.getAsset(note.screenshotKey) : undefined,
+    note.audioKey ? repository.getAsset(note.audioKey) : undefined,
+  ]);
+  if (generation !== renderGeneration) return;
+
+  if (note.screenshotKey) {
+    if (!screenshot) {
+      appendAssetWarning(container, "截图文件缺失");
+    } else {
+      const button = document.createElement("button");
+      button.className = "note-screenshot-button";
+      button.type = "button";
+      button.setAttribute("aria-label", "放大标记截图");
+      const image = document.createElement("img");
+      image.className = "note-screenshot";
+      image.loading = "lazy";
+      image.alt = "标记时的播放器截图";
+      image.src = assetUrls.set(note.screenshotKey, screenshot);
+      button.append(image);
+      button.addEventListener("click", () => {
+        elements.screenshotDialogImage.src = image.src;
+        if (!elements.screenshotDialog.open) elements.screenshotDialog.showModal();
+      });
+      container.append(button);
+    }
+  }
+
+  if (note.audioKey) {
+    if (!audio) {
+      appendAssetWarning(container, "录音文件缺失");
+    } else {
+      const player = document.createElement("audio");
+      player.className = "note-audio";
+      player.controls = true;
+      player.preload = "metadata";
+      player.src = assetUrls.set(note.audioKey, audio);
+      container.append(player);
+    }
+  }
+}
+
 function renderNotes(notes) {
+  const generation = ++renderGeneration;
+  closeScreenshotDialog();
+  assetUrls.revokeAll();
   const saved = notes.filter((note) => note.status === "saved");
   elements.noteList.replaceChildren();
   elements.emptyNotes.hidden = saved.length > 0;
@@ -177,6 +244,10 @@ function renderNotes(notes) {
     body.className = "note-body";
     body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
     item.append(body);
+    const assets = document.createElement("div");
+    assets.className = "note-assets";
+    item.append(assets);
+    void renderNoteAssets(note, assets, generation);
     edit.addEventListener("click", () => {
       let canceled = false;
       editingNoteId = note.id;
@@ -540,6 +611,23 @@ elements.microphonePermissionButton.addEventListener("click", async () => {
   }
 });
 
+elements.screenshotDialogClose.addEventListener("click", () => {
+  elements.screenshotDialog.close();
+});
+elements.screenshotDialog.addEventListener("click", (event) => {
+  const bounds = elements.screenshotDialog.getBoundingClientRect();
+  const outsideDialog = event.clientX < bounds.left
+    || event.clientX > bounds.right
+    || event.clientY < bounds.top
+    || event.clientY > bounds.bottom;
+  if (event.target === elements.screenshotDialog && outsideDialog) {
+    elements.screenshotDialog.close();
+  }
+});
+elements.screenshotDialog.addEventListener("close", () => {
+  elements.screenshotDialogImage.removeAttribute("src");
+});
+
 elements.exportButton.addEventListener("click", async () => {
   if (!activeContext) return;
   elements.exportButton.disabled = true;
@@ -640,6 +728,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 window.addEventListener("pagehide", () => {
+  closeScreenshotDialog();
+  assetUrls.revokeAll();
   if (recording || voiceStarting) {
     void chrome.runtime.sendMessage({ type: "CANCEL_PENDING_VOICE", reason: "sidepanel-closed" });
   }

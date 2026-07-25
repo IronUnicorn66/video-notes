@@ -86,6 +86,18 @@ test("侧栏提供可见的截图和麦克风授权入口", async () => {
   assert.match(source, /chrome\.permissions\.request/);
 });
 
+test("侧栏提供截图预览对话框和音频样式入口", async () => {
+  const html = await readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8");
+  const css = await readFile(new URL("../src/sidepanel.css", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
+  assert.match(html, /<dialog id="screenshot-dialog"/);
+  assert.match(html, /id="screenshot-dialog-close"/);
+  assert.match(html, /id="screenshot-dialog-image"/);
+  assert.match(source, /note-audio/);
+  assert.match(source, /getBoundingClientRect/);
+  assert.match(css, /\.note-audio/);
+});
+
 test("首次麦克风授权从普通扩展页发起", async () => {
   const sidepanel = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
   const permissionHtml = await readFile(

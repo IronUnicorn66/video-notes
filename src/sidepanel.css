@@ -31,6 +31,12 @@ select:disabled {
   opacity: 0.52;
 }
 
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(96, 124, 111, 0.4);
+  outline-offset: 2px;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 18px 16px 28px;
@@ -243,6 +249,39 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.note-assets {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.note-screenshot-button {
+  width: min(100%, 180px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #d5d1c7;
+  border-radius: 8px;
+  padding: 0;
+  background: #f8f7f2;
+}
+
+.note-screenshot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.note-audio {
+  display: block;
+  width: 100%;
+}
+
+.note-asset-warning {
+  color: #8a6829;
+  font-size: 11px;
+}
+
 .note-body.is-editing {
   min-height: 54px;
   border: 1px solid #607c6f;
@@ -382,4 +421,38 @@ textarea:focus {
   background: rgba(36, 42, 39, 0.94);
   font-size: 12px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+
+#screenshot-dialog {
+  width: min(92vw, 960px);
+  max-width: 960px;
+  border: 1px solid #dedbd2;
+  border-radius: 12px;
+  padding: 12px;
+  color: #1f2530;
+  background: #fffdf8;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.28);
+}
+
+#screenshot-dialog::backdrop {
+  background: rgba(28, 31, 30, 0.58);
+}
+
+#screenshot-dialog-close {
+  display: block;
+  margin: 0 0 10px auto;
+  border: 1px solid #cfcabe;
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #34463e;
+  background: #f8f7f2;
+  font-size: 12px;
+}
+
+#screenshot-dialog-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 70px);
+  margin: 0 auto;
+  object-fit: contain;
 }
