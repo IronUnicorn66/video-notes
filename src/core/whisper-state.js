@@ -43,19 +43,29 @@ export function canTranscribeWithWhisper({ whisperState, modelCached }) {
   return whisperState === "ready" && modelCached === true;
 }
 
-export function applyTranscript(note, transcript) {
+export function applyTranscript(note, transcript, {
+  modelId,
+  source,
+  createdAt = Date.now(),
+}) {
   const text = String(transcript ?? "").trim();
-  if ((note.userEditVersion ?? 0) === 0 && !note.body?.trim()) {
+  const run = { modelId, text, source, createdAt };
+  const next = {
+    ...note,
+    transcriptionStatus: "complete",
+    transcriptionModelId: modelId,
+    transcriptionRuns: [...(note.transcriptionRuns ?? []), run],
+    pendingTranscription: null,
+  };
+  if ((note.userEditVersion ?? 0) === 0) {
     return {
-      ...note,
+      ...next,
       body: text,
       transcriptCandidate: "",
-      transcriptionStatus: "complete",
     };
   }
   return {
-    ...note,
+    ...next,
     transcriptCandidate: text,
-    transcriptionStatus: "complete",
   };
 }

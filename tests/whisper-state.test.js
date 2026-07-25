@@ -46,17 +46,50 @@ for (const busyState of [
   });
 }
 
-test("未编辑的空语音标记直接采用转写", () => {
-  const note = applyTranscript({ body: "", userEditVersion: 0 }, "口述内容");
-  assert.equal(note.body, "口述内容");
-  assert.equal(note.transcriptCandidate, "");
-  assert.equal(note.transcriptionStatus, "complete");
+test("首次语音转写写入正文并记录模型", () => {
+  const note = applyTranscript(
+    { body: "", userEditVersion: 0, transcriptionRuns: [] },
+    "第一版",
+    { modelId: "base-q5_1", source: "automatic", createdAt: 100 },
+  );
+  assert.equal(note.body, "第一版");
+  assert.equal(note.transcriptionModelId, "base-q5_1");
+  assert.deepEqual(note.transcriptionRuns, [{
+    modelId: "base-q5_1",
+    text: "第一版",
+    source: "automatic",
+    createdAt: 100,
+  }]);
 });
 
-test("用户已编辑时保留正文并将迟到转写存为候选", () => {
-  const note = applyTranscript({ body: "用户内容", userEditVersion: 2 }, "口述内容");
-  assert.equal(note.body, "用户内容");
-  assert.equal(note.transcriptCandidate, "口述内容");
+test("用户编辑后的重复转写只更新候选和历史", () => {
+  const note = applyTranscript(
+    {
+      body: "我的修改",
+      userEditVersion: 1,
+      transcriptionRuns: [{ modelId: "base-q5_1", text: "第一版", source: "automatic", createdAt: 100 }],
+    },
+    "第二版",
+    { modelId: "small-q5_1", source: "manual", createdAt: 200 },
+  );
+  assert.equal(note.body, "我的修改");
+  assert.equal(note.transcriptCandidate, "第二版");
+  assert.equal(note.transcriptionRuns.length, 2);
+  assert.equal(note.transcriptionRuns[1].modelId, "small-q5_1");
+});
+
+test("用户未编辑时用最新转写更新正文", () => {
+  const note = applyTranscript(
+    {
+      body: "第一版",
+      userEditVersion: 0,
+      transcriptionRuns: [{ modelId: "base-q5_1", text: "第一版", source: "automatic", createdAt: 100 }],
+    },
+    "第二版",
+    { modelId: "small-q5_1", source: "manual", createdAt: 200 },
+  );
+  assert.equal(note.body, "第二版");
+  assert.equal(note.transcriptCandidate, "");
 });
 
 test("未启用时即使内置 Base 已缓存也不转写", () => {

@@ -44,6 +44,7 @@ let refreshAfterEdit = false;
 let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
+let whisperStatus = null;
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -52,6 +53,30 @@ function showToast(message) {
   toastTimeout = setTimeout(() => {
     elements.toast.hidden = true;
   }, 3600);
+}
+
+function whisperModelLabel(modelId) {
+  return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? "当前模型";
+}
+
+function retranscriptionUnavailableReason(note) {
+  if (!note.audioKey) return "原始录音不可用";
+  if (!whisperStatus) return "正在读取模型状态";
+  const selectedModelId = whisperStatus.selectedModelId;
+  if (!whisperStatus.cachedModelIds.includes(selectedModelId)) return "当前模型尚未缓存";
+  if (["downloading", "recording", "transcribing"].includes(whisperStatus.whisperState)) {
+    return "当前语音任务进行中";
+  }
+  return "";
+}
+
+function formatTranscriptionTime(createdAt) {
+  return new Date(createdAt).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 async function request(message) {
@@ -208,8 +233,55 @@ function renderNotes(notes) {
     if (note.transcriptionStatus === "transcribing" || note.transcriptionStatus === "pending") {
       const pending = document.createElement("span");
       pending.className = "note-pending";
-      pending.textContent = "本地转写中…";
+      pending.textContent = note.pendingTranscription
+        ? `使用 ${whisperModelLabel(note.pendingTranscription.modelId)} 转写中…`
+        : "本地转写中…";
       item.append(pending);
+    }
+    if (note.inputType === "voice") {
+      const retranscribe = document.createElement("button");
+      retranscribe.className = "note-retranscribe-button";
+      retranscribe.type = "button";
+      retranscribe.textContent = "用当前模型重新转写";
+      const unavailableReason = retranscriptionUnavailableReason(note);
+      retranscribe.disabled = Boolean(unavailableReason);
+      retranscribe.title = unavailableReason;
+      retranscribe.addEventListener("click", async () => {
+        retranscribe.disabled = true;
+        try {
+          await request({ type: "RETRANSCRIBE_NOTE", noteId: note.id });
+          await refresh();
+        } catch (error) {
+          showToast(error.message);
+          await refresh();
+        }
+      });
+      item.append(retranscribe);
+      if (unavailableReason) {
+        const reason = document.createElement("span");
+        reason.className = "note-retranscribe-reason";
+        reason.textContent = unavailableReason;
+        item.append(reason);
+      }
+    }
+    if ((note.transcriptionRuns?.length ?? 0) > 1) {
+      const results = document.createElement("details");
+      results.className = "note-transcription-results";
+      const summary = document.createElement("summary");
+      summary.textContent = `查看 ${note.transcriptionRuns.length} 个转写结果`;
+      results.append(summary);
+      for (const run of note.transcriptionRuns) {
+        const result = document.createElement("div");
+        result.className = "note-transcription-result";
+        const metadata = document.createElement("span");
+        metadata.className = "note-transcription-meta";
+        metadata.textContent = `${whisperModelLabel(run.modelId)} · ${formatTranscriptionTime(run.createdAt)}`;
+        const text = document.createElement("p");
+        text.textContent = run.text || "（无识别文本）";
+        result.append(metadata, text);
+        results.append(result);
+      }
+      item.append(results);
     }
     for (const warning of note.warnings ?? []) {
       const warningLine = document.createElement("span");
@@ -224,6 +296,7 @@ function renderNotes(notes) {
 async function refresh() {
   try {
     const response = await request({ type: "GET_ACTIVE_STATE" });
+    whisperStatus = await request({ type: "GET_WHISPER_STATUS" }).catch(() => whisperStatus);
     activeContext = response.context;
     if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
     elements.videoTitle.textContent = activeContext.title;
@@ -357,6 +430,7 @@ function shortcutLabel(code) {
 
 async function renderWhisperStatus() {
   const status = await request({ type: "GET_WHISPER_STATUS" });
+  whisperStatus = status;
   const labels = {
     disabled: "尚未启用。请选择模型后下载。",
     downloading: "正在下载并校验模型，可在中断后续传。",

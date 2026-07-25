@@ -258,6 +258,49 @@ textarea:focus {
   font-size: 11px;
 }
 
+.note-retranscribe-button {
+  display: block;
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+  color: #607c6f;
+  background: transparent;
+  font-size: 11px;
+}
+
+.note-retranscribe-reason {
+  margin-left: 7px;
+  color: #858174;
+  font-size: 11px;
+}
+
+.note-transcription-results {
+  margin-top: 8px;
+  color: #5f5b51;
+  font-size: 11px;
+}
+
+.note-transcription-results summary {
+  cursor: pointer;
+  color: #607c6f;
+}
+
+.note-transcription-result {
+  margin-top: 7px;
+  padding-left: 8px;
+  border-left: 2px solid #dedbd2;
+}
+
+.note-transcription-meta {
+  color: #858174;
+}
+
+.note-transcription-result p {
+  margin: 3px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
 .empty-state {
   margin: 18px 0 6px;
   color: #918c80;

@@ -1,3 +1,5 @@
+import { getWhisperModel } from "./model-config.js";
+
 function pad(value, width = 2) {
   return String(value).padStart(width, "0");
 }
@@ -32,6 +34,14 @@ function escapeLinkLabel(value) {
   return String(value).replace(/([\\\[\]])/g, "\\$1");
 }
 
+function whisperModelLabel(modelId) {
+  try {
+    return getWhisperModel(modelId).label;
+  } catch {
+    return String(modelId ?? "未知模型");
+  }
+}
+
 export function buildMarkdown(session, entries) {
   const lines = [
     `# ${escapeHeading(session.title)}`,
@@ -49,20 +59,28 @@ export function buildMarkdown(session, entries) {
     if (entry.imageFilename) {
       lines.push(`![${escapeLinkLabel(timestamp)} 截图](${entry.imageFilename})`, "");
     }
-    if (entry.subtitleContext?.trim()) {
-      lines.push("### 前置字幕", "", `> ${entry.subtitleContext.trim().replace(/\n/g, "\n> ")}`, "");
-    }
     if (entry.audioFilename) {
       lines.push(`[原始录音](${entry.audioFilename})`, "");
     }
-    if (entry.transcriptCandidate?.trim()) {
-      lines.push("<details>", "<summary>语音转写候选</summary>", "", entry.transcriptCandidate.trim(), "", "</details>", "");
+    const transcriptionRuns = entry.transcriptionRuns ?? [];
+    if (transcriptionRuns.length > 0) {
+      lines.push(
+        "<details>",
+        `<summary>本地转写结果（${transcriptionRuns.length} 个模型）</summary>`,
+        "",
+      );
+      for (const run of transcriptionRuns) {
+        lines.push(`- ${whisperModelLabel(run.modelId)}：${String(run.text ?? "").trim()}`);
+      }
+      lines.push("", "</details>", "");
     }
     for (const warning of entry.warnings ?? []) {
       lines.push(`> ⚠ ${warning}`, "");
+    }
+    if (entry.subtitleContext?.trim()) {
+      lines.push("### 前置字幕", "", `> ${entry.subtitleContext.trim().replace(/\n/g, "\n> ")}`, "");
     }
   });
 
   return `${lines.join("\n").trimEnd()}\n`;
 }
-

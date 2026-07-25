@@ -129,6 +129,45 @@ async function sendToOffscreen(message) {
   return response;
 }
 
+async function enqueueTranscription(noteId, modelId, source) {
+  getWhisperModel(modelId);
+  if (!["automatic", "manual"].includes(source)) throw new Error("未知转写来源");
+  await sendToOffscreen({
+    type: "TRANSCRIBE_NOTE",
+    noteId,
+    modelId,
+    source,
+  });
+}
+
+async function markTranscriptionFailure(noteId, error) {
+  const warning = `转写失败：${error.message}`;
+  await repository.updateNote(noteId, (note) => ({
+    ...note,
+    pendingTranscription: null,
+    transcriptionStatus: "error",
+    warnings: note.warnings?.includes(warning)
+      ? note.warnings
+      : [...(note.warnings ?? []), warning],
+    updatedAt: Date.now(),
+  })).catch(() => {});
+}
+
+async function queueTranscription(noteId, modelId, source) {
+  getWhisperModel(modelId);
+  if (!["automatic", "manual"].includes(source)) throw new Error("未知转写来源");
+  const pendingTranscription = { modelId, source, queuedAt: Date.now() };
+  await repository.updateNote(noteId, (note) => ({
+    ...note,
+    transcriptionStatus: "pending",
+    pendingTranscription,
+    updatedAt: Date.now(),
+  }));
+  void enqueueTranscription(noteId, modelId, source).catch((error) => (
+    markTranscriptionFailure(noteId, error)
+  ));
+}
+
 async function recoverTransientWhisperState() {
   const settings = await chrome.storage.local.get({
     whisperState: "disabled",
@@ -169,15 +208,36 @@ async function recoverTransientWhisperState() {
   else if (whisperState === "ready") recovered.whisperError = "";
   await chrome.storage.local.set(recovered);
 
-  if (!modelAvailable || processing?.downloading) return;
+  if (processing?.downloading) return;
   await chrome.permissions.remove({ origins: WHISPER_ORIGINS }).catch(() => false);
   const activeNoteIds = new Set(processing?.transcriptionNoteIds ?? []);
   const pending = (await repository.listPendingTranscriptions())
     .filter((note) => !activeNoteIds.has(note.id));
   if (pending.length === 0) return;
-  await chrome.storage.local.set({ whisperState: "transcribing", whisperError: "" });
   for (const note of pending) {
-    void sendToOffscreen({ type: "TRANSCRIBE_NOTE", noteId: note.id }).catch(() => {});
+    let pendingTranscription = note.pendingTranscription;
+    if (!pendingTranscription) {
+      pendingTranscription = {
+        modelId: selectedModelId,
+        source: (note.transcriptionRuns?.length ?? 0) > 0 ? "manual" : "automatic",
+        queuedAt: Date.now(),
+      };
+      await repository.updateNote(note.id, (current) => ({
+        ...current,
+        transcriptionStatus: "pending",
+        pendingTranscription,
+        updatedAt: Date.now(),
+      }));
+    }
+    if (!cachedModelIds.includes(pendingTranscription.modelId)) {
+      await markTranscriptionFailure(note.id, new Error("待转写模型缓存已丢失，请重新下载"));
+      continue;
+    }
+    void enqueueTranscription(
+      note.id,
+      pendingTranscription.modelId,
+      pendingTranscription.source,
+    ).catch((error) => markTranscriptionFailure(note.id, error));
   }
 }
 
@@ -243,6 +303,9 @@ async function beginMarker(tab, inputType, { beforePause, onPrepared } = {}) {
     body: "",
     transcriptionStatus: inputType === "voice" ? "pending" : "none",
     transcriptCandidate: "",
+    transcriptionModelId: "",
+    transcriptionRuns: [],
+    pendingTranscription: null,
     subtitleContext: snapshot.subtitleContext,
     screenshotKey: "",
     audioKey: "",
@@ -472,24 +535,21 @@ async function stopVoiceUnlocked(reason) {
   note.audioKey = result.audioKey;
   note.status = "saved";
   note.updatedAt = Date.now();
-  note.transcriptionStatus = result.whisperReady ? "transcribing" : "disabled";
+  note.transcriptionStatus = result.whisperReady ? "pending" : "disabled";
   await repository.putNote(note);
   await releaseMarker(note, true);
   activeVoiceNote = null;
   await finishVoiceUi(note);
 
   if (result.whisperReady) {
-    void sendToOffscreen({ type: "TRANSCRIBE_NOTE", noteId: note.id }).catch((error) => {
-      const warning = `转写失败：${error.message}`;
-      return repository.updateNote(note.id, (latest) => ({
-        ...latest,
-        transcriptionStatus: "error",
-        warnings: latest.warnings?.includes(warning)
-          ? latest.warnings
-          : [...(latest.warnings ?? []), warning],
-        updatedAt: Date.now(),
-      })).catch(() => {});
+    const { whisperSelectedModel = "" } = await chrome.storage.local.get({
+      whisperSelectedModel: "",
     });
+    await queueTranscription(
+      note.id,
+      getWhisperModel(whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID).id,
+      "automatic",
+    );
   }
   return { noteId: note.id };
 }
@@ -666,6 +726,35 @@ async function handleMessage(message, sender) {
         throw new Error("录音超时消息来源无效");
       }
       return stopVoice("timeout");
+    case "RETRANSCRIBE_NOTE": {
+      await whisperRecoveryPromise;
+      const note = await repository.getNote(message.noteId);
+      if (note?.inputType !== "voice" || !note.audioKey) {
+        throw new Error("该标记没有可重新转写的原始录音");
+      }
+      const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
+      if (
+        processing.downloading
+        || processing.recording
+        || processing.starting
+        || processing.stopping
+        || processing.transcriptionNoteIds.length > 0
+      ) {
+        throw new Error("请等待当前语音任务结束后再重新转写");
+      }
+      const [settings, cacheStatus] = await Promise.all([
+        chrome.storage.local.get({ whisperSelectedModel: "" }),
+        sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
+      ]);
+      const modelId = getWhisperModel(
+        settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
+      ).id;
+      if (!cacheStatus.cachedModelIds.includes(modelId)) {
+        throw new Error("当前模型尚未缓存，请先下载并启用");
+      }
+      await queueTranscription(note.id, modelId, "manual");
+      return {};
+    }
     case "ENABLE_WHISPER":
       return enableWhisper(message.modelId);
     case "SELECT_WHISPER_MODEL":

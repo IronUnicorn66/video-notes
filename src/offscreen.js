@@ -107,11 +107,6 @@ async function cachedModelResponse(model = WHISPER_MODEL) {
   return bundledModelResponse(model);
 }
 
-async function configuredWhisperModel() {
-  const { whisperSelectedModel = "" } = await getLocalStorage({ whisperSelectedModel: "" });
-  return getWhisperModel(whisperSelectedModel || WHISPER_MODEL.id);
-}
-
 async function downloadAndEnableModel(modelId = WHISPER_MODEL.id) {
   assertModelSwitchAllowed(processingState());
   modelDownloading = true;
@@ -291,7 +286,7 @@ async function stopRecordingCore() {
       ...note,
       audioKey,
       status: "saved",
-      transcriptionStatus: whisperReady ? "transcribing" : "disabled",
+      transcriptionStatus: whisperReady ? "pending" : "disabled",
       updatedAt: Date.now(),
     }));
     if (whisperReady) await setWhisperState("transcribing").catch(() => {});
@@ -324,13 +319,18 @@ async function abortRecording() {
   return { aborted: true, noteId };
 }
 
-async function transcribeNote(noteId) {
+async function transcribeNote(noteId, modelId, source) {
   try {
     const note = await repository.getNote(noteId);
     if (!note?.audioKey) throw new Error("没有找到原始录音");
+    await repository.updateNote(noteId, (latest) => ({
+      ...latest,
+      transcriptionStatus: "transcribing",
+      updatedAt: Date.now(),
+    }));
     const audio = await repository.getAsset(note.audioKey);
     if (!audio) throw new Error("原始录音已丢失");
-    const engine = await ensureTranscriber((await configuredWhisperModel()).id);
+    const engine = await ensureTranscriber(getWhisperModel(modelId).id);
     const result = await engine.transcribe(
       new File([audio], `${noteId}.webm`, { type: audio.type || "audio/webm" }),
       {
@@ -342,7 +342,7 @@ async function transcribeNote(noteId) {
     );
     const text = (result.transcription ?? []).map((segment) => segment.text).join("").trim();
     await repository.updateNote(noteId, (latest) => ({
-      ...applyTranscript(latest, text),
+      ...applyTranscript(latest, text, { modelId, source }),
       updatedAt: Date.now(),
     }));
     void chrome.runtime.sendMessage({ type: "NOTE_TRANSCRIBED", noteId }).catch(() => {});
@@ -350,6 +350,7 @@ async function transcribeNote(noteId) {
   } catch (error) {
     await repository.updateNote(noteId, (note) => ({
       ...note,
+      pendingTranscription: null,
       transcriptionStatus: "error",
       warnings: [...(note.warnings ?? []), `转写失败：${error.message}`],
       updatedAt: Date.now(),
@@ -374,9 +375,13 @@ async function syncWhisperActivity(error = null) {
   }
 }
 
-function enqueueTranscription(noteId) {
-  if (transcriptionJobs.has(noteId)) return transcriptionJobs.get(noteId);
-  const task = transcriptionTail.then(() => transcribeNote(noteId));
+function enqueueTranscription(noteId, modelId, source) {
+  getWhisperModel(modelId);
+  if (!["automatic", "manual"].includes(source)) throw new Error("未知转写来源");
+  const existing = transcriptionJobs.get(noteId);
+  if (existing) return existing.promise;
+  const job = { noteId, modelId, source };
+  const task = transcriptionTail.then(() => transcribeNote(job.noteId, job.modelId, job.source));
   transcriptionTail = task.catch(() => {});
   const tracked = task.then(
     async (result) => {
@@ -390,7 +395,7 @@ function enqueueTranscription(noteId) {
       throw error;
     },
   );
-  transcriptionJobs.set(noteId, tracked);
+  transcriptionJobs.set(noteId, { ...job, promise: tracked });
   if (!recordingStarting && recorder?.state !== "recording") {
     void setWhisperState("transcribing");
   }
@@ -484,7 +489,7 @@ async function handleMessage(message) {
     case "CHECK_BUNDLED_MODEL":
       return { bundled: Boolean(await bundledModelResponse()) };
     case "TRANSCRIBE_NOTE":
-      return enqueueTranscription(message.noteId);
+      return enqueueTranscription(message.noteId, message.modelId, message.source);
     case "EXPORT_SESSION":
       return exportSession(message.sessionId);
     default:
