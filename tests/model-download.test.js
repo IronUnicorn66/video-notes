@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createModelDownloader, modelChunkKey } from "../src/core/model-download.js";
 
-function createDownloadHarness({ corruptModelId = "", failAfterChunk = 0 } = {}) {
+function createDownloadHarness({ corruptModelId = "", failAfterChunk = 0, ignoreRange = false } = {}) {
   const models = {
     base: {
       id: "base",
@@ -53,9 +53,11 @@ function createDownloadHarness({ corruptModelId = "", failAfterChunk = 0 } = {})
         throw new Error("网络中断");
       }
       const [, start, end] = /^bytes=(\d+)-(\d+)$/.exec(range);
-      const bytes = bytesByUrl.get(url).slice(Number(start), Number(end) + 1);
+      const bytes = ignoreRange
+        ? bytesByUrl.get(url).slice()
+        : bytesByUrl.get(url).slice(Number(start), Number(end) + 1);
       if (url === models[corruptModelId]?.url) bytes[0] = 0;
-      return new Response(bytes, { status: 206 });
+      return new Response(bytes, { status: ignoreRange ? 200 : 206 });
     },
     digest: async (buffer) => {
       const firstByte = new Uint8Array(buffer)[0];
@@ -109,4 +111,13 @@ test("中断后复用当前模型已经缓存的分块", async () => {
   await harness.downloader.download(harness.models.small);
 
   assert.equal(harness.rangeRequests.slice(requestsBeforeRetry).includes("bytes=0-1"), false);
+});
+
+test("服务器忽略 Range 并返回完整模型时完成下载", async () => {
+  const harness = createDownloadHarness({ ignoreRange: true });
+
+  await harness.downloader.download(harness.models.small);
+
+  assert.equal(harness.cache.has(harness.models.small.url), true);
+  assert.deepEqual(harness.rangeRequests, ["bytes=0-1"]);
 });

@@ -13,6 +13,16 @@ export function transitionWhisperState(state, event) {
   return next;
 }
 
+export function isWhisperModelSwitchBlocked({
+  recording = false,
+  starting = false,
+  stopping = false,
+  downloading = false,
+  transcriptionNoteIds = [],
+}) {
+  return recording || starting || stopping || downloading || transcriptionNoteIds.length > 0;
+}
+
 export function applyTranscript(note, transcript) {
   const text = String(transcript ?? "").trim();
   if ((note.userEditVersion ?? 0) === 0 && !note.body?.trim()) {
@@ -29,4 +39,3 @@ export function applyTranscript(note, transcript) {
     transcriptionStatus: "complete",
   };
 }
-

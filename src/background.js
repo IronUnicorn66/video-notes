@@ -5,6 +5,7 @@ import {
   noteHoldMessage,
 } from "./core/study-sound-protocol.js";
 import { WHISPER_MODEL, WHISPER_ORIGINS, getWhisperModel } from "./core/model-config.js";
+import { isWhisperModelSwitchBlocked } from "./core/whisper-state.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
   canUseMicrophone,
@@ -26,6 +27,7 @@ let voiceStartPromise = null;
 let voiceStopPromise = null;
 let activeVoiceNote = null;
 let whisperRecoveryPromise = Promise.resolve();
+let whisperEnablePromise = null;
 let microphonePermissionPagePromise = null;
 let microphonePermissionTabId = null;
 
@@ -516,8 +518,22 @@ async function currentContextAndNotes(sender) {
 }
 
 async function enableWhisper(modelId = WHISPER_MODEL.id) {
+  if (whisperEnablePromise) throw new Error("模型正在下载");
+  whisperEnablePromise = enableWhisperCore(modelId);
+  try {
+    return await whisperEnablePromise;
+  } finally {
+    whisperEnablePromise = null;
+  }
+}
+
+async function enableWhisperCore(modelId) {
   await whisperRecoveryPromise;
   const model = getWhisperModel(modelId);
+  const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
+  if (isWhisperModelSwitchBlocked(processing)) {
+    throw new Error("录音、转写或下载期间不能切换模型");
+  }
   const source = model.id === WHISPER_MODEL.id
     ? await sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" })
     : { bundled: false };

@@ -5,7 +5,7 @@ import { WHISPER_MODEL, WHISPER_MODELS, getWhisperModel } from "./core/model-con
 import { createModelDownloader } from "./core/model-download.js";
 import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
 import { VideoNotesRepository } from "./core/storage.js";
-import { applyTranscript } from "./core/whisper-state.js";
+import { applyTranscript, isWhisperModelSwitchBlocked } from "./core/whisper-state.js";
 import { createZip } from "./core/zip.js";
 
 const repository = new VideoNotesRepository();
@@ -109,7 +109,15 @@ async function configuredWhisperModel() {
 }
 
 async function downloadAndEnableModel(modelId = WHISPER_MODEL.id) {
-  if (modelDownloading) throw new Error("模型正在下载");
+  if (isWhisperModelSwitchBlocked({
+    recording: recorder?.state === "recording",
+    starting: recordingStarting,
+    stopping: recordingStopping,
+    downloading: modelDownloading,
+    transcriptionNoteIds: [...transcriptionJobs.keys()],
+  })) {
+    throw new Error("录音、转写或下载期间不能切换模型");
+  }
   modelDownloading = true;
   await setWhisperState("downloading", { whisperError: "" });
   try {
@@ -136,6 +144,11 @@ async function ensureTranscriber() {
     if (!crossOriginIsolated) throw new Error("扩展页面未启用 SharedArrayBuffer 隔离");
     const response = await cachedModelResponse(model);
     if (!response) throw new Error("本地语音模型尚未下载");
+    if (transcriber) {
+      transcriber.destroy();
+      transcriber = null;
+      transcriberModelId = "";
+    }
     const file = new File([await response.blob()], model.filename, {
       type: "application/octet-stream",
     });
