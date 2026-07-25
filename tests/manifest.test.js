@@ -15,10 +15,19 @@ const manifest = JSON.parse(
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
+const packageLock = JSON.parse(
+  await readFile(new URL("../package-lock.json", import.meta.url), "utf8"),
+);
+
+test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
+  assert.equal(manifest.version, "0.2.0");
+  assert.equal(packageJson.version, manifest.version);
+  assert.equal(packageLock.version, manifest.version);
+  assert.equal(packageLock.packages[""].version, manifest.version);
+});
 
 test("Manifest V3 权限保持在计划范围内", () => {
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, packageJson.version);
   assert.deepEqual(manifest.permissions, [
     "storage",
     "activeTab",
@@ -35,6 +44,14 @@ test("播放器截图权限保持可选并由用户单独授权", () => {
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
 });
 
+test("模型下载主机权限保持可选并覆盖固定模型源", () => {
+  assert.deepEqual(manifest.optional_host_permissions.slice(1), [
+    "https://huggingface.co/*",
+    "https://cdn-lfs.hf.co/*",
+    "https://*.xethub.hf.co/*",
+  ]);
+});
+
 test("Edge MV3 扩展页 CSP 只允许打包内 Worker", () => {
   assert.equal(
     manifest.content_security_policy.extension_pages,
@@ -42,13 +59,27 @@ test("Edge MV3 扩展页 CSP 只允许打包内 Worker", () => {
   );
 });
 
-test("可执行入口全部来自扩展包", () => {
+test("所有本地执行代码入口都来自扩展包", async () => {
   const serialized = JSON.stringify({
     background: manifest.background.service_worker,
     contentScripts: manifest.content_scripts.flatMap((entry) => entry.js),
     sidePanel: manifest.side_panel.default_path,
   });
   assert.doesNotMatch(serialized, /https?:\/\//);
+  assert.match(serialized, /background\.js/);
+  assert.match(serialized, /content\.js/);
+  assert.match(serialized, /sidepanel\.html/);
+
+  const build = await readFile(new URL("../scripts/build-extension.mjs", import.meta.url), "utf8");
+  for (const entry of [
+    "background.js",
+    "content.js",
+    "sidepanel.js",
+    "offscreen.js",
+    "microphone-permission.js",
+  ]) {
+    assert.ok(build.includes(`src/${entry}`));
+  }
 });
 
 test("侧栏只由受支持的视频标签启用", async () => {
