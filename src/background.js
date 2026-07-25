@@ -22,6 +22,7 @@ import {
   friendlyMicrophoneError,
   isMicrophonePermissionError,
 } from "./core/media-permissions.js";
+import { sidePanelOptionsForTab } from "./core/sidepanel-scope.js";
 
 const repository = new VideoNotesRepository();
 const microphoneNavigation = createMicrophoneNavigation({
@@ -41,25 +42,89 @@ let microphonePermissionTabId = null;
 const whisperModelOperationLock = createWhisperOperationLock();
 const coordinateNoteTranscription = createNoteTaskCoordinator();
 
-chrome.runtime.onInstalled.addListener(async () => {
-  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  const settings = await chrome.storage.local.get([
-    "shortcutCode",
-    "whisperState",
-    "whisperSelectedModel",
-    "whisperModel",
-  ]);
-  await chrome.storage.local.set({
-    shortcutCode: settings.shortcutCode ?? "AltRight",
-    whisperState: settings.whisperState ?? "disabled",
-    whisperSelectedModel: getWhisperModel(
-      settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
-    ).id,
-  });
+function logSidePanelConfigurationError(tab, error) {
+  console.warn("配置标签页侧栏失败", tab?.id, error);
+}
+
+async function configureSidePanelForTab(tab) {
+  try {
+    await chrome.sidePanel.setOptions(sidePanelOptionsForTab(tab));
+  } catch (error) {
+    logSidePanelConfigurationError(tab, error);
+  }
+}
+
+async function configureExistingSidePanels() {
+  let tabs;
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch (error) {
+    console.warn("查询现有标签页以配置侧栏失败", error);
+    return;
+  }
+  await Promise.all(tabs.map((tab) => configureSidePanelForTab(tab)));
+}
+
+function notifyActiveContextChanged() {
+  void chrome.runtime.sendMessage({ type: "ACTIVE_CONTEXT_CHANGED" }).catch(() => {});
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  void (async () => {
+    try {
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      const settings = await chrome.storage.local.get([
+        "shortcutCode",
+        "whisperState",
+        "whisperSelectedModel",
+        "whisperModel",
+      ]);
+      await chrome.storage.local.set({
+        shortcutCode: settings.shortcutCode ?? "AltRight",
+        whisperState: settings.whisperState ?? "disabled",
+        whisperSelectedModel: getWhisperModel(
+          settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
+        ).id,
+      });
+      await configureExistingSidePanels();
+    } catch (error) {
+      console.warn("初始化侧栏失败", error);
+    }
+  })();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  void (async () => {
+    try {
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      await configureExistingSidePanels();
+    } catch (error) {
+      console.warn("启动时配置侧栏失败", error);
+    }
+  })();
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  void configureSidePanelForTab(tab);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url || changeInfo.status === "complete") {
+    void configureSidePanelForTab({ ...tab, id: tabId });
+  }
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  void (async () => {
+    let tab;
+    try {
+      tab = await chrome.tabs.get(tabId);
+      await configureSidePanelForTab(tab);
+      notifyActiveContextChanged();
+    } catch (error) {
+      logSidePanelConfigurationError(tab ?? { id: tabId }, error);
+    }
+  })();
 });
 
 async function activeSupportedTab() {
@@ -814,7 +879,9 @@ async function handleMessage(message, sender) {
     case "EXPORT_SESSION":
       return sendToOffscreen({ type: "EXPORT_SESSION", sessionId: message.sessionId });
     case "CONTEXT_CHANGED":
-      void chrome.runtime.sendMessage({ type: "ACTIVE_CONTEXT_CHANGED" }).catch(() => {});
+      if (sender.tab) await configureSidePanelForTab(sender.tab);
+      else console.warn("视频上下文变化缺少发送标签页");
+      notifyActiveContextChanged();
       return {};
     default:
       return undefined;

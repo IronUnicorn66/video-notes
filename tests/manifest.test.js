@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+await execFileAsync(process.execPath, ["scripts/build-extension.mjs"], {
+  cwd: new URL("../", import.meta.url),
+});
 
 const manifest = JSON.parse(
   await readFile(new URL("../manifest.json", import.meta.url), "utf8"),
@@ -42,6 +49,15 @@ test("可执行入口全部来自扩展包", () => {
     sidePanel: manifest.side_panel.default_path,
   });
   assert.doesNotMatch(serialized, /https?:\/\//);
+});
+
+test("侧栏只由受支持的视频标签启用", async () => {
+  const background = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
+
+  assert.equal(manifest.side_panel.default_path, "sidepanel.html");
+  assert.match(background, /chrome\.sidePanel\.setOptions/);
+  assert.ok(!manifest.permissions.includes("tabs"));
+  assert.ok(!manifest.host_permissions.includes("<all_urls>"));
 });
 
 test("构建依赖包含本地 Whisper pthread Worker", async () => {
