@@ -78,7 +78,7 @@ export function buildMarkdown(session, entries) {
     if (transcriptionRuns.length > 0) {
       lines.push(
         "<details>",
-        `<summary>本地转写结果（${transcriptionRuns.length} 个模型）</summary>`,
+        `<summary>本地转写结果（${transcriptionRuns.length} 次转写）</summary>`,
         "",
       );
       for (const run of transcriptionRuns) {

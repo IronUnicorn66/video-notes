@@ -45,7 +45,7 @@ test("Markdown 以个人内容优先并使用相对资产链接", () => {
   assert.match(markdown, /!\[00:00:12 截图\]\(images\/001_00-00-12\.webp\)/);
   assert.match(markdown, /\[原始录音\]\(audio\/001_00-00-12\.webm\)/);
   assert.ok(markdown.indexOf("我的 **重点**") < markdown.indexOf("本地转写结果"));
-  assert.match(markdown, /<details>\n<summary>本地转写结果（2 个模型）<\/summary>/);
+  assert.match(markdown, /<details>\n<summary>本地转写结果（2 次转写）<\/summary>/);
   assert.match(markdown, /- Base · 57 MiB：第一版文本/);
   assert.match(markdown, /- Small · 181 MiB：第二版文本/);
   assert.doesNotMatch(markdown, /语音转写候选/);

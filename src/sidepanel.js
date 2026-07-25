@@ -7,6 +7,7 @@ import {
   stopNoteMedia,
 } from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
+import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -59,6 +60,16 @@ let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
 
+const sidePanelRefresh = createSidePanelRefreshController((message) => {
+  if (message.type === "VOICE_STATE_CHANGED") {
+    setRecordingUi(message.recording);
+    if (!message.recording) void refresh();
+    return;
+  }
+  if (editingNoteId) refreshAfterEdit = true;
+  else void refresh();
+});
+
 function showToast(message) {
   elements.toast.textContent = message;
   elements.toast.hidden = false;
@@ -93,7 +104,10 @@ function formatTranscriptionTime(createdAt) {
 }
 
 async function request(message) {
-  const response = await chrome.runtime.sendMessage(message);
+  const payload = message.type === "GET_ACTIVE_STATE" && Number.isInteger(sidePanelRefresh.tabId)
+    ? { ...message, tabId: sidePanelRefresh.tabId }
+    : message;
+  const response = await chrome.runtime.sendMessage(payload);
   if (!response?.ok) throw new Error(response?.error ?? "操作失败");
   return response;
 }
@@ -716,14 +730,13 @@ elements.keyButton.addEventListener("keydown", async (event) => {
 });
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === "ACTIVE_CONTEXT_CHANGED" || message.type === "NOTE_TRANSCRIBED") {
-    if (editingNoteId) refreshAfterEdit = true;
-    else void refresh();
+  if (["ACTIVE_CONTEXT_CHANGED", "NOTE_TRANSCRIBED", "VOICE_STATE_CHANGED"].includes(message.type)) {
+    sidePanelRefresh.handleContextChanged(message);
   }
-  if (message.type === "VOICE_STATE_CHANGED") {
-    setRecordingUi(message.recording);
-    if (!message.recording) void refresh();
-  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  sidePanelRefresh.handleVisibilityChange(document.visibilityState === "visible");
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -764,6 +777,8 @@ window.addEventListener("pagehide", () => {
 
 const { shortcutCode = "AltRight" } = await chrome.storage.local.get("shortcutCode");
 elements.keyButton.textContent = shortcutLabel(shortcutCode);
+const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
+sidePanelRefresh.setTabId(panelContext.tabId);
 await Promise.all([
   refresh(),
   renderWhisperStatus(),

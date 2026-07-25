@@ -341,11 +341,15 @@ async function transcribeNote(noteId, modelId, source) {
       },
     );
     const text = (result.transcription ?? []).map((segment) => segment.text).join("").trim();
-    await repository.updateNote(noteId, (latest) => ({
+    const transcribedNote = await repository.updateNote(noteId, (latest) => ({
       ...applyTranscript(latest, text, { modelId, source }),
       updatedAt: Date.now(),
     }));
-    void chrome.runtime.sendMessage({ type: "NOTE_TRANSCRIBED", noteId }).catch(() => {});
+    void chrome.runtime.sendMessage({
+      type: "NOTE_TRANSCRIBED",
+      noteId,
+      tabId: transcribedNote.tabId,
+    }).catch(() => {});
     return { noteId, text };
   } catch (error) {
     await repository.updateNote(noteId, (note) => ({

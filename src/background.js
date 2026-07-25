@@ -14,6 +14,7 @@ import {
   assertModelSwitchAllowed,
   createNoteTaskCoordinator,
 } from "./core/whisper-state.js";
+import { recoverWhisperState } from "./core/whisper-recovery.js";
 import { createWhisperOperationLock } from "./core/whisper-operation.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
@@ -22,7 +23,11 @@ import {
   friendlyMicrophoneError,
   isMicrophonePermissionError,
 } from "./core/media-permissions.js";
-import { contextChangedSenderTab, sidePanelOptionsForTab } from "./core/sidepanel-scope.js";
+import {
+  contextChangedSenderTab,
+  sidePanelOptionsForTab,
+  sidePanelTabIdForSender,
+} from "./core/sidepanel-scope.js";
 
 const repository = new VideoNotesRepository();
 const microphoneNavigation = createMicrophoneNavigation({
@@ -65,8 +70,9 @@ async function configureExistingSidePanels() {
   await Promise.all(tabs.map((tab) => configureSidePanelForTab(tab)));
 }
 
-function notifyActiveContextChanged() {
-  void chrome.runtime.sendMessage({ type: "ACTIVE_CONTEXT_CHANGED" }).catch(() => {});
+function notifyActiveContextChanged(tabId) {
+  if (!Number.isInteger(tabId)) return;
+  void chrome.runtime.sendMessage({ type: "ACTIVE_CONTEXT_CHANGED", tabId }).catch(() => {});
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -120,7 +126,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
     try {
       tab = await chrome.tabs.get(tabId);
       await configureSidePanelForTab(tab);
-      notifyActiveContextChanged();
+      notifyActiveContextChanged(tabId);
     } catch (error) {
       logSidePanelConfigurationError(tab ?? { id: tabId }, error);
     }
@@ -133,8 +139,10 @@ async function activeSupportedTab() {
   return tab;
 }
 
-async function targetTab(sender) {
-  return sender.tab?.id ? sender.tab : activeSupportedTab();
+async function targetTab(sender, requestedTabId) {
+  if (sender.tab?.id) return sender.tab;
+  if (Number.isInteger(requestedTabId)) return chrome.tabs.get(requestedTabId);
+  return activeSupportedTab();
 }
 
 async function openMicrophonePermissionPage(returnTab) {
@@ -252,29 +260,18 @@ async function recoverTransientWhisperState() {
   const selectedModelId = getWhisperModel(
     settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
   ).id;
-  const modelAvailable = cachedModelIds.includes(selectedModelId);
-  const transientStates = new Set(["downloading", "recording", "transcribing"]);
-  let whisperState = settings.whisperState;
-  let whisperError;
-
-  if (processing?.downloading) whisperState = "downloading";
-  else if (processing?.recording || processing?.starting || processing?.stopping) {
-    whisperState = "recording";
-  } else if (processing?.transcriptionNoteIds?.length) whisperState = "transcribing";
-  else if (transientStates.has(whisperState)) {
-    whisperState = modelAvailable ? "ready" : "error";
-    if (!modelAvailable) whisperError = "上次本地语音任务中断，请重新启用";
-  } else if (settings.whisperSelectedModel && !modelAvailable) {
-    whisperState = "error";
-    whisperError = "本地语音模型缓存已丢失，请重新启用";
-  }
+  const { whisperState, whisperError } = recoverWhisperState({
+    whisperState: settings.whisperState,
+    cachedModelIds,
+    selectedModelId,
+    processing,
+  });
 
   const recovered = {
     whisperState,
     whisperSelectedModel: selectedModelId,
   };
   if (whisperError !== undefined) recovered.whisperError = whisperError;
-  else if (whisperState === "ready") recovered.whisperError = "";
   await chrome.storage.local.set(recovered);
 
   if (processing?.downloading) return;
@@ -553,7 +550,12 @@ async function startVoiceUnlocked(tab) {
       await stopVoice("sidepanel-closed");
       return { note, session, canceled: true };
     }
-    void chrome.runtime.sendMessage({ type: "VOICE_STATE_CHANGED", recording: true, noteId: note.id }).catch(() => {});
+    void chrome.runtime.sendMessage({
+      type: "VOICE_STATE_CHANGED",
+      recording: true,
+      noteId: note.id,
+      tabId: note.tabId,
+    }).catch(() => {});
     return { note, session };
   } catch (error) {
     const permissionError = isMicrophonePermissionError(error);
@@ -628,7 +630,12 @@ async function finishVoiceUi(note) {
     type: "FORCE_STOP_RECORDING",
     reason: "recording-ended",
   }).catch(() => {});
-  void chrome.runtime.sendMessage({ type: "VOICE_STATE_CHANGED", recording: false, noteId: note.id }).catch(() => {});
+  void chrome.runtime.sendMessage({
+    type: "VOICE_STATE_CHANGED",
+    recording: false,
+    noteId: note.id,
+    tabId: note.tabId,
+  }).catch(() => {});
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -653,8 +660,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   })().catch(() => {});
 });
 
-async function currentContextAndNotes(sender) {
-  const tab = await targetTab(sender);
+async function currentContextAndNotes(sender, tabId) {
+  const tab = await targetTab(sender, tabId);
   const response = await sendToTab(tab.id, { type: "GET_PAGE_CONTEXT" });
   const context = response.context;
   if (!context) return { context: null, notes: [] };
@@ -740,7 +747,13 @@ async function handleMessage(message, sender) {
         }),
       };
     case "GET_ACTIVE_STATE":
-      return currentContextAndNotes(sender);
+      return currentContextAndNotes(sender, message.tabId);
+    case "GET_SIDEPANEL_CONTEXT": {
+      const contexts = await chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
+      const tabId = sidePanelTabIdForSender(sender, contexts);
+      if (tabId === null) throw new Error("无法确定侧栏所属标签页");
+      return { tabId };
+    }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
       return beginMarker(tab, "typed");
@@ -885,7 +898,7 @@ async function handleMessage(message, sender) {
         return {};
       }
       await configureSidePanelForTab(tab);
-      notifyActiveContextChanged();
+      notifyActiveContextChanged(tab.id);
       return {};
     }
     default:

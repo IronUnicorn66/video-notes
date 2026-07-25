@@ -9,6 +9,47 @@ import {
   isWhisperModelSwitchBlocked,
   transitionWhisperState,
 } from "../src/core/whisper-state.js";
+import { recoverWhisperState } from "../src/core/whisper-recovery.js";
+
+test("禁用的 Whisper 在重启后即使模型未缓存也保持禁用", () => {
+  const recovery = recoverWhisperState({
+    whisperState: "disabled",
+    selectedModelId: "base-q5_1",
+    cachedModelIds: [],
+    processing: null,
+  });
+
+  assert.deepEqual(recovery, { whisperState: "disabled", whisperError: "" });
+});
+
+test("已启用且就绪的 Whisper 模型缓存丢失后提示重新启用", () => {
+  const recovery = recoverWhisperState({
+    whisperState: "ready",
+    selectedModelId: "small-q5_1",
+    cachedModelIds: [],
+    processing: null,
+  });
+
+  assert.deepEqual(recovery, {
+    whisperState: "error",
+    whisperError: "本地语音模型缓存已丢失，请重新启用",
+  });
+});
+
+test("重启恢复优先保留仍在进行的下载、录音和转写", () => {
+  for (const [processing, whisperState] of [
+    [{ downloading: true }, "downloading"],
+    [{ recording: true }, "recording"],
+    [{ transcriptionNoteIds: ["note-1"] }, "transcribing"],
+  ]) {
+    assert.equal(recoverWhisperState({
+      whisperState: "disabled",
+      selectedModelId: "base-q5_1",
+      cachedModelIds: [],
+      processing,
+    }).whisperState, whisperState);
+  }
+});
 
 test("Whisper 状态只允许合法迁移", () => {
   assert.equal(transitionWhisperState("disabled", "enable"), "downloading");

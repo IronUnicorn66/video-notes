@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createSidePanelRefreshController,
   contextChangedSenderTab,
+  sidePanelTabIdForSender,
   sidePanelOptionsForTab,
 } from "../src/core/sidepanel-scope.js";
 
@@ -46,4 +48,44 @@ test("扩展页发送者没有有效标签页时不触发上下文刷新", () =>
     null,
   );
   assert.equal(contextChangedSenderTab({ tab: { id: "11" } }), null);
+});
+
+test("侧栏上下文按所属标签页隔离，并在重新可见时刷新自身会话", () => {
+  let refreshesA = 0;
+  let refreshesB = 0;
+  const panelA = createSidePanelRefreshController(() => { refreshesA += 1; });
+  const panelB = createSidePanelRefreshController(() => { refreshesB += 1; });
+  const draftA = { text: "A 的草稿" };
+
+  assert.equal(panelA.handleContextChanged({ tabId: 1 }), false);
+  panelA.setTabId(1);
+  panelB.setTabId(2);
+
+  assert.equal(panelA.handleContextChanged({ tabId: 2 }), false);
+  assert.equal(refreshesA, 0);
+  assert.equal(draftA.text, "A 的草稿");
+  assert.equal(panelA.handleContextChanged({ tabId: 1 }), true);
+  assert.equal(refreshesA, 1);
+  assert.equal(refreshesB, 0);
+
+  assert.equal(panelB.handleContextChanged({ tabId: 2 }), true);
+  assert.equal(refreshesA, 1);
+  assert.equal(refreshesB, 1);
+  assert.equal(panelA.handleVisibilityChange(false), false);
+  assert.equal(panelA.handleVisibilityChange(true), true);
+  assert.equal(refreshesA, 2);
+});
+
+test("侧栏通过自身文档标识解析所属标签页", () => {
+  assert.equal(
+    sidePanelTabIdForSender(
+      { documentId: "panel-a" },
+      [
+        { contextType: "SIDE_PANEL", documentId: "panel-b", tabId: 2 },
+        { contextType: "SIDE_PANEL", documentId: "panel-a", tabId: 1 },
+      ],
+    ),
+    1,
+  );
+  assert.equal(sidePanelTabIdForSender({ documentId: "late-panel" }, []), null);
 });
