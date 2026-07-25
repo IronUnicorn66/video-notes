@@ -1,14 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { WHISPER_MODEL } from "../src/core/model-config.js";
+import {
+  DEFAULT_WHISPER_MODEL_ID,
+  WHISPER_MODEL,
+  WHISPER_MODELS,
+  getWhisperModel,
+} from "../src/core/model-config.js";
 
-test("Whisper 模型固定版本、大小与 SHA-256", () => {
-  assert.equal(WHISPER_MODEL.id, "base-q5_1");
-  assert.equal(WHISPER_MODEL.size, 59_707_625);
-  assert.equal(
-    WHISPER_MODEL.sha256,
-    "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898",
+test("Whisper 模型目录固定为三种可选模型", () => {
+  assert.deepEqual(
+    WHISPER_MODELS.map(({ id, size }) => ({ id, size })),
+    [
+      { id: "base-q5_1", size: 59_707_625 },
+      { id: "small-q5_1", size: 190_085_487 },
+      { id: "medium-q5_0", size: 539_212_467 },
+    ],
   );
-  assert.match(WHISPER_MODEL.url, /\/resolve\/[0-9a-f]{40}\//);
+  for (const model of WHISPER_MODELS) {
+    assert.match(model.sha256, /^[a-f0-9]{64}$/);
+    assert.match(model.url, /98aa99a0a9db05ae2342309f5096248665f7cba3/);
+  }
+});
+
+test("默认模型兼容旧调用方", () => {
+  assert.equal(DEFAULT_WHISPER_MODEL_ID, "base-q5_1");
+  assert.equal(WHISPER_MODEL, getWhisperModel(DEFAULT_WHISPER_MODEL_ID));
+});
+
+test("拒绝未知模型 ID", () => {
+  assert.throws(() => getWhisperModel("large-v3"), /未知 Whisper 模型/);
 });
