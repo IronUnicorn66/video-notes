@@ -1,7 +1,11 @@
 import { formatTimestamp } from "./core/note-format.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
-import { createAssetUrlRegistry } from "./core/asset-url-registry.js";
+import {
+  createAssetUrlRegistry,
+  loadNoteAssets,
+  stopNoteMedia,
+} from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
 
 const elements = {
@@ -166,44 +170,56 @@ function appendAssetWarning(container, message) {
 }
 
 async function renderNoteAssets(note, container, generation) {
-  const [screenshot, audio] = await Promise.all([
-    note.screenshotKey ? repository.getAsset(note.screenshotKey) : undefined,
-    note.audioKey ? repository.getAsset(note.audioKey) : undefined,
-  ]);
-  if (generation !== renderGeneration) return;
+  try {
+    const assets = await loadNoteAssets(note, {
+      getAsset: (key) => repository.getAsset(key),
+      registry: assetUrls,
+      isCurrent: () => generation === renderGeneration,
+      registryKeyPrefix: `note:${note.id}:`,
+    });
+    if (assets.stale) return;
 
-  if (note.screenshotKey) {
-    if (!screenshot) {
-      appendAssetWarning(container, "截图文件缺失");
-    } else {
-      const button = document.createElement("button");
-      button.className = "note-screenshot-button";
-      button.type = "button";
-      button.setAttribute("aria-label", "放大标记截图");
-      const image = document.createElement("img");
-      image.className = "note-screenshot";
-      image.loading = "lazy";
-      image.alt = "标记时的播放器截图";
-      image.src = assetUrls.set(note.screenshotKey, screenshot);
-      button.append(image);
-      button.addEventListener("click", () => {
-        elements.screenshotDialogImage.src = image.src;
-        if (!elements.screenshotDialog.open) elements.screenshotDialog.showModal();
-      });
-      container.append(button);
+    if (note.screenshotKey) {
+      if (!assets.screenshotUrl) {
+        appendAssetWarning(container, "截图文件缺失");
+      } else {
+        const button = document.createElement("button");
+        button.className = "note-screenshot-button";
+        button.type = "button";
+        button.setAttribute("aria-label", "放大标记截图");
+        const image = document.createElement("img");
+        image.className = "note-screenshot";
+        image.loading = "lazy";
+        image.alt = "标记时的播放器截图";
+        image.src = assets.screenshotUrl;
+        button.append(image);
+        button.addEventListener("click", () => {
+          elements.screenshotDialogImage.src = image.src;
+          if (!elements.screenshotDialog.open) elements.screenshotDialog.showModal();
+        });
+        container.append(button);
+      }
     }
-  }
 
-  if (note.audioKey) {
-    if (!audio) {
+    if (note.audioKey) {
+      if (!assets.audioUrl) {
+        appendAssetWarning(container, "录音文件缺失");
+      } else {
+        const player = document.createElement("audio");
+        player.className = "note-audio";
+        player.controls = true;
+        player.preload = "metadata";
+        player.src = assets.audioUrl;
+        container.append(player);
+      }
+    }
+  } catch {
+    if (generation !== renderGeneration) return;
+    if (note.screenshotKey) {
+      appendAssetWarning(container, "截图文件缺失");
+    }
+    if (note.audioKey) {
       appendAssetWarning(container, "录音文件缺失");
-    } else {
-      const player = document.createElement("audio");
-      player.className = "note-audio";
-      player.controls = true;
-      player.preload = "metadata";
-      player.src = assetUrls.set(note.audioKey, audio);
-      container.append(player);
     }
   }
 }
@@ -211,6 +227,7 @@ async function renderNoteAssets(note, container, generation) {
 function renderNotes(notes) {
   const generation = ++renderGeneration;
   closeScreenshotDialog();
+  stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();
   const saved = notes.filter((note) => note.status === "saved");
   elements.noteList.replaceChildren();
@@ -728,7 +745,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 window.addEventListener("pagehide", () => {
+  ++renderGeneration;
   closeScreenshotDialog();
+  stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();
   if (recording || voiceStarting) {
     void chrome.runtime.sendMessage({ type: "CANCEL_PENDING_VOICE", reason: "sidepanel-closed" });
