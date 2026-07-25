@@ -76,6 +76,27 @@ test("侧栏上下文按所属标签页隔离，并在重新可见时刷新自�
   assert.equal(refreshesA, 2);
 });
 
+test("编辑中重新可见延后刷新，并在编辑完成后只刷新一次", () => {
+  let editing = true;
+  let refreshes = 0;
+  const panel = createSidePanelRefreshController(
+    () => { refreshes += 1; },
+    { shouldDeferRefresh: () => editing },
+  );
+  panel.setTabId(1);
+
+  assert.equal(panel.handleVisibilityChange(true), true);
+  assert.equal(refreshes, 0);
+
+  editing = false;
+  assert.equal(panel.flushDeferredRefresh(), true);
+  assert.equal(refreshes, 1);
+  assert.equal(panel.flushDeferredRefresh(), false);
+
+  assert.equal(panel.handleVisibilityChange(true), true);
+  assert.equal(refreshes, 2);
+});
+
 test("侧栏通过自身文档标识解析所属标签页", () => {
   assert.equal(
     sidePanelTabIdForSender(

@@ -13,8 +13,18 @@ export function sidePanelTabIdForSender(sender, contexts) {
   return context?.tabId ?? null;
 }
 
-export function createSidePanelRefreshController(refresh) {
+export function createSidePanelRefreshController(refresh, { shouldDeferRefresh = () => false } = {}) {
   let tabId = null;
+  let deferredMessage = null;
+
+  function refreshOrDefer(message) {
+    if (shouldDeferRefresh(message)) {
+      deferredMessage = message;
+      return false;
+    }
+    refresh(message);
+    return true;
+  }
 
   return {
     get tabId() {
@@ -25,12 +35,19 @@ export function createSidePanelRefreshController(refresh) {
     },
     handleContextChanged(message) {
       if (!Number.isInteger(tabId) || message?.tabId !== tabId) return false;
-      refresh(message);
+      refreshOrDefer(message);
       return true;
     },
     handleVisibilityChange(visible) {
       if (!visible || !Number.isInteger(tabId)) return false;
-      refresh({ type: "SIDE_PANEL_VISIBLE", tabId });
+      refreshOrDefer({ type: "SIDE_PANEL_VISIBLE", tabId });
+      return true;
+    },
+    flushDeferredRefresh() {
+      if (!deferredMessage) return false;
+      const message = deferredMessage;
+      deferredMessage = null;
+      refresh(message);
       return true;
     },
   };

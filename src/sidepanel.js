@@ -66,8 +66,13 @@ const sidePanelRefresh = createSidePanelRefreshController((message) => {
     if (!message.recording) void refresh();
     return;
   }
-  if (editingNoteId) refreshAfterEdit = true;
-  else void refresh();
+  void refresh();
+}, {
+  shouldDeferRefresh(message) {
+    if (message.type === "VOICE_STATE_CHANGED" || !editingNoteId) return false;
+    refreshAfterEdit = true;
+    return true;
+  },
 });
 
 function showToast(message) {
@@ -298,7 +303,7 @@ function renderNotes(notes) {
           body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
           if (refreshAfterEdit) {
             refreshAfterEdit = false;
-            void refresh();
+            void sidePanelRefresh.flushDeferredRefresh();
           }
           return;
         }
@@ -315,7 +320,7 @@ function renderNotes(notes) {
         } finally {
           if (refreshAfterEdit) {
             refreshAfterEdit = false;
-            void refresh();
+            void sidePanelRefresh.flushDeferredRefresh();
           }
         }
       };
