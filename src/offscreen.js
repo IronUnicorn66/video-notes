@@ -5,7 +5,8 @@ import { WHISPER_MODEL, WHISPER_MODELS, getWhisperModel } from "./core/model-con
 import { createModelDownloader } from "./core/model-download.js";
 import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
 import { VideoNotesRepository } from "./core/storage.js";
-import { applyTranscript, isWhisperModelSwitchBlocked } from "./core/whisper-state.js";
+import { createTranscriberManager } from "./core/transcriber-manager.js";
+import { applyTranscript, assertModelSwitchAllowed } from "./core/whisper-state.js";
 import { createZip } from "./core/zip.js";
 
 const repository = new VideoNotesRepository();
@@ -14,9 +15,6 @@ let mediaStream = null;
 let audioChunks = [];
 let recordingNoteId = null;
 let recordingWhisperModel = null;
-let transcriber = null;
-let transcriberPromise = null;
-let transcriberModelId = "";
 let recordingCanTranscribe = false;
 let recordingTimeout = null;
 let recordingStarting = false;
@@ -104,26 +102,19 @@ async function cachedModelResponse(model = WHISPER_MODEL) {
 }
 
 async function configuredWhisperModel() {
-  const { whisperModel = "" } = await getLocalStorage({ whisperModel: "" });
-  return whisperModel ? getWhisperModel(whisperModel) : WHISPER_MODEL;
+  const { whisperSelectedModel = "" } = await getLocalStorage({ whisperSelectedModel: "" });
+  return getWhisperModel(whisperSelectedModel || WHISPER_MODEL.id);
 }
 
 async function downloadAndEnableModel(modelId = WHISPER_MODEL.id) {
-  if (isWhisperModelSwitchBlocked({
-    recording: recorder?.state === "recording",
-    starting: recordingStarting,
-    stopping: recordingStopping,
-    downloading: modelDownloading,
-    transcriptionNoteIds: [...transcriptionJobs.keys()],
-  })) {
-    throw new Error("录音、转写或下载期间不能切换模型");
-  }
+  assertModelSwitchAllowed(processingState());
   modelDownloading = true;
   await setWhisperState("downloading", { whisperError: "" });
   try {
     const result = await modelDownloader.download(getWhisperModel(modelId));
+    await transcriberManager.dispose();
     await setWhisperState("ready", {
-      whisperModel: result.model,
+      whisperSelectedModel: result.model,
       whisperError: "",
     });
     return result;
@@ -135,41 +126,58 @@ async function downloadAndEnableModel(modelId = WHISPER_MODEL.id) {
   }
 }
 
-async function ensureTranscriber() {
-  const model = await configuredWhisperModel();
-  if (transcriber?.isReady && transcriberModelId === model.id) return transcriber;
-  if (transcriberPromise) return transcriberPromise;
+function processingState() {
+  return {
+    whisperState: modelDownloading
+      ? "downloading"
+      : recordingStarting || recordingStopping || recorder?.state === "recording"
+        ? "recording"
+        : transcriptionJobs.size > 0
+          ? "transcribing"
+          : "ready",
+    modelDownloading,
+    transcriptionCount: transcriptionJobs.size,
+    recording: recordingStarting || recordingStopping || recorder?.state === "recording",
+  };
+}
 
-  transcriberPromise = (async () => {
-    if (!crossOriginIsolated) throw new Error("扩展页面未启用 SharedArrayBuffer 隔离");
-    const response = await cachedModelResponse(model);
-    if (!response) throw new Error("本地语音模型尚未下载");
-    if (transcriber) {
-      transcriber.destroy();
-      transcriber = null;
-      transcriberModelId = "";
-    }
-    const file = new File([await response.blob()], model.filename, {
-      type: "application/octet-stream",
-    });
-    const instance = new FileTranscriber({
-      createModule: createWhisperModule,
-      model: file,
-      print: () => {},
-      printErr: (message) => console.warn("Whisper", message),
-    });
-    instance.Module.mainScriptUrlOrBlob = chrome.runtime.getURL("shout-worker.js");
-    await instance.init();
-    transcriber = instance;
-    transcriberModelId = model.id;
-    return instance;
-  })();
-
+async function createFileTranscriber(modelId) {
+  if (!crossOriginIsolated) throw new Error("扩展页面未启用 SharedArrayBuffer 隔离");
+  const model = getWhisperModel(modelId);
+  const response = await cachedModelResponse(model);
+  if (!response) throw new Error(`尚未下载 ${model.label}`);
+  const file = new File([await response.blob()], model.filename, {
+    type: "application/octet-stream",
+  });
+  const instance = new FileTranscriber({
+    createModule: createWhisperModule,
+    model: file,
+    print: () => {},
+    printErr: (message) => console.warn("Whisper", message),
+  });
+  instance.Module.mainScriptUrlOrBlob = chrome.runtime.getURL("shout-worker.js");
   try {
-    return await transcriberPromise;
-  } finally {
-    transcriberPromise = null;
+    await instance.init();
+    return instance;
+  } catch (error) {
+    await instance.destroy?.();
+    throw error;
   }
+}
+
+const transcriberManager = createTranscriberManager({ create: createFileTranscriber });
+
+async function ensureTranscriber(modelId) {
+  return transcriberManager.ensure(modelId);
+}
+
+async function selectWhisperModel(modelId) {
+  assertModelSwitchAllowed(processingState());
+  const model = getWhisperModel(modelId);
+  if (!await modelDownloader.cached(model)) throw new Error(`尚未下载 ${model.label}`);
+  await transcriberManager.dispose();
+  await setWhisperState("ready", { whisperSelectedModel: model.id, whisperError: "" });
+  return { modelId: model.id };
 }
 
 async function startRecording(noteId) {
@@ -180,8 +188,8 @@ async function startRecording(noteId) {
   recordingAbortRequested = false;
   recordingNoteId = noteId;
   try {
-    const { whisperModel = "" } = await getLocalStorage({ whisperModel: "" });
-    recordingWhisperModel = whisperModel ? getWhisperModel(whisperModel) : null;
+    const { whisperSelectedModel = "" } = await getLocalStorage({ whisperSelectedModel: "" });
+    recordingWhisperModel = whisperSelectedModel ? getWhisperModel(whisperSelectedModel) : null;
     const model = recordingWhisperModel && await cachedModelResponse(recordingWhisperModel);
     recordingCanTranscribe = Boolean(recordingWhisperModel && model);
     if (recordingWhisperModel && !model) {
@@ -310,7 +318,7 @@ async function transcribeNote(noteId) {
     if (!note?.audioKey) throw new Error("没有找到原始录音");
     const audio = await repository.getAsset(note.audioKey);
     if (!audio) throw new Error("原始录音已丢失");
-    const engine = await ensureTranscriber();
+    const engine = await ensureTranscriber((await configuredWhisperModel()).id);
     const result = await engine.transcribe(
       new File([audio], `${noteId}.webm`, { type: audio.type || "audio/webm" }),
       {
@@ -447,7 +455,7 @@ async function handleMessage(message) {
         stopping: recordingStopping,
         downloading: modelDownloading,
         transcriptionNoteIds: [...transcriptionJobs.keys()],
-        modelCached: Boolean(await cachedModelResponse()),
+        loadedModelId: transcriberManager.loadedModelId,
       };
     case "GET_MODEL_CACHE_STATUS":
       return { cachedModelIds: await modelDownloader.cachedIds(WHISPER_MODELS) };
@@ -459,6 +467,8 @@ async function handleMessage(message) {
       return abortRecording();
     case "DOWNLOAD_MODEL":
       return downloadAndEnableModel(message.modelId);
+    case "SELECT_WHISPER_MODEL":
+      return selectWhisperModel(message.modelId);
     case "CHECK_BUNDLED_MODEL":
       return { bundled: Boolean(await bundledModelResponse()) };
     case "TRANSCRIBE_NOTE":

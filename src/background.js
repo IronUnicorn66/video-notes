@@ -4,8 +4,13 @@ import {
   STUDY_SOUND_EXTENSION_ID,
   noteHoldMessage,
 } from "./core/study-sound-protocol.js";
-import { WHISPER_MODEL, WHISPER_ORIGINS, getWhisperModel } from "./core/model-config.js";
-import { isWhisperModelSwitchBlocked } from "./core/whisper-state.js";
+import {
+  DEFAULT_WHISPER_MODEL_ID,
+  WHISPER_MODELS,
+  WHISPER_ORIGINS,
+  getWhisperModel,
+} from "./core/model-config.js";
+import { assertModelSwitchAllowed } from "./core/whisper-state.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
   canUseMicrophone,
@@ -33,10 +38,18 @@ let microphonePermissionTabId = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  const settings = await chrome.storage.local.get(["shortcutCode", "whisperState"]);
+  const settings = await chrome.storage.local.get([
+    "shortcutCode",
+    "whisperState",
+    "whisperSelectedModel",
+    "whisperModel",
+  ]);
   await chrome.storage.local.set({
     shortcutCode: settings.shortcutCode ?? "AltRight",
     whisperState: settings.whisperState ?? "disabled",
+    whisperSelectedModel: getWhisperModel(
+      settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
+    ).id,
   });
 });
 
@@ -118,6 +131,7 @@ async function sendToOffscreen(message) {
 async function recoverTransientWhisperState() {
   const settings = await chrome.storage.local.get({
     whisperState: "disabled",
+    whisperSelectedModel: "",
     whisperModel: "",
   });
   let processing = null;
@@ -126,10 +140,10 @@ async function recoverTransientWhisperState() {
   }
   const cacheStatus = await sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" });
   const cachedModelIds = cacheStatus.cachedModelIds;
-  const selectedModelId = cachedModelIds.includes(settings.whisperModel)
-    ? settings.whisperModel
-    : cachedModelIds[0] ?? "";
-  const modelAvailable = selectedModelId !== "";
+  const selectedModelId = getWhisperModel(
+    settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
+  ).id;
+  const modelAvailable = cachedModelIds.includes(selectedModelId);
   const transientStates = new Set(["downloading", "recording", "transcribing"]);
   let whisperState = settings.whisperState;
   let whisperError;
@@ -141,14 +155,14 @@ async function recoverTransientWhisperState() {
   else if (transientStates.has(whisperState)) {
     whisperState = modelAvailable ? "ready" : "error";
     if (!modelAvailable) whisperError = "上次本地语音任务中断，请重新启用";
-  } else if (settings.whisperModel && !modelAvailable) {
+  } else if (settings.whisperSelectedModel && !modelAvailable) {
     whisperState = "error";
     whisperError = "本地语音模型缓存已丢失，请重新启用";
   }
 
   const recovered = {
     whisperState,
-    whisperModel: selectedModelId,
+    whisperSelectedModel: selectedModelId,
   };
   if (whisperError !== undefined) recovered.whisperError = whisperError;
   else if (whisperState === "ready") recovered.whisperError = "";
@@ -517,7 +531,7 @@ async function currentContextAndNotes(sender) {
   return { context, notes: await repository.listNotes(context.sessionId) };
 }
 
-async function enableWhisper(modelId = WHISPER_MODEL.id) {
+async function enableWhisper(modelId = DEFAULT_WHISPER_MODEL_ID) {
   if (whisperEnablePromise) throw new Error("模型正在下载");
   whisperEnablePromise = enableWhisperCore(modelId);
   try {
@@ -531,19 +545,22 @@ async function enableWhisperCore(modelId) {
   await whisperRecoveryPromise;
   const model = getWhisperModel(modelId);
   const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
-  if (isWhisperModelSwitchBlocked(processing)) {
-    throw new Error("录音、转写或下载期间不能切换模型");
-  }
-  const source = model.id === WHISPER_MODEL.id
-    ? await sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" })
-    : { bundled: false };
+  assertModelSwitchAllowed({
+    whisperState: processing.downloading
+      ? "downloading"
+      : processing.recording || processing.starting || processing.stopping
+        ? "recording"
+        : processing.transcriptionNoteIds.length > 0
+          ? "transcribing"
+          : "ready",
+    modelDownloading: processing.downloading,
+    transcriptionCount: processing.transcriptionNoteIds.length,
+    recording: processing.recording || processing.starting || processing.stopping,
+  });
   try {
-    if (!source.bundled && !await chrome.permissions.request({ origins: WHISPER_ORIGINS })) {
-      throw new Error("未授权下载本地语音模型");
-    }
     await chrome.storage.local.set({ whisperState: "downloading", whisperError: "" });
     const result = await sendToOffscreen({ type: "DOWNLOAD_MODEL", modelId: model.id });
-    await chrome.storage.local.set({ whisperState: "ready", whisperModel: result.model });
+    await chrome.storage.local.set({ whisperState: "ready", whisperSelectedModel: result.model });
     return result;
   } catch (error) {
     await chrome.storage.local.set({ whisperState: "error", whisperError: error.message });
@@ -551,6 +568,25 @@ async function enableWhisperCore(modelId) {
   } finally {
     await chrome.permissions.remove({ origins: WHISPER_ORIGINS }).catch(() => false);
   }
+}
+
+async function selectWhisperModel(modelId) {
+  await whisperRecoveryPromise;
+  getWhisperModel(modelId);
+  const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
+  assertModelSwitchAllowed({
+    whisperState: processing.downloading
+      ? "downloading"
+      : processing.recording || processing.starting || processing.stopping
+        ? "recording"
+        : processing.transcriptionNoteIds.length > 0
+          ? "transcribing"
+          : "ready",
+    modelDownloading: processing.downloading,
+    transcriptionCount: processing.transcriptionNoteIds.length,
+    recording: processing.recording || processing.starting || processing.stopping,
+  });
+  return sendToOffscreen({ type: "SELECT_WHISPER_MODEL", modelId });
 }
 
 async function handleMessage(message, sender) {
@@ -633,11 +669,48 @@ async function handleMessage(message, sender) {
       return stopVoice("timeout");
     case "ENABLE_WHISPER":
       return enableWhisper(message.modelId);
+    case "SELECT_WHISPER_MODEL":
+      return selectWhisperModel(message.modelId);
     case "CHECK_BUNDLED_MODEL":
       return sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" });
     case "GET_WHISPER_STATUS":
       await whisperRecoveryPromise;
-      return chrome.storage.local.get(["whisperState", "whisperError", "whisperModel"]);
+      {
+        const [settings, processing, cacheStatus] = await Promise.all([
+          chrome.storage.local.get([
+            "whisperState",
+            "whisperError",
+            "whisperSelectedModel",
+            "whisperDownloadModel",
+            "whisperDownloadedBytes",
+          ]),
+          sendToOffscreen({ type: "GET_PROCESSING_STATE" }),
+          sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
+        ]);
+        const whisperSelectedModel = getWhisperModel(
+          settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
+        ).id;
+        return {
+          whisperState: settings.whisperState,
+          whisperError: settings.whisperError,
+          selectedModelId: whisperSelectedModel,
+          loadedModelId: processing.loadedModelId,
+          cachedModelIds: cacheStatus.cachedModelIds,
+          download: processing.downloading
+            ? {
+                modelId: settings.whisperDownloadModel,
+                downloadedBytes: settings.whisperDownloadedBytes,
+              }
+            : null,
+          models: WHISPER_MODELS.map(({ id, label, size, recommended, experimental }) => ({
+            id,
+            label,
+            size,
+            recommended: Boolean(recommended),
+            experimental: Boolean(experimental),
+          })),
+        };
+      }
     case "SET_SHORTCUT":
       await chrome.storage.local.set({ shortcutCode: message.code });
       return { code: message.code };

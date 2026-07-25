@@ -1,5 +1,5 @@
 import { formatTimestamp } from "./core/note-format.js";
-import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
+import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 
 const elements = {
@@ -14,8 +14,10 @@ const elements = {
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
   exportButton: document.querySelector("#export-button"),
-  whisperButton: document.querySelector("#whisper-button"),
   whisperDetail: document.querySelector("#whisper-detail"),
+  whisperModelSelect: document.querySelector("#whisper-model-select"),
+  whisperModelAction: document.querySelector("#whisper-model-action"),
+  whisperModelWarning: document.querySelector("#whisper-model-warning"),
   settings: document.querySelector("#permission-settings"),
   screenshotPermissionButton: document.querySelector("#screenshot-permission-button"),
   screenshotPermissionDetail: document.querySelector("#screenshot-permission-detail"),
@@ -41,6 +43,7 @@ let editingNoteId = null;
 let refreshAfterEdit = false;
 let microphoneReady = false;
 let microphonePermissionStatus = null;
+let pendingWhisperModelId = null;
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -355,17 +358,40 @@ function shortcutLabel(code) {
 async function renderWhisperStatus() {
   const status = await request({ type: "GET_WHISPER_STATUS" });
   const labels = {
-    disabled: ["尚未启用。首次下载约 57 MiB。", "启用", false],
-    downloading: ["正在下载并校验模型，可在中断后续传。", "下载中", true],
-    ready: [`${status.whisperModel ?? WHISPER_MODEL.id} 已缓存在本机。`, "已启用", true],
-    recording: ["正在录音，松开后会在本机转写。", "已启用", true],
-    transcribing: ["正在本机转写，视频可继续播放。", "转写中", true],
-    error: [`本地语音异常：${status.whisperError || "未知错误"}`, "重试", false],
+    disabled: "尚未启用。请选择模型后下载。",
+    downloading: "正在下载并校验模型，可在中断后续传。",
+    ready: "已启用，可在本机转写。",
+    recording: "正在录音，松开后会在本机转写。",
+    transcribing: "正在本机转写，视频可继续播放。",
+    error: `本地语音异常：${status.whisperError || "未知错误"}`,
   };
-  const [detail, button, disabled] = labels[status.whisperState] ?? labels.disabled;
-  elements.whisperDetail.textContent = detail;
-  elements.whisperButton.textContent = button;
-  elements.whisperButton.disabled = disabled;
+  const selectedModelId = pendingWhisperModelId ?? status.selectedModelId;
+  if (elements.whisperModelSelect.options.length !== status.models.length) {
+    elements.whisperModelSelect.replaceChildren(...status.models.map((model) => {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = `${model.label}${model.recommended ? "（推荐）" : ""}`;
+      return option;
+    }));
+  }
+  elements.whisperModelSelect.value = selectedModelId;
+  const selectedModel = status.models.find(({ id }) => id === selectedModelId);
+  const downloadingModel = status.models.find(({ id }) => id === status.download?.modelId);
+  const busy = ["downloading", "recording", "transcribing"].includes(status.whisperState)
+    || Boolean(status.download);
+  const cached = status.cachedModelIds.includes(selectedModelId);
+  elements.whisperDetail.textContent = downloadingModel
+    ? `正在下载并校验 ${downloadingModel.label}（已下载 ${Math.round(
+      (status.download.downloadedBytes ?? 0) / 1024 / 1024,
+    )} / ${Math.round(downloadingModel.size / 1024 / 1024)} MiB）。`
+    : labels[status.whisperState] ?? labels.disabled;
+  elements.whisperModelAction.textContent = cached ? "使用此模型" : "下载并使用";
+  elements.whisperModelSelect.disabled = busy;
+  elements.whisperModelAction.disabled = busy;
+  elements.whisperModelWarning.hidden = selectedModel?.experimental !== true;
+  elements.whisperModelWarning.textContent = selectedModel?.experimental
+    ? "约 514 MiB，当前设备可能转写较慢"
+    : "";
 }
 
 elements.input.addEventListener("focus", () => void beginTypedDraft());
@@ -453,16 +479,31 @@ elements.exportButton.addEventListener("click", async () => {
   }
 });
 
-elements.whisperButton.addEventListener("click", async () => {
-  elements.whisperButton.disabled = true;
+elements.whisperModelSelect.addEventListener("change", () => {
+  pendingWhisperModelId = elements.whisperModelSelect.value;
+  void renderWhisperStatus();
+});
+
+elements.whisperModelAction.addEventListener("click", async () => {
+  elements.whisperModelAction.disabled = true;
   try {
-    const source = await request({ type: "CHECK_BUNDLED_MODEL" });
-    if (!source.bundled) {
-      const granted = await chrome.permissions.request({ origins: WHISPER_ORIGINS });
-      if (!granted) throw new Error("未授权下载本地语音模型");
+    const status = await request({ type: "GET_WHISPER_STATUS" });
+    const modelId = elements.whisperModelSelect.value;
+    if (status.cachedModelIds.includes(modelId)) {
+      await request({ type: "SELECT_WHISPER_MODEL", modelId });
+      showToast("已切换本地 Whisper 模型");
+    } else {
+      const source = modelId === "base-q5_1"
+        ? await request({ type: "CHECK_BUNDLED_MODEL" })
+        : { bundled: false };
+      if (!source.bundled) {
+        const granted = await chrome.permissions.request({ origins: WHISPER_ORIGINS });
+        if (!granted) throw new Error("未授权下载本地语音模型");
+      }
+      await request({ type: "ENABLE_WHISPER", modelId });
+      showToast("本地 Whisper 已启用");
     }
-    await request({ type: "ENABLE_WHISPER" });
-    showToast("本地 Whisper 已启用");
+    pendingWhisperModelId = null;
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -507,7 +548,12 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes.whisperState || changes.whisperDownloadedBytes)) {
+  if (area === "local" && (
+    changes.whisperState
+    || changes.whisperSelectedModel
+    || changes.whisperDownloadModel
+    || changes.whisperDownloadedBytes
+  )) {
     void renderWhisperStatus();
   }
   if (area === "local" && changes.shortcutCode?.newValue) {

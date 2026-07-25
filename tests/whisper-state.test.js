@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assertModelSwitchAllowed,
   applyTranscript,
   isWhisperModelSwitchBlocked,
   transitionWhisperState,
@@ -24,6 +25,25 @@ test("录音、转写或下载期间拒绝切换 Whisper 模型", () => {
   assert.equal(isWhisperModelSwitchBlocked({ downloading: true }), true);
   assert.equal(isWhisperModelSwitchBlocked({ transcriptionNoteIds: ["note-1"] }), true);
 });
+
+test("空闲状态允许切换模型", () => {
+  assert.doesNotThrow(() => assertModelSwitchAllowed({
+    whisperState: "ready",
+    modelDownloading: false,
+    transcriptionCount: 0,
+    recording: false,
+  }));
+});
+
+for (const busyState of [
+  { whisperState: "downloading", modelDownloading: true, transcriptionCount: 0, recording: false },
+  { whisperState: "recording", modelDownloading: false, transcriptionCount: 0, recording: true },
+  { whisperState: "transcribing", modelDownloading: false, transcriptionCount: 1, recording: false },
+]) {
+  test(`忙碌状态 ${busyState.whisperState} 拒绝切换模型`, () => {
+    assert.throws(() => assertModelSwitchAllowed(busyState), /任务结束后再切换/);
+  });
+}
 
 test("未编辑的空语音标记直接采用转写", () => {
   const note = applyTranscript({ body: "", userEditVersion: 0 }, "口述内容");

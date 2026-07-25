@@ -23,6 +23,22 @@ export function isWhisperModelSwitchBlocked({
   return recording || starting || stopping || downloading || transcriptionNoteIds.length > 0;
 }
 
+export function assertModelSwitchAllowed({
+  whisperState,
+  modelDownloading,
+  transcriptionCount,
+  recording,
+}) {
+  if (
+    modelDownloading
+    || recording
+    || transcriptionCount > 0
+    || ["downloading", "recording", "transcribing"].includes(whisperState)
+  ) {
+    throw new Error("请等待当前语音任务结束后再切换模型");
+  }
+}
+
 export function applyTranscript(note, transcript) {
   const text = String(transcript ?? "").trim();
   if ((note.userEditVersion ?? 0) === 0 && !note.body?.trim()) {

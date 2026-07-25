@@ -66,11 +66,14 @@
             <button id="microphone-permission-button" class="secondary-button" type="button">授权</button>
           </div>
           <div class="setting-row">
-            <div>
+            <div class="whisper-setting">
               <strong>本地 Whisper</strong>
               <p id="whisper-detail">尚未启用。首次下载约 57 MiB。</p>
+              <label for="whisper-model-select">转写模型</label>
+              <select id="whisper-model-select"></select>
+              <p id="whisper-model-warning" hidden></p>
             </div>
-            <button id="whisper-button" class="secondary-button" type="button">启用</button>
+            <button id="whisper-model-action" class="secondary-button" type="button">下载并使用</button>
           </div>
           <div class="setting-row">
             <div>
