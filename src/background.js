@@ -4,7 +4,7 @@ import {
   STUDY_SOUND_EXTENSION_ID,
   noteHoldMessage,
 } from "./core/study-sound-protocol.js";
-import { WHISPER_MODEL, WHISPER_ORIGINS } from "./core/model-config.js";
+import { WHISPER_MODEL, WHISPER_ORIGINS, getWhisperModel } from "./core/model-config.js";
 import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
 import {
   canUseMicrophone,
@@ -113,16 +113,6 @@ async function sendToOffscreen(message) {
   return response;
 }
 
-async function hasLocalWhisperModel() {
-  const cached = await (await caches.open(WHISPER_MODEL.cacheName)).match(WHISPER_MODEL.url);
-  if (cached) return true;
-  try {
-    return (await fetch(chrome.runtime.getURL(`models/${WHISPER_MODEL.filename}`))).ok;
-  } catch {
-    return false;
-  }
-}
-
 async function recoverTransientWhisperState() {
   const settings = await chrome.storage.local.get({
     whisperState: "disabled",
@@ -132,7 +122,12 @@ async function recoverTransientWhisperState() {
   if (await chrome.offscreen.hasDocument()) {
     processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" }).catch(() => null);
   }
-  const modelAvailable = processing?.modelCached ?? await hasLocalWhisperModel();
+  const cacheStatus = await sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" });
+  const cachedModelIds = cacheStatus.cachedModelIds;
+  const selectedModelId = cachedModelIds.includes(settings.whisperModel)
+    ? settings.whisperModel
+    : cachedModelIds[0] ?? "";
+  const modelAvailable = selectedModelId !== "";
   const transientStates = new Set(["downloading", "recording", "transcribing"]);
   let whisperState = settings.whisperState;
   let whisperError;
@@ -151,7 +146,7 @@ async function recoverTransientWhisperState() {
 
   const recovered = {
     whisperState,
-    whisperModel: modelAvailable ? WHISPER_MODEL.id : "",
+    whisperModel: selectedModelId,
   };
   if (whisperError !== undefined) recovered.whisperError = whisperError;
   else if (whisperState === "ready") recovered.whisperError = "";
@@ -520,20 +515,25 @@ async function currentContextAndNotes(sender) {
   return { context, notes: await repository.listNotes(context.sessionId) };
 }
 
-async function enableWhisper() {
+async function enableWhisper(modelId = WHISPER_MODEL.id) {
   await whisperRecoveryPromise;
-  const source = await sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" });
-  const granted = source.bundled || await chrome.permissions.contains({ origins: WHISPER_ORIGINS });
-  if (!granted) throw new Error("未授权下载本地语音模型");
-  await chrome.storage.local.set({ whisperState: "downloading", whisperError: "" });
+  const model = getWhisperModel(modelId);
+  const source = model.id === WHISPER_MODEL.id
+    ? await sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" })
+    : { bundled: false };
   try {
-    const result = await sendToOffscreen({ type: "DOWNLOAD_MODEL" });
+    if (!source.bundled && !await chrome.permissions.request({ origins: WHISPER_ORIGINS })) {
+      throw new Error("未授权下载本地语音模型");
+    }
+    await chrome.storage.local.set({ whisperState: "downloading", whisperError: "" });
+    const result = await sendToOffscreen({ type: "DOWNLOAD_MODEL", modelId: model.id });
     await chrome.storage.local.set({ whisperState: "ready", whisperModel: result.model });
-    await chrome.permissions.remove({ origins: WHISPER_ORIGINS });
     return result;
   } catch (error) {
     await chrome.storage.local.set({ whisperState: "error", whisperError: error.message });
     throw error;
+  } finally {
+    await chrome.permissions.remove({ origins: WHISPER_ORIGINS }).catch(() => false);
   }
 }
 
@@ -616,7 +616,7 @@ async function handleMessage(message, sender) {
       }
       return stopVoice("timeout");
     case "ENABLE_WHISPER":
-      return enableWhisper();
+      return enableWhisper(message.modelId);
     case "CHECK_BUNDLED_MODEL":
       return sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" });
     case "GET_WHISPER_STATUS":

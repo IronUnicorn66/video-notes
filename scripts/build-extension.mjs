@@ -4,10 +4,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { build } from "esbuild";
-import { WHISPER_MODEL } from "../src/core/model-config.js";
+import { getWhisperModel } from "../src/core/model-config.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "dist");
+const bundledModel = getWhisperModel("base-q5_1");
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -33,14 +34,14 @@ await Promise.all([
 if (process.env.VIDEO_NOTES_BUNDLED_MODEL) {
   const modelPath = resolve(process.env.VIDEO_NOTES_BUNDLED_MODEL);
   const modelStat = await stat(modelPath);
-  if (modelStat.size !== WHISPER_MODEL.size) {
+  if (modelStat.size !== bundledModel.size) {
     throw new Error(`内置模型大小无效：${modelStat.size}`);
   }
   const modelBytes = await readFile(modelPath);
   const digest = createHash("sha256").update(modelBytes).digest("hex");
-  if (digest !== WHISPER_MODEL.sha256) throw new Error("内置模型 SHA-256 无效");
+  if (digest !== bundledModel.sha256) throw new Error("内置模型 SHA-256 无效");
   await mkdir(resolve(output, "models"), { recursive: true });
-  await writeFile(resolve(output, "models", WHISPER_MODEL.filename), modelBytes);
+  await writeFile(resolve(output, "models", bundledModel.filename), modelBytes);
 }
 
 await Promise.all([

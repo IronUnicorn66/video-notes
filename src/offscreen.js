@@ -1,20 +1,22 @@
 import createWhisperModule from "@transcribe/shout";
 import { FileTranscriber } from "@transcribe/transcriber";
 
-import { WHISPER_MODEL } from "./core/model-config.js";
+import { WHISPER_MODEL, WHISPER_MODELS, getWhisperModel } from "./core/model-config.js";
+import { createModelDownloader } from "./core/model-download.js";
 import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { applyTranscript } from "./core/whisper-state.js";
 import { createZip } from "./core/zip.js";
 
 const repository = new VideoNotesRepository();
-const MODEL_CHUNK_SIZE = 4 * 1024 * 1024;
 let recorder = null;
 let mediaStream = null;
 let audioChunks = [];
 let recordingNoteId = null;
+let recordingWhisperModel = null;
 let transcriber = null;
 let transcriberPromise = null;
+let transcriberModelId = "";
 let recordingCanTranscribe = false;
 let recordingTimeout = null;
 let recordingStarting = false;
@@ -52,6 +54,7 @@ function releaseRecordingResources() {
   mediaStream = null;
   audioChunks = [];
   recordingNoteId = null;
+  recordingWhisperModel = null;
   recordingCanTranscribe = false;
 }
 
@@ -64,26 +67,13 @@ async function setWhisperState(whisperState, extra = {}) {
   await setLocalStorage({ whisperState, ...extra });
 }
 
-async function modelCache() {
-  return caches.open(WHISPER_MODEL.cacheName);
-}
-
-async function bundledModelResponse() {
+async function bundledModelResponse(model = WHISPER_MODEL) {
+  if (model.id !== WHISPER_MODEL.id) return undefined;
   try {
-    const response = await fetch(chrome.runtime.getURL(`models/${WHISPER_MODEL.filename}`));
+    const response = await fetch(chrome.runtime.getURL(`models/${model.filename}`));
     return response.ok ? response : undefined;
   } catch {
     return undefined;
-  }
-}
-
-function chunkCacheKey(offset) {
-  return `${WHISPER_MODEL.url}?video-notes-chunk=${offset}`;
-}
-
-async function clearModelChunks(cache) {
-  for (let offset = 0; offset < WHISPER_MODEL.size; offset += MODEL_CHUNK_SIZE) {
-    await cache.delete(chunkCacheKey(offset));
   }
 }
 
@@ -95,95 +85,35 @@ async function sha256(buffer) {
   return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", buffer)));
 }
 
-async function cachedModelResponse() {
-  const cached = await (await modelCache()).match(WHISPER_MODEL.url);
+const modelDownloader = createModelDownloader({
+  openCache: (cacheName) => caches.open(cacheName),
+  fetchResource: (...args) => fetch(...args),
+  digest: sha256,
+  readBundled: bundledModelResponse,
+  onProgress: ({ modelId, downloadedBytes }) => setLocalStorage({
+    whisperDownloadModel: modelId,
+    whisperDownloadedBytes: downloadedBytes,
+  }),
+  clearProgress: () => removeLocalStorage(["whisperDownloadModel", "whisperDownloadedBytes"]),
+});
+
+async function cachedModelResponse(model = WHISPER_MODEL) {
+  const cached = await (await caches.open(model.cacheName)).match(model.url);
   if (cached) return cached;
-  return bundledModelResponse();
+  return bundledModelResponse(model);
 }
 
-async function downloadModel() {
-  const cache = await modelCache();
-  const existing = await cache.match(WHISPER_MODEL.url);
-  if (existing) {
-    return { model: WHISPER_MODEL.id, cached: true };
-  }
-
-  const bundled = await bundledModelResponse();
-  if (bundled) {
-    const bytes = await bundled.arrayBuffer();
-    if (bytes.byteLength !== WHISPER_MODEL.size || await sha256(bytes) !== WHISPER_MODEL.sha256) {
-      throw new Error("内置模型校验失败");
-    }
-    await cache.put(
-      WHISPER_MODEL.url,
-      new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } }),
-    );
-    return { model: WHISPER_MODEL.id, cached: true, bundled: true };
-  }
-
-  const chunks = [];
-  let downloadedBytes = 0;
-  for (let offset = 0; offset < WHISPER_MODEL.size; offset += MODEL_CHUNK_SIZE) {
-    const end = Math.min(offset + MODEL_CHUNK_SIZE, WHISPER_MODEL.size) - 1;
-    const key = chunkCacheKey(offset);
-    let response = await cache.match(key);
-    if (!response) {
-      response = await fetch(WHISPER_MODEL.url, {
-        cache: "no-store",
-        headers: { Range: `bytes=${offset}-${end}` },
-      });
-      if (!response.ok) throw new Error(`模型下载失败（HTTP ${response.status}）`);
-      const received = await response.arrayBuffer();
-      if (response.status === 200 && received.byteLength === WHISPER_MODEL.size) {
-        chunks.length = 0;
-        chunks.push(new Uint8Array(received));
-        downloadedBytes = received.byteLength;
-        break;
-      }
-      const expectedLength = end - offset + 1;
-      if (response.status !== 206 || received.byteLength !== expectedLength) {
-        throw new Error(`模型分块长度异常：期望 ${expectedLength}，收到 ${received.byteLength}`);
-      }
-      response = new Response(received, { headers: { "Content-Type": "application/octet-stream" } });
-      await cache.put(key, response.clone());
-    }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    chunks.push(bytes);
-    downloadedBytes += bytes.byteLength;
-    await setLocalStorage({ whisperDownloadedBytes: downloadedBytes });
-  }
-
-  const modelBytes = new Uint8Array(downloadedBytes);
-  let position = 0;
-  for (const chunk of chunks) {
-    modelBytes.set(chunk, position);
-    position += chunk.byteLength;
-  }
-  if (modelBytes.byteLength !== WHISPER_MODEL.size) {
-    await clearModelChunks(cache);
-    throw new Error(`模型大小校验失败：${modelBytes.byteLength}`);
-  }
-  const digest = await sha256(modelBytes.buffer);
-  if (digest !== WHISPER_MODEL.sha256) {
-    await clearModelChunks(cache);
-    throw new Error("模型 SHA-256 校验失败");
-  }
-
-  await cache.put(
-    WHISPER_MODEL.url,
-    new Response(modelBytes, { headers: { "Content-Type": "application/octet-stream" } }),
-  );
-  await clearModelChunks(cache);
-  await removeLocalStorage("whisperDownloadedBytes");
-  return { model: WHISPER_MODEL.id, cached: false };
+async function configuredWhisperModel() {
+  const { whisperModel = "" } = await getLocalStorage({ whisperModel: "" });
+  return whisperModel ? getWhisperModel(whisperModel) : WHISPER_MODEL;
 }
 
-async function downloadAndEnableModel() {
+async function downloadAndEnableModel(modelId = WHISPER_MODEL.id) {
   if (modelDownloading) throw new Error("模型正在下载");
   modelDownloading = true;
   await setWhisperState("downloading", { whisperError: "" });
   try {
-    const result = await downloadModel();
+    const result = await modelDownloader.download(getWhisperModel(modelId));
     await setWhisperState("ready", {
       whisperModel: result.model,
       whisperError: "",
@@ -198,14 +128,15 @@ async function downloadAndEnableModel() {
 }
 
 async function ensureTranscriber() {
-  if (transcriber?.isReady) return transcriber;
+  const model = await configuredWhisperModel();
+  if (transcriber?.isReady && transcriberModelId === model.id) return transcriber;
   if (transcriberPromise) return transcriberPromise;
 
   transcriberPromise = (async () => {
     if (!crossOriginIsolated) throw new Error("扩展页面未启用 SharedArrayBuffer 隔离");
-    const response = await cachedModelResponse();
+    const response = await cachedModelResponse(model);
     if (!response) throw new Error("本地语音模型尚未下载");
-    const file = new File([await response.blob()], WHISPER_MODEL.filename, {
+    const file = new File([await response.blob()], model.filename, {
       type: "application/octet-stream",
     });
     const instance = new FileTranscriber({
@@ -217,6 +148,7 @@ async function ensureTranscriber() {
     instance.Module.mainScriptUrlOrBlob = chrome.runtime.getURL("shout-worker.js");
     await instance.init();
     transcriber = instance;
+    transcriberModelId = model.id;
     return instance;
   })();
 
@@ -235,12 +167,11 @@ async function startRecording(noteId) {
   recordingAbortRequested = false;
   recordingNoteId = noteId;
   try {
-    const [{ whisperModel = "" }, model] = await Promise.all([
-      getLocalStorage({ whisperModel: "" }),
-      cachedModelResponse(),
-    ]);
-    recordingCanTranscribe = Boolean(whisperModel && model);
-    if (whisperModel && !model) {
+    const { whisperModel = "" } = await getLocalStorage({ whisperModel: "" });
+    recordingWhisperModel = whisperModel ? getWhisperModel(whisperModel) : null;
+    const model = recordingWhisperModel && await cachedModelResponse(recordingWhisperModel);
+    recordingCanTranscribe = Boolean(recordingWhisperModel && model);
+    if (recordingWhisperModel && !model) {
       await setWhisperState("error", {
         whisperError: "本地语音模型缓存已丢失，请重新启用",
       }).catch(() => {});
@@ -299,6 +230,7 @@ async function stopRecordingCore() {
   recordingStopping = true;
   const noteId = recordingNoteId;
   const shouldTranscribe = recordingCanTranscribe;
+  const whisperModel = recordingWhisperModel;
   stoppingNoteId = noteId;
   const mimeType = recorder.mimeType || "audio/webm";
   const stopped = new Promise((resolve, reject) => {
@@ -320,7 +252,7 @@ async function stopRecordingCore() {
     }
 
     const whisperReady = shouldTranscribe && Boolean(
-      await cachedModelResponse().catch(() => undefined),
+      await cachedModelResponse(whisperModel ?? WHISPER_MODEL).catch(() => undefined),
     );
     await repository.updateNote(noteId, (note) => ({
       ...note,
@@ -347,6 +279,7 @@ async function abortRecording() {
     return { aborted: false };
   }
   const noteId = recordingNoteId;
+  const whisperModel = recordingWhisperModel;
   const stopped = new Promise((resolve) => recorder.addEventListener("stop", resolve, { once: true }));
   try {
     recorder.stop();
@@ -354,7 +287,7 @@ async function abortRecording() {
   } finally {
     releaseRecordingResources();
   }
-  if (await cachedModelResponse()) await syncWhisperActivity();
+  if (await cachedModelResponse(whisperModel ?? WHISPER_MODEL)) await syncWhisperActivity();
   return { aborted: true, noteId };
 }
 
@@ -503,6 +436,8 @@ async function handleMessage(message) {
         transcriptionNoteIds: [...transcriptionJobs.keys()],
         modelCached: Boolean(await cachedModelResponse()),
       };
+    case "GET_MODEL_CACHE_STATUS":
+      return { cachedModelIds: await modelDownloader.cachedIds(WHISPER_MODELS) };
     case "START_RECORDING":
       return startRecording(message.noteId);
     case "STOP_RECORDING":
@@ -510,7 +445,7 @@ async function handleMessage(message) {
     case "ABORT_RECORDING":
       return abortRecording();
     case "DOWNLOAD_MODEL":
-      return downloadAndEnableModel();
+      return downloadAndEnableModel(message.modelId);
     case "CHECK_BUNDLED_MODEL":
       return { bundled: Boolean(await bundledModelResponse()) };
     case "TRANSCRIBE_NOTE":
