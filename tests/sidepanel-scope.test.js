@@ -109,6 +109,26 @@ test("编辑中重新可见延后刷新，并在编辑完成后只刷新一次",
   assert.equal(refreshes, 2);
 });
 
+test("编辑失焦后设置变化等保存完成再刷新一次", () => {
+  let editing = true;
+  let saving = false;
+  let refreshes = 0;
+  const panel = createSidePanelRefreshController(
+    () => { refreshes += 1; },
+    { shouldDeferRefresh: () => editing || saving },
+  );
+
+  editing = false;
+  saving = true;
+  assert.equal(panel.requestRefresh({ type: "SUBTITLE_SETTINGS_CHANGED" }), false);
+  assert.equal(refreshes, 0);
+
+  saving = false;
+  assert.equal(panel.flushDeferredRefresh(), true);
+  assert.equal(refreshes, 1);
+  assert.equal(panel.flushDeferredRefresh(), false);
+});
+
 test("编辑中录音结束只延后列表刷新，录音 UI 仍立即更新", () => {
   let editing = true;
   let refreshes = 0;

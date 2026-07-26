@@ -8,6 +8,8 @@ import {
 } from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
+import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
+import { subtitleBlockState } from "./core/subtitle-view.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -30,6 +32,8 @@ const elements = {
   screenshotPermissionDetail: document.querySelector("#screenshot-permission-detail"),
   microphonePermissionButton: document.querySelector("#microphone-permission-button"),
   microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
+  subtitleEnabled: document.querySelector("#subtitle-enabled"),
+  subtitleWindowSeconds: document.querySelector("#subtitle-window-seconds"),
   keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
   screenshotDialog: document.querySelector("#screenshot-dialog"),
@@ -54,11 +58,13 @@ let recordingTimeout = null;
 let toastTimeout = null;
 let editingNoteId = null;
 let refreshAfterEdit = false;
+let inlineSavePendingCount = 0;
 let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
+let subtitleSettings = normalizeSubtitleSettings();
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refresh();
@@ -70,7 +76,7 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
   },
   shouldDeferRefresh(message) {
-    if (!editingNoteId) return false;
+    if (!editingNoteId && inlineSavePendingCount === 0) return false;
     refreshAfterEdit = true;
     return true;
   },
@@ -83,6 +89,12 @@ function showToast(message) {
   toastTimeout = setTimeout(() => {
     elements.toast.hidden = true;
   }, 3600);
+}
+
+function syncSubtitleSettingsControls() {
+  elements.subtitleEnabled.checked = subtitleSettings.enabled;
+  elements.subtitleWindowSeconds.value = String(subtitleSettings.windowSeconds);
+  elements.subtitleWindowSeconds.disabled = !subtitleSettings.enabled;
 }
 
 function whisperModelLabel(modelId) {
@@ -244,6 +256,56 @@ async function renderNoteAssets(note, container, generation) {
   }
 }
 
+function beginInlineEdit({ noteId, button, content, initialText, restore, save }) {
+  let canceled = false;
+  editingNoteId = noteId;
+  button.disabled = true;
+  content.textContent = initialText;
+  content.contentEditable = "true";
+  content.classList.remove("is-empty");
+  content.classList.add("is-editing");
+  content.focus();
+
+  let keyHandler;
+  const finish = async () => {
+    let saveStarted = false;
+    content.removeEventListener("keydown", keyHandler);
+    content.contentEditable = "false";
+    content.classList.remove("is-editing");
+    button.disabled = false;
+    editingNoteId = null;
+    try {
+      if (canceled) restore();
+      else {
+        saveStarted = true;
+        inlineSavePendingCount += 1;
+        await save(content.textContent);
+      }
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      if (saveStarted) inlineSavePendingCount -= 1;
+      if (refreshAfterEdit && !editingNoteId && inlineSavePendingCount === 0) {
+        refreshAfterEdit = false;
+        void sidePanelRefresh.flushDeferredRefresh();
+      }
+    }
+  };
+
+  content.addEventListener("blur", () => void finish(), { once: true });
+  keyHandler = (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Escape") {
+      canceled = true;
+      content.blur();
+    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      content.blur();
+    }
+  };
+  content.addEventListener("keydown", keyHandler);
+}
+
 function renderNotes(notes) {
   const generation = ++renderGeneration;
   closeScreenshotDialog();
@@ -286,58 +348,72 @@ function renderNotes(notes) {
     item.append(assets);
     void renderNoteAssets(note, assets, generation);
     edit.addEventListener("click", () => {
-      let canceled = false;
-      editingNoteId = note.id;
-      edit.disabled = true;
-      body.textContent = note.body ?? "";
-      body.contentEditable = "true";
-      body.classList.add("is-editing");
-      body.focus();
-      let keyHandler;
-      const finish = async () => {
-        body.removeEventListener("keydown", keyHandler);
-        body.contentEditable = "false";
-        body.classList.remove("is-editing");
-        edit.disabled = false;
-        editingNoteId = null;
-        if (canceled) {
+      beginInlineEdit({
+        noteId: note.id,
+        button: edit,
+        content: body,
+        initialText: note.body ?? "",
+        restore() {
           body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-          if (refreshAfterEdit) {
-            refreshAfterEdit = false;
-            void sidePanelRefresh.flushDeferredRefresh();
-          }
-          return;
-        }
-        try {
+        },
+        async save(text) {
           const response = await request({
             type: "UPDATE_NOTE_BODY",
             noteId: note.id,
-            body: body.textContent,
+            body: text,
           });
           note.body = response.note.body;
           body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-        } catch (error) {
-          showToast(error.message);
-        } finally {
-          if (refreshAfterEdit) {
-            refreshAfterEdit = false;
-            void sidePanelRefresh.flushDeferredRefresh();
-          }
-        }
-      };
-      body.addEventListener("blur", () => void finish(), { once: true });
-      keyHandler = (event) => {
-        if (event.isComposing) return;
-        if (event.key === "Escape") {
-          canceled = true;
-          body.blur();
-        } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-          event.preventDefault();
-          body.blur();
-        }
-      };
-      body.addEventListener("keydown", keyHandler);
+        },
+      });
     });
+    const subtitleState = subtitleBlockState(note, subtitleSettings.enabled);
+    if (subtitleState.visible) {
+      const subtitleBlock = document.createElement("section");
+      subtitleBlock.className = "note-subtitle";
+      const subtitleHeader = document.createElement("div");
+      subtitleHeader.className = "note-subtitle-header";
+      const subtitleTitle = document.createElement("strong");
+      subtitleTitle.textContent = "前置字幕";
+      const subtitleEdit = document.createElement("button");
+      subtitleEdit.className = "note-edit-button";
+      subtitleEdit.type = "button";
+      subtitleEdit.textContent = "编辑字幕";
+      const subtitle = document.createElement("p");
+      subtitle.className = "note-subtitle-text";
+
+      const renderSubtitle = () => {
+        const state = subtitleBlockState(note, true);
+        subtitle.textContent = state.empty
+          ? "未读取到字幕，请确认播放器已开启字幕"
+          : state.text;
+        subtitle.classList.toggle("is-empty", state.empty);
+      };
+
+      renderSubtitle();
+      subtitleHeader.append(subtitleTitle, subtitleEdit);
+      subtitleBlock.append(subtitleHeader, subtitle);
+      item.append(subtitleBlock);
+
+      subtitleEdit.addEventListener("click", () => {
+        beginInlineEdit({
+          noteId: note.id,
+          button: subtitleEdit,
+          content: subtitle,
+          initialText: note.subtitleContext ?? "",
+          restore: renderSubtitle,
+          async save(text) {
+            const response = await request({
+              type: "UPDATE_NOTE_SUBTITLE",
+              noteId: note.id,
+              subtitleContext: text,
+            });
+            note.subtitleContext = response.note.subtitleContext;
+            renderSubtitle();
+          },
+        });
+      });
+    }
     if (note.transcriptionStatus === "transcribing" || note.transcriptionStatus === "pending") {
       const pending = document.createElement("span");
       pending.className = "note-pending";
@@ -648,6 +724,32 @@ elements.microphonePermissionButton.addEventListener("click", async () => {
   }
 });
 
+elements.subtitleEnabled.addEventListener("change", async () => {
+  const previous = subtitleSettings;
+  elements.subtitleWindowSeconds.disabled = !elements.subtitleEnabled.checked;
+  try {
+    await chrome.storage.local.set({
+      subtitleEnabled: elements.subtitleEnabled.checked,
+    });
+  } catch (error) {
+    elements.subtitleEnabled.checked = previous.enabled;
+    elements.subtitleWindowSeconds.disabled = !previous.enabled;
+    showToast(error.message);
+  }
+});
+
+elements.subtitleWindowSeconds.addEventListener("change", async () => {
+  const previous = subtitleSettings;
+  try {
+    await chrome.storage.local.set({
+      subtitleWindowSeconds: Number(elements.subtitleWindowSeconds.value),
+    });
+  } catch (error) {
+    elements.subtitleWindowSeconds.value = String(previous.windowSeconds);
+    showToast(error.message);
+  }
+});
+
 elements.screenshotDialogClose.addEventListener("click", () => {
   elements.screenshotDialog.close();
 });
@@ -761,6 +863,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
     microphoneReady = changes.microphoneReady.newValue === true;
     void renderPermissionStatus();
   }
+  if (area === "local" && (
+    changes.subtitleEnabled
+    || changes.subtitleWindowSeconds
+  )) {
+    subtitleSettings = normalizeSubtitleSettings({
+      subtitleEnabled: changes.subtitleEnabled
+        ? changes.subtitleEnabled.newValue
+        : subtitleSettings.enabled,
+      subtitleWindowSeconds: changes.subtitleWindowSeconds
+        ? changes.subtitleWindowSeconds.newValue
+        : subtitleSettings.windowSeconds,
+    });
+    syncSubtitleSettingsControls();
+    sidePanelRefresh.requestRefresh({ type: "SUBTITLE_SETTINGS_CHANGED" });
+  }
 });
 
 window.addEventListener("pagehide", () => {
@@ -783,6 +900,13 @@ window.addEventListener("pagehide", () => {
 
 const { shortcutCode = "AltRight" } = await chrome.storage.local.get("shortcutCode");
 elements.keyButton.textContent = shortcutLabel(shortcutCode);
+subtitleSettings = normalizeSubtitleSettings(
+  await chrome.storage.local.get({
+    subtitleEnabled: true,
+    subtitleWindowSeconds: 20,
+  }),
+);
+syncSubtitleSettingsControls();
 const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
 sidePanelRefresh.setTabId(panelContext.tabId);
 await Promise.all([
