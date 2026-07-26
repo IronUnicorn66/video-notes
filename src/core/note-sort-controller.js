@@ -28,13 +28,13 @@ export function createNoteSortController({
     },
     async select(value) {
       hasNewerPreference = true;
-      if (!apply(value)) return false;
+      const changed = apply(value);
       try {
         await persistOrder(order);
       } catch (error) {
         onPersistError(error);
       }
-      return true;
+      return changed;
     },
   };
 }

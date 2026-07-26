@@ -68,3 +68,18 @@ test("初始偏好读取完成前同步的新偏好不会被旧读取结果覆�
   assert.equal(controller.order, "oldest");
   assert.deepEqual(changes, ["oldest"]);
 });
+
+test("用户显式选择当前默认顺序时保存选择并阻止旧初始值覆盖", async () => {
+  const saves = [];
+  const controller = controllerModule.createNoteSortController({
+    initialOrder: "newest",
+    onOrderChange: () => {},
+    persistOrder: async (order) => saves.push(order),
+  });
+
+  await controller.select("newest");
+  controller.sync("oldest", { initial: true });
+
+  assert.equal(controller.order, "newest");
+  assert.deepEqual(saves, ["newest"]);
+});
