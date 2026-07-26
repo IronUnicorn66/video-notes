@@ -8,6 +8,11 @@ import {
 } from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
+import {
+  inlineEditResolution,
+  inlineEditStartingText,
+  shouldDeferInlineEditRefresh,
+} from "./core/inline-edit-state.js";
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 
@@ -59,6 +64,7 @@ let toastTimeout = null;
 let editingNoteId = null;
 let refreshAfterEdit = false;
 let inlineSavePendingCount = 0;
+const inlineEditRetries = new Map();
 let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
@@ -67,7 +73,7 @@ let renderGeneration = 0;
 let subtitleSettings = normalizeSubtitleSettings();
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
-  void refresh();
+  void refreshNow();
 }, {
   onContextEvent(message) {
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
@@ -76,7 +82,11 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
   },
   shouldDeferRefresh(message) {
-    if (!editingNoteId && inlineSavePendingCount === 0) return false;
+    if (!shouldDeferInlineEditRefresh({
+      editing: Boolean(editingNoteId),
+      pendingSaveCount: inlineSavePendingCount,
+      retryCount: inlineEditRetries.size,
+    })) return false;
     refreshAfterEdit = true;
     return true;
   },
@@ -260,7 +270,7 @@ function beginInlineEdit({ noteId, button, content, initialText, restore, save }
   let canceled = false;
   editingNoteId = noteId;
   button.disabled = true;
-  content.textContent = initialText;
+  content.textContent = inlineEditStartingText(inlineEditRetries.get(content), initialText);
   content.contentEditable = "true";
   content.classList.remove("is-empty");
   content.classList.add("is-editing");
@@ -269,6 +279,7 @@ function beginInlineEdit({ noteId, button, content, initialText, restore, save }
   let keyHandler;
   const finish = async () => {
     let saveStarted = false;
+    let saveSucceeded = false;
     content.removeEventListener("keydown", keyHandler);
     content.contentEditable = "false";
     content.classList.remove("is-editing");
@@ -280,12 +291,26 @@ function beginInlineEdit({ noteId, button, content, initialText, restore, save }
         saveStarted = true;
         inlineSavePendingCount += 1;
         await save(content.textContent);
+        saveSucceeded = true;
       }
     } catch (error) {
       showToast(error.message);
     } finally {
       if (saveStarted) inlineSavePendingCount -= 1;
-      if (refreshAfterEdit && !editingNoteId && inlineSavePendingCount === 0) {
+      const resolution = inlineEditResolution({
+        canceled,
+        saveSucceeded,
+        text: content.textContent,
+      });
+      if (resolution.retryText === null) inlineEditRetries.delete(content);
+      else inlineEditRetries.set(content, resolution.retryText);
+      if (
+        resolution.allowDeferredRefresh
+        && refreshAfterEdit
+        && !editingNoteId
+        && inlineSavePendingCount === 0
+        && inlineEditRetries.size === 0
+      ) {
         refreshAfterEdit = false;
         void sidePanelRefresh.flushDeferredRefresh();
       }
@@ -478,6 +503,18 @@ function renderNotes(notes) {
 }
 
 async function refresh() {
+  if (shouldDeferInlineEditRefresh({
+    editing: Boolean(editingNoteId),
+    pendingSaveCount: inlineSavePendingCount,
+    retryCount: inlineEditRetries.size,
+  })) {
+    sidePanelRefresh.requestRefresh({ type: "SIDE_PANEL_REFRESH_REQUEST" });
+    return;
+  }
+  await refreshNow();
+}
+
+async function refreshNow() {
   try {
     const response = await request({ type: "GET_ACTIVE_STATE" });
     whisperStatus = await request({ type: "GET_WHISPER_STATUS" }).catch(() => whisperStatus);
