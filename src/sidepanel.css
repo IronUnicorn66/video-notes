@@ -99,6 +99,38 @@ h2 {
   gap: 10px;
 }
 
+.timeline-actions,
+.note-sort-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.timeline-actions {
+  gap: 8px;
+}
+
+.note-sort-toggle {
+  border: 1px solid #cfcabe;
+  border-radius: 8px;
+  padding: 2px;
+  background: #f1efe8;
+}
+
+.note-sort-button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #777369;
+  background: transparent;
+  font-size: 11px;
+}
+
+.note-sort-button.is-active {
+  color: #34463e;
+  background: #fffdf8;
+  box-shadow: 0 1px 4px rgba(44, 40, 32, 0.12);
+}
+
 .time-chip {
   border-radius: 999px;
   padding: 3px 8px;

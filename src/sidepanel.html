@@ -42,7 +42,25 @@
       <section class="timeline" aria-labelledby="timeline-title">
         <div class="section-row">
           <h2 id="timeline-title">标记时间线</h2>
-          <button id="export-button" class="secondary-button" type="button" disabled>导出 ZIP</button>
+          <div class="timeline-actions">
+            <div class="note-sort-toggle" role="group" aria-label="笔记显示顺序">
+              <button
+                class="note-sort-button"
+                type="button"
+                data-note-sort-order="oldest"
+                aria-pressed="false"
+                title="最早笔记在前"
+              >正序</button>
+              <button
+                class="note-sort-button is-active"
+                type="button"
+                data-note-sort-order="newest"
+                aria-pressed="true"
+                title="最新笔记在前"
+              >倒序</button>
+            </div>
+            <button id="export-button" class="secondary-button" type="button" disabled>导出 ZIP</button>
+          </div>
         </div>
         <ol id="note-list" class="note-list"></ol>
         <p id="empty-notes" class="empty-state">这个视频还没有标记。</p>

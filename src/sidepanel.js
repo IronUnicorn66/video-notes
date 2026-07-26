@@ -1,4 +1,6 @@
 import { formatTimestamp } from "./core/note-format.js";
+import { normalizeNoteSortOrder, sortNotesForDisplay } from "./core/note-sort-order.js";
+import { createNoteSortController } from "./core/note-sort-controller.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
@@ -20,6 +22,7 @@ const elements = {
   recordingTimer: document.querySelector("#recording-timer"),
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
+  noteSortButtons: document.querySelectorAll("[data-note-sort-order]"),
   exportButton: document.querySelector("#export-button"),
   whisperDetail: document.querySelector("#whisper-detail"),
   whisperModelSelect: document.querySelector("#whisper-model-select"),
@@ -59,6 +62,8 @@ let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
+let currentNotes = [];
+let noteSortController;
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refresh();
@@ -245,11 +250,15 @@ async function renderNoteAssets(note, container, generation) {
 }
 
 function renderNotes(notes) {
+  currentNotes = notes;
   const generation = ++renderGeneration;
   closeScreenshotDialog();
   stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();
-  const saved = notes.filter((note) => note.status === "saved");
+  const saved = sortNotesForDisplay(
+    currentNotes.filter((note) => note.status === "saved"),
+    noteSortController.order,
+  );
   elements.noteList.replaceChildren();
   elements.emptyNotes.hidden = saved.length > 0;
   elements.exportButton.disabled = saved.length === 0;
@@ -398,6 +407,14 @@ function renderNotes(notes) {
       item.append(warningLine);
     }
     elements.noteList.append(item);
+  }
+}
+
+function renderNoteSortOrder() {
+  for (const button of elements.noteSortButtons) {
+    const active = button.dataset.noteSortOrder === noteSortController.order;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   }
 }
 
@@ -678,6 +695,12 @@ elements.exportButton.addEventListener("click", async () => {
   }
 });
 
+for (const button of elements.noteSortButtons) {
+  button.addEventListener("click", () => {
+    void noteSortController.select(button.dataset.noteSortOrder);
+  });
+}
+
 elements.whisperModelSelect.addEventListener("change", () => {
   pendingWhisperModelId = elements.whisperModelSelect.value;
   void renderWhisperStatus();
@@ -757,6 +780,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.shortcutCode?.newValue) {
     elements.keyButton.textContent = shortcutLabel(changes.shortcutCode.newValue);
   }
+  if (area === "local" && changes.noteSortOrder && noteSortController) {
+    noteSortController.sync(changes.noteSortOrder.newValue);
+  }
   if (area === "local" && changes.microphoneReady) {
     microphoneReady = changes.microphoneReady.newValue === true;
     void renderPermissionStatus();
@@ -781,8 +807,21 @@ window.addEventListener("pagehide", () => {
   }
 });
 
-const { shortcutCode = "AltRight" } = await chrome.storage.local.get("shortcutCode");
+const { shortcutCode = "AltRight", noteSortOrder } = await chrome.storage.local.get({
+  shortcutCode: "AltRight",
+  noteSortOrder: "newest",
+});
 elements.keyButton.textContent = shortcutLabel(shortcutCode);
+noteSortController = createNoteSortController({
+  initialOrder: normalizeNoteSortOrder(noteSortOrder),
+  onOrderChange: () => {
+    renderNoteSortOrder();
+    renderNotes(currentNotes);
+  },
+  persistOrder: async (order) => chrome.storage.local.set({ noteSortOrder: order }),
+  onPersistError: (error) => showToast(error.message),
+});
+renderNoteSortOrder();
 const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
 sidePanelRefresh.setTabId(panelContext.tabId);
 await Promise.all([
