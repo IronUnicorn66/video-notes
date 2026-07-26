@@ -7,6 +7,7 @@ export function createNoteSortController({
   onPersistError = () => {},
 }) {
   let order = normalizeNoteSortOrder(initialOrder);
+  let hasNewerPreference = false;
 
   function apply(value) {
     const nextOrder = normalizeNoteSortOrder(value);
@@ -20,10 +21,13 @@ export function createNoteSortController({
     get order() {
       return order;
     },
-    sync(value) {
+    sync(value, { initial = false } = {}) {
+      if (initial && hasNewerPreference) return false;
+      if (!initial) hasNewerPreference = true;
       return apply(value);
     },
     async select(value) {
+      hasNewerPreference = true;
       if (!apply(value)) return false;
       try {
         await persistOrder(order);

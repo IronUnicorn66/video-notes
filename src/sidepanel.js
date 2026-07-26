@@ -63,7 +63,16 @@ let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
 let currentNotes = [];
-let noteSortController;
+
+const noteSortController = createNoteSortController({
+  initialOrder: "newest",
+  onOrderChange: () => {
+    renderNoteSortOrder();
+    renderNotes(currentNotes);
+  },
+  persistOrder: async (order) => chrome.storage.local.set({ noteSortOrder: order }),
+  onPersistError: (error) => showToast(error.message),
+});
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refresh();
@@ -780,7 +789,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.shortcutCode?.newValue) {
     elements.keyButton.textContent = shortcutLabel(changes.shortcutCode.newValue);
   }
-  if (area === "local" && changes.noteSortOrder && noteSortController) {
+  if (area === "local" && changes.noteSortOrder) {
     noteSortController.sync(changes.noteSortOrder.newValue);
   }
   if (area === "local" && changes.microphoneReady) {
@@ -812,15 +821,7 @@ const { shortcutCode = "AltRight", noteSortOrder } = await chrome.storage.local.
   noteSortOrder: "newest",
 });
 elements.keyButton.textContent = shortcutLabel(shortcutCode);
-noteSortController = createNoteSortController({
-  initialOrder: normalizeNoteSortOrder(noteSortOrder),
-  onOrderChange: () => {
-    renderNoteSortOrder();
-    renderNotes(currentNotes);
-  },
-  persistOrder: async (order) => chrome.storage.local.set({ noteSortOrder: order }),
-  onPersistError: (error) => showToast(error.message),
-});
+noteSortController.sync(normalizeNoteSortOrder(noteSortOrder), { initial: true });
 renderNoteSortOrder();
 const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
 sidePanelRefresh.setTabId(panelContext.tabId);

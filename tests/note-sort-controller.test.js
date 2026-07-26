@@ -53,3 +53,18 @@ test("恢复或同步外部偏好时更新显示且不重复保存", () => {
   assert.deepEqual(changes, ["oldest"]);
   assert.equal(saveCount, 0);
 });
+
+test("初始偏好读取完成前同步的新偏好不会被旧读取结果覆盖", () => {
+  const changes = [];
+  const controller = controllerModule.createNoteSortController({
+    initialOrder: "newest",
+    onOrderChange: (order) => changes.push(order),
+    persistOrder: async () => {},
+  });
+
+  controller.sync("oldest");
+  controller.sync("newest", { initial: true });
+
+  assert.equal(controller.order, "oldest");
+  assert.deepEqual(changes, ["oldest"]);
+});
