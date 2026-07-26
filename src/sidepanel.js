@@ -9,10 +9,9 @@ import {
 import { VideoNotesRepository } from "./core/storage.js";
 import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
 import {
-  inlineEditResolution,
-  inlineEditStartingText,
-  shouldDeferInlineEditRefresh,
-} from "./core/inline-edit-state.js";
+  createSidePanelInlineEditController,
+  createSidePanelRefreshRunner,
+} from "./core/sidepanel-interaction.js";
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 
@@ -61,10 +60,9 @@ let recordingStartedAt = 0;
 let recordingInterval = null;
 let recordingTimeout = null;
 let toastTimeout = null;
-let editingNoteId = null;
 let refreshAfterEdit = false;
-let inlineSavePendingCount = 0;
-const inlineEditRetries = new Map();
+let inlineEditController = null;
+let refreshRunner = null;
 let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
@@ -82,11 +80,7 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
   },
   shouldDeferRefresh(message) {
-    if (!shouldDeferInlineEditRefresh({
-      editing: Boolean(editingNoteId),
-      pendingSaveCount: inlineSavePendingCount,
-      retryCount: inlineEditRetries.size,
-    })) return false;
+    if (!inlineEditController?.blocked) return false;
     refreshAfterEdit = true;
     return true;
   },
@@ -106,6 +100,20 @@ function syncSubtitleSettingsControls() {
   elements.subtitleWindowSeconds.value = String(subtitleSettings.windowSeconds);
   elements.subtitleWindowSeconds.disabled = !subtitleSettings.enabled;
 }
+
+inlineEditController = createSidePanelInlineEditController({
+  onEditStarted() {
+    refreshRunner?.invalidateForEdit();
+  },
+  onError(error) {
+    showToast(error.message);
+  },
+  flushDeferredRefresh() {
+    if (!refreshAfterEdit) return false;
+    refreshAfterEdit = false;
+    return sidePanelRefresh.flushDeferredRefresh();
+  },
+});
 
 function whisperModelLabel(modelId) {
   return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? "当前模型";
@@ -266,71 +274,6 @@ async function renderNoteAssets(note, container, generation) {
   }
 }
 
-function beginInlineEdit({ noteId, button, content, initialText, restore, save }) {
-  let canceled = false;
-  editingNoteId = noteId;
-  button.disabled = true;
-  content.textContent = inlineEditStartingText(inlineEditRetries.get(content), initialText);
-  content.contentEditable = "true";
-  content.classList.remove("is-empty");
-  content.classList.add("is-editing");
-  content.focus();
-
-  let keyHandler;
-  const finish = async () => {
-    let saveStarted = false;
-    let saveSucceeded = false;
-    content.removeEventListener("keydown", keyHandler);
-    content.contentEditable = "false";
-    content.classList.remove("is-editing");
-    button.disabled = false;
-    editingNoteId = null;
-    try {
-      if (canceled) restore();
-      else {
-        saveStarted = true;
-        inlineSavePendingCount += 1;
-        await save(content.textContent);
-        saveSucceeded = true;
-      }
-    } catch (error) {
-      showToast(error.message);
-    } finally {
-      if (saveStarted) inlineSavePendingCount -= 1;
-      const resolution = inlineEditResolution({
-        canceled,
-        saveSucceeded,
-        text: content.textContent,
-      });
-      if (resolution.retryText === null) inlineEditRetries.delete(content);
-      else inlineEditRetries.set(content, resolution.retryText);
-      if (
-        resolution.allowDeferredRefresh
-        && refreshAfterEdit
-        && !editingNoteId
-        && inlineSavePendingCount === 0
-        && inlineEditRetries.size === 0
-      ) {
-        refreshAfterEdit = false;
-        void sidePanelRefresh.flushDeferredRefresh();
-      }
-    }
-  };
-
-  content.addEventListener("blur", () => void finish(), { once: true });
-  keyHandler = (event) => {
-    if (event.isComposing) return;
-    if (event.key === "Escape") {
-      canceled = true;
-      content.blur();
-    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      content.blur();
-    }
-  };
-  content.addEventListener("keydown", keyHandler);
-}
-
 function renderNotes(notes) {
   const generation = ++renderGeneration;
   closeScreenshotDialog();
@@ -372,25 +315,25 @@ function renderNotes(notes) {
     assets.className = "note-assets";
     item.append(assets);
     void renderNoteAssets(note, assets, generation);
-    edit.addEventListener("click", () => {
-      beginInlineEdit({
-        noteId: note.id,
-        button: edit,
-        content: body,
-        initialText: note.body ?? "",
-        restore() {
-          body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-        },
-        async save(text) {
-          const response = await request({
-            type: "UPDATE_NOTE_BODY",
-            noteId: note.id,
-            body: text,
-          });
-          note.body = response.note.body;
-          body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-        },
-      });
+    inlineEditController.bind({
+      noteId: note.id,
+      button: edit,
+      content: body,
+      getInitialText: () => note.body ?? "",
+      restore() {
+        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+      },
+      save(text) {
+        return request({
+          type: "UPDATE_NOTE_BODY",
+          noteId: note.id,
+          body: text,
+        });
+      },
+      applySaved(response) {
+        note.body = response.note.body;
+        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+      },
     });
     const subtitleState = subtitleBlockState(note, subtitleSettings.enabled);
     if (subtitleState.visible) {
@@ -420,23 +363,23 @@ function renderNotes(notes) {
       subtitleBlock.append(subtitleHeader, subtitle);
       item.append(subtitleBlock);
 
-      subtitleEdit.addEventListener("click", () => {
-        beginInlineEdit({
-          noteId: note.id,
-          button: subtitleEdit,
-          content: subtitle,
-          initialText: note.subtitleContext ?? "",
-          restore: renderSubtitle,
-          async save(text) {
-            const response = await request({
-              type: "UPDATE_NOTE_SUBTITLE",
-              noteId: note.id,
-              subtitleContext: text,
-            });
-            note.subtitleContext = response.note.subtitleContext;
-            renderSubtitle();
-          },
-        });
+      inlineEditController.bind({
+        noteId: note.id,
+        button: subtitleEdit,
+        content: subtitle,
+        getInitialText: () => note.subtitleContext ?? "",
+        restore: renderSubtitle,
+        save(text) {
+          return request({
+            type: "UPDATE_NOTE_SUBTITLE",
+            noteId: note.id,
+            subtitleContext: text,
+          });
+        },
+        applySaved(response) {
+          note.subtitleContext = response.note.subtitleContext;
+          renderSubtitle();
+        },
       });
     }
     if (note.transcriptionStatus === "transcribing" || note.transcriptionStatus === "pending") {
@@ -503,11 +446,7 @@ function renderNotes(notes) {
 }
 
 async function refresh() {
-  if (shouldDeferInlineEditRefresh({
-    editing: Boolean(editingNoteId),
-    pendingSaveCount: inlineSavePendingCount,
-    retryCount: inlineEditRetries.size,
-  })) {
+  if (inlineEditController.blocked) {
     sidePanelRefresh.requestRefresh({ type: "SIDE_PANEL_REFRESH_REQUEST" });
     return;
   }
@@ -515,9 +454,18 @@ async function refresh() {
 }
 
 async function refreshNow() {
-  try {
+  await refreshRunner.run();
+}
+
+refreshRunner = createSidePanelRefreshRunner({
+  async load() {
     const response = await request({ type: "GET_ACTIVE_STATE" });
-    whisperStatus = await request({ type: "GET_WHISPER_STATUS" }).catch(() => whisperStatus);
+    const nextWhisperStatus = await request({ type: "GET_WHISPER_STATUS" })
+      .catch(() => whisperStatus);
+    return { nextWhisperStatus, response };
+  },
+  apply({ nextWhisperStatus, response }) {
+    whisperStatus = nextWhisperStatus;
     activeContext = response.context;
     if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
     elements.videoTitle.textContent = activeContext.title;
@@ -526,7 +474,8 @@ async function refreshNow() {
     elements.input.disabled = false;
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
-  } catch (error) {
+  },
+  applyError(error) {
     activeContext = null;
     elements.videoTitle.textContent = error.message;
     elements.videoUrl.hidden = true;
@@ -534,8 +483,12 @@ async function refreshNow() {
     elements.voiceButton.disabled = true;
     elements.exportButton.disabled = true;
     renderNotes([]);
-  }
-}
+  },
+  isBlocked: () => inlineEditController.blocked,
+  defer() {
+    sidePanelRefresh.requestRefresh({ type: "SIDE_PANEL_REFRESH_RESPONSE_DEFERRED" });
+  },
+});
 
 async function beginTypedDraft() {
   if (currentDraft || draftPromise || !activeContext) return;
