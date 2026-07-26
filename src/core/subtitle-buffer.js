@@ -2,6 +2,7 @@ function normalizeText(text) {
   return String(text ?? "").replace(/\s+/g, " ").trim();
 }
 
+
 export class SubtitleBuffer {
   constructor({ retentionSeconds = 60 } = {}) {
     this.retentionSeconds = retentionSeconds;
@@ -20,6 +21,10 @@ export class SubtitleBuffer {
 
     const cutoff = at - this.retentionSeconds;
     this.items = this.items.filter((item) => item.seconds >= cutoff);
+  }
+
+  clear() {
+    this.items = [];
   }
 
   before(markerSeconds, { seconds = 20, maxChars = 500 } = {}) {
@@ -48,4 +53,3 @@ export class SubtitleBuffer {
     return selected.join("\n");
   }
 }
-
