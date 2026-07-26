@@ -1,6 +1,9 @@
 import { formatTimestamp } from "./core/note-format.js";
-import { normalizeNoteSortOrder, sortNotesForDisplay } from "./core/note-sort-order.js";
-import { createNoteSortController } from "./core/note-sort-controller.js";
+import { sortNotesForDisplay } from "./core/note-sort-order.js";
+import {
+  createSidepanelNoteSortBinding,
+  initializeSidepanel,
+} from "./core/sidepanel-note-sort.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
@@ -64,14 +67,13 @@ let whisperStatus = null;
 let renderGeneration = 0;
 let currentNotes = [];
 
-const noteSortController = createNoteSortController({
-  initialOrder: "newest",
-  onOrderChange: () => {
-    renderNoteSortOrder();
-    renderNotes(currentNotes);
-  },
-  persistOrder: async (order) => chrome.storage.local.set({ noteSortOrder: order }),
-  onPersistError: (error) => showToast(error.message),
+const noteSortBinding = createSidepanelNoteSortBinding({
+  buttons: elements.noteSortButtons,
+  storage: chrome.storage,
+  getNotes: () => currentNotes,
+  renderNotes,
+  isEditing: () => Boolean(editingNoteId),
+  showToast,
 });
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
@@ -258,7 +260,7 @@ async function renderNoteAssets(note, container, generation) {
   }
 }
 
-function renderNotes(notes) {
+function renderNotes(notes, order = noteSortBinding.order) {
   currentNotes = notes;
   const generation = ++renderGeneration;
   closeScreenshotDialog();
@@ -266,7 +268,7 @@ function renderNotes(notes) {
   assetUrls.revokeAll();
   const saved = sortNotesForDisplay(
     currentNotes.filter((note) => note.status === "saved"),
-    noteSortController.order,
+    order,
   );
   elements.noteList.replaceChildren();
   elements.emptyNotes.hidden = saved.length > 0;
@@ -318,11 +320,15 @@ function renderNotes(notes) {
         body.classList.remove("is-editing");
         edit.disabled = false;
         editingNoteId = null;
+        const shouldRefreshAfterEdit = refreshAfterEdit;
         if (canceled) {
           body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-          if (refreshAfterEdit) {
+          if (shouldRefreshAfterEdit) {
             refreshAfterEdit = false;
+            noteSortBinding.finishEditing({ render: false });
             void sidePanelRefresh.flushDeferredRefresh();
+          } else {
+            noteSortBinding.finishEditing();
           }
           return;
         }
@@ -337,9 +343,12 @@ function renderNotes(notes) {
         } catch (error) {
           showToast(error.message);
         } finally {
-          if (refreshAfterEdit) {
+          if (shouldRefreshAfterEdit) {
             refreshAfterEdit = false;
+            noteSortBinding.finishEditing({ render: false });
             void sidePanelRefresh.flushDeferredRefresh();
+          } else {
+            noteSortBinding.finishEditing();
           }
         }
       };
@@ -416,14 +425,6 @@ function renderNotes(notes) {
       item.append(warningLine);
     }
     elements.noteList.append(item);
-  }
-}
-
-function renderNoteSortOrder() {
-  for (const button of elements.noteSortButtons) {
-    const active = button.dataset.noteSortOrder === noteSortController.order;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
   }
 }
 
@@ -704,12 +705,6 @@ elements.exportButton.addEventListener("click", async () => {
   }
 });
 
-for (const button of elements.noteSortButtons) {
-  button.addEventListener("click", () => {
-    void noteSortController.select(button.dataset.noteSortOrder);
-  });
-}
-
 elements.whisperModelSelect.addEventListener("change", () => {
   pendingWhisperModelId = elements.whisperModelSelect.value;
   void renderWhisperStatus();
@@ -790,7 +785,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     elements.keyButton.textContent = shortcutLabel(changes.shortcutCode.newValue);
   }
   if (area === "local" && changes.noteSortOrder) {
-    noteSortController.sync(changes.noteSortOrder.newValue);
+    noteSortBinding.sync(changes.noteSortOrder.newValue);
   }
   if (area === "local" && changes.microphoneReady) {
     microphoneReady = changes.microphoneReady.newValue === true;
@@ -816,17 +811,17 @@ window.addEventListener("pagehide", () => {
   }
 });
 
-const { shortcutCode = "AltRight", noteSortOrder } = await chrome.storage.local.get({
-  shortcutCode: "AltRight",
-  noteSortOrder: "newest",
+await initializeSidepanel({
+  storage: chrome.storage,
+  onShortcutCode: (shortcutCode) => {
+    elements.keyButton.textContent = shortcutLabel(shortcutCode);
+  },
+  noteSortBinding,
+  setPanelContext: async () => {
+    const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
+    sidePanelRefresh.setTabId(panelContext.tabId);
+  },
+  refresh,
+  renderWhisperStatus,
+  renderPermissionStatus: () => renderPermissionStatus({ expandIfNeeded: true }),
 });
-elements.keyButton.textContent = shortcutLabel(shortcutCode);
-noteSortController.sync(normalizeNoteSortOrder(noteSortOrder), { initial: true });
-renderNoteSortOrder();
-const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
-sidePanelRefresh.setTabId(panelContext.tabId);
-await Promise.all([
-  refresh(),
-  renderWhisperStatus(),
-  renderPermissionStatus({ expandIfNeeded: true }),
-]);
