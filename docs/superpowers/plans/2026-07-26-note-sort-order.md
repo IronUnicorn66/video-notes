@@ -4,7 +4,7 @@
 
 **Goal:** 为侧栏时间线增加单击切换的“正序 / 倒序”分段开关，默认倒序并全局记住用户选择。
 
-**Architecture:** IndexedDB 和导出流程继续保持时间正序。新增一个无副作用的排序核心模块；侧栏读取 `chrome.storage.local` 中的 `noteSortOrder`，用该模块生成显示副本，并通过两个 `aria-pressed` 按钮切换顺序。
+**Architecture:** IndexedDB 和导出流程继续保持时间正序。新增无副作用的排序核心与偏好控制器；侧栏读取 `chrome.storage.local` 中的 `noteSortOrder`，用排序核心生成显示副本，并通过两个 `aria-pressed` 按钮切换顺序。自动化测试验证用户选择产生的重排、持久化、恢复和失败提示行为，实际按钮布局由 Edge 实机验收。
 
 **Tech Stack:** Edge Manifest V3、原生 JavaScript ES Module、Chrome Storage API、HTML/CSS、`node:test`。
 
@@ -101,44 +101,131 @@ git commit -m "新增: 实现侧栏笔记显示排序"
 ### Task 2: 接入正序与倒序分段开关
 
 **Files:**
+- Create: `src/core/note-sort-controller.js`
+- Create: `tests/note-sort-controller.test.js`
 - Modify: `src/sidepanel.html`
 - Modify: `src/sidepanel.css`
 - Modify: `src/sidepanel.js`
-- Modify: `tests/manifest.test.js`
 
 **Interfaces:**
 - Consumes: `normalizeNoteSortOrder(value)` 和 `sortNotesForDisplay(notes, order)`。
+- Produces: `createNoteSortController(options)`，公开只读 `order`、`select(value)` 和 `sync(value)`。
 - Persists: `chrome.storage.local.noteSortOrder`，值为 `newest` 或 `oldest`。
 - UI contract: `[data-note-sort-order="oldest"]` 表示正序；`[data-note-sort-order="newest"]` 表示倒序。
 
-- [ ] **Step 1: 添加侧栏分段开关契约测试**
+- [ ] **Step 1: 添加排序选择行为测试**
 
-在 `tests/manifest.test.js` 增加：
+在 `tests/note-sort-controller.test.js` 验证：
 
 ```javascript {.line-numbers}
-test("侧栏提供单击切换的正序倒序分段开关", async () => {
-  const html = await readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8");
-  const css = await readFile(new URL("../src/sidepanel.css", import.meta.url), "utf8");
-  const source = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
+test("用户切换顺序后立即更新显示并保存选择", async () => {
+  const changes = [];
+  const saves = [];
+  const controller = createNoteSortController({
+    initialOrder: "newest",
+    onOrderChange: (order) => changes.push(order),
+    persistOrder: async (order) => saves.push(order),
+  });
 
-  assert.match(html, /role="group" aria-label="笔记显示顺序"/);
-  assert.match(html, /data-note-sort-order="oldest"[^>]*>\s*正序\s*</);
-  assert.match(html, /data-note-sort-order="newest"[^>]*>\s*倒序\s*</);
-  assert.match(html, /aria-pressed=/);
-  assert.match(css, /\.note-sort-toggle/);
-  assert.match(css, /\.note-sort-button\.is-active/);
-  assert.match(source, /noteSortOrder/);
-  assert.match(source, /sortNotesForDisplay/);
+  await controller.select("oldest");
+
+  assert.equal(controller.order, "oldest");
+  assert.deepEqual(changes, ["oldest"]);
+  assert.deepEqual(saves, ["oldest"]);
+});
+
+test("保存失败时保留本次选择并报告错误", async () => {
+  const errors = [];
+  const controller = createNoteSortController({
+    initialOrder: "newest",
+    onOrderChange: () => {},
+    persistOrder: async () => {
+      throw new Error("存储不可用");
+    },
+    onPersistError: (error) => errors.push(error.message),
+  });
+
+  await controller.select("oldest");
+
+  assert.equal(controller.order, "oldest");
+  assert.deepEqual(errors, ["存储不可用"]);
+});
+
+test("恢复或同步外部偏好时更新显示且不重复保存", () => {
+  const changes = [];
+  let saveCount = 0;
+  const controller = createNoteSortController({
+    initialOrder: "newest",
+    onOrderChange: (order) => changes.push(order),
+    persistOrder: async () => {
+      saveCount += 1;
+    },
+  });
+
+  controller.sync("oldest");
+
+  assert.equal(controller.order, "oldest");
+  assert.deepEqual(changes, ["oldest"]);
+  assert.equal(saveCount, 0);
 });
 ```
 
-- [ ] **Step 2: 运行契约测试并确认失败原因**
+- [ ] **Step 2: 运行行为测试并确认失败原因**
 
-Run: `node --test tests/manifest.test.js`
+Run: `node --test tests/note-sort-controller.test.js`
 
-Expected: FAIL，提示侧栏 HTML 中找不到“笔记显示顺序”分组。
+Expected: FAIL，提示找不到 `src/core/note-sort-controller.js` 或导出函数缺失。
 
-- [ ] **Step 3: 在时间线标题区增加分段开关**
+- [ ] **Step 3: 写入最小偏好控制器**
+
+控制器只负责规范化选择、同步内存状态、通知显示层和保存用户主动选择：
+
+```javascript {.line-numbers}
+import { normalizeNoteSortOrder } from "./note-sort-order.js";
+
+export function createNoteSortController({
+  initialOrder,
+  onOrderChange,
+  persistOrder,
+  onPersistError = () => {},
+}) {
+  let order = normalizeNoteSortOrder(initialOrder);
+
+  function apply(value) {
+    const nextOrder = normalizeNoteSortOrder(value);
+    if (nextOrder === order) return false;
+    order = nextOrder;
+    onOrderChange(order);
+    return true;
+  }
+
+  return {
+    get order() {
+      return order;
+    },
+    sync(value) {
+      return apply(value);
+    },
+    async select(value) {
+      if (!apply(value)) return false;
+      try {
+        await persistOrder(order);
+      } catch (error) {
+        onPersistError(error);
+      }
+      return true;
+    },
+  };
+}
+```
+
+- [ ] **Step 4: 运行控制器测试并确认通过**
+
+Run: `node --test tests/note-sort-controller.test.js`
+
+Expected: 3 tests pass，0 fail。
+
+- [ ] **Step 5: 在时间线标题区增加分段开关**
 
 将时间线标题行改成：
 
@@ -167,7 +254,7 @@ Expected: FAIL，提示侧栏 HTML 中找不到“笔记显示顺序”分组。
 </div>
 ```
 
-- [ ] **Step 4: 添加紧凑分段开关样式**
+- [ ] **Step 6: 添加紧凑分段开关样式**
 
 在 `src/sidepanel.css` 增加：
 
@@ -205,49 +292,41 @@ Expected: FAIL，提示侧栏 HTML 中找不到“笔记显示顺序”分组。
 }
 ```
 
-- [ ] **Step 5: 在侧栏中读取、渲染并保存排序偏好**
+- [ ] **Step 7: 在侧栏中读取、渲染并保存排序偏好**
 
 在 `src/sidepanel.js`：
 
 - 导入两个排序函数。
+- 导入并创建偏好控制器。
 - 将两个排序按钮收集到 `elements.noteSortButtons`。
-- 增加 `noteSortOrder = "newest"` 和 `currentNotes = []`。
+- 增加 `currentNotes = []`。
 - `renderNotes(notes)` 先保存 `currentNotes = notes`，再对已保存笔记调用 `sortNotesForDisplay()`。
 - 增加 `renderNoteSortOrder()`，同步按钮的 `aria-pressed` 与 `is-active`。
-- 点击按钮时先更新内存和当前列表，再调用 `chrome.storage.local.set({ noteSortOrder })`；保存失败使用现有 toast 提示。
+- 控制器的 `onOrderChange` 先更新按钮和当前列表，`persistOrder` 再调用 `chrome.storage.local.set({ noteSortOrder })`；保存失败使用现有 toast 提示。
 - 初始化时与 `shortcutCode` 一起读取 `noteSortOrder`，规范化后再首次 `refresh()`。
-- `chrome.storage.onChanged` 收到外部偏好变化时，只在值实际变化后重排。
+- 点击按钮时调用 `controller.select()`；`chrome.storage.onChanged` 收到外部偏好变化时调用 `controller.sync()`，只在值实际变化后重排且不重复保存。
 
 核心逻辑采用：
 
 ```javascript {.line-numbers}
 function renderNoteSortOrder() {
   for (const button of elements.noteSortButtons) {
-    const active = button.dataset.noteSortOrder === noteSortOrder;
+    const active = button.dataset.noteSortOrder === noteSortController.order;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   }
 }
 
 for (const button of elements.noteSortButtons) {
-  button.addEventListener("click", async () => {
-    const nextOrder = normalizeNoteSortOrder(button.dataset.noteSortOrder);
-    if (nextOrder === noteSortOrder) return;
-    noteSortOrder = nextOrder;
-    renderNoteSortOrder();
-    renderNotes(currentNotes);
-    try {
-      await chrome.storage.local.set({ noteSortOrder });
-    } catch (error) {
-      showToast(`排序偏好保存失败：${error.message}`);
-    }
+  button.addEventListener("click", () => {
+    void noteSortController.select(button.dataset.noteSortOrder);
   });
 }
 ```
 
-- [ ] **Step 6: 运行排序、侧栏和完整测试**
+- [ ] **Step 8: 运行排序、控制器和完整测试**
 
-Run: `node --test tests/note-sort-order.test.js tests/manifest.test.js`
+Run: `node --test tests/note-sort-order.test.js tests/note-sort-controller.test.js`
 
 Expected: 所有目标测试通过。
 
@@ -255,13 +334,13 @@ Run: `npm test`
 
 Expected: 全部测试通过，0 fail。
 
-- [ ] **Step 7: 构建 Edge 扩展**
+- [ ] **Step 9: 构建 Edge 扩展**
 
 Run: `npm run build`
 
 Expected: 命令退出码为 0，`dist/sidepanel.html` 包含“正序”和“倒序”按钮。
 
-- [ ] **Step 8: 在 Edge 中完成实机验收**
+- [ ] **Step 10: 在 Edge 中完成实机验收**
 
 1. 重新加载 `/Users/psh/codes/video_notes/.worktrees/note-sort-order/dist`。
 2. 打开已有多条笔记的 YouTube 视频，确认首次显示倒序且最新笔记位于顶部。
@@ -270,9 +349,9 @@ Expected: 命令退出码为 0，`dist/sidepanel.html` 包含“正序”和“�
 5. 单击“倒序”并新增一条文字标记，确认新笔记位于顶部。
 6. 导出 ZIP，确认 Markdown 中的笔记仍按时间正序排列。
 
-- [ ] **Step 9: 提交侧栏交互**
+- [ ] **Step 11: 提交侧栏交互**
 
 ```bash {.line-numbers}
-git add src/sidepanel.html src/sidepanel.css src/sidepanel.js tests/manifest.test.js
+git add src/core/note-sort-controller.js tests/note-sort-controller.test.js src/sidepanel.html src/sidepanel.css src/sidepanel.js
 git commit -m "新增: 支持切换侧栏笔记排序"
 ```
