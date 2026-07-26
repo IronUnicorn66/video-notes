@@ -4,7 +4,7 @@
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（86 个测试）。
+- [x] 已自动验证：`npm test` 通过（109 个测试）。
 - [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `0.2.0`。
 - [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-0.2.0.zip`。
 - [x] 已自动验证：`unzip -t artifacts/video-notes-edge-0.2.0.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
