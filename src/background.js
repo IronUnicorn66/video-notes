@@ -749,8 +749,11 @@ async function handleMessage(message, sender) {
     case "GET_ACTIVE_STATE":
       return currentContextAndNotes(sender, message.tabId);
     case "GET_SIDEPANEL_CONTEXT": {
-      const contexts = await chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
-      const tabId = sidePanelTabIdForSender(sender, contexts);
+      const [contexts, activeTab] = await Promise.all([
+        chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] }),
+        activeSupportedTab(),
+      ]);
+      const tabId = sidePanelTabIdForSender(sender, contexts, activeTab.id);
       if (tabId === null) throw new Error("无法确定侧栏所属标签页");
       return { tabId };
     }

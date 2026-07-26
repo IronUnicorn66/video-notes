@@ -76,6 +76,18 @@ test("侧栏上下文按所属标签页隔离，并在重新可见时刷新自�
   assert.equal(refreshesA, 2);
 });
 
+test("活动课程标签切换时侧栏接管新标签并刷新", () => {
+  let refreshedMessage = null;
+  const panel = createSidePanelRefreshController((message) => {
+    refreshedMessage = message;
+  });
+  panel.setTabId(1);
+
+  assert.equal(panel.handleContextChanged({ type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 }), true);
+  assert.equal(panel.tabId, 2);
+  assert.deepEqual(refreshedMessage, { type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 });
+});
+
 test("编辑中重新可见延后刷新，并在编辑完成后只刷新一次", () => {
   let editing = true;
   let refreshes = 0;
@@ -144,4 +156,20 @@ test("侧栏通过自身文档标识解析所属标签页", () => {
     1,
   );
   assert.equal(sidePanelTabIdForSender({ documentId: "late-panel" }, []), null);
+});
+
+test("Edge 侧栏不提供有效标签页时回退到当前课程标签页", () => {
+  assert.equal(
+    sidePanelTabIdForSender(
+      {},
+      [{
+        contextType: "SIDE_PANEL",
+        documentId: "edge-panel",
+        tabId: -1,
+        windowId: -1,
+      }],
+      17,
+    ),
+    17,
+  );
 });

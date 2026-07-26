@@ -4,13 +4,15 @@ export function contextChangedSenderTab(sender) {
   return Number.isInteger(sender?.tab?.id) ? sender.tab : null;
 }
 
-export function sidePanelTabIdForSender(sender, contexts) {
+export function sidePanelTabIdForSender(sender, contexts, fallbackTabId = null) {
   const context = contexts.find((candidate) => (
     candidate.contextType === "SIDE_PANEL"
     && candidate.documentId === sender?.documentId
     && Number.isInteger(candidate.tabId)
+    && candidate.tabId >= 0
   ));
-  return context?.tabId ?? null;
+  return context?.tabId
+    ?? (Number.isInteger(fallbackTabId) && fallbackTabId >= 0 ? fallbackTabId : null);
 }
 
 export function createSidePanelRefreshController(refresh, {
@@ -40,6 +42,9 @@ export function createSidePanelRefreshController(refresh, {
       tabId = Number.isInteger(value) ? value : null;
     },
     handleContextChanged(message) {
+      if (message?.type === "ACTIVE_CONTEXT_CHANGED" && Number.isInteger(message.tabId)) {
+        tabId = message.tabId;
+      }
       if (!Number.isInteger(tabId) || message?.tabId !== tabId) return false;
       refreshOrDefer(message);
       return true;
