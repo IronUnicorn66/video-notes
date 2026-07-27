@@ -17,6 +17,14 @@ function subtitleRoot(nodes) {
   };
 }
 
+function nodeList(nodes) {
+  return {
+    *[Symbol.iterator]() {
+      yield* nodes;
+    },
+  };
+}
+
 test("沉浸式翻译字幕保留双语两行并忽略原生字幕", () => {
   const root = subtitleRoot({
     ".imt-captions-text": [subtitleNode("", {
@@ -34,6 +42,21 @@ test("沉浸式翻译字幕保留双语两行并忽略原生字幕", () => {
     readRenderedSubtitleText(root, "youtube"),
     "children starting school this year will be retiring in 2065.\n今年入学的孩子们将在 2065 年退休。",
   );
+});
+
+test("沉浸式翻译字幕读取可迭代 NodeList 风格提示节点", () => {
+  const root = subtitleRoot({
+    ".imt-captions-text": [subtitleNode("", {
+      children: {
+        ".source-cue, .target-cue": nodeList([
+          subtitleNode("source cue"),
+          subtitleNode("target cue"),
+        ]),
+      },
+    })],
+  });
+
+  assert.equal(readRenderedSubtitleText(root, "youtube"), "source cue\ntarget cue");
 });
 
 test("沉浸式翻译字幕为空时回退到平台原生字幕", () => {

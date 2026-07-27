@@ -22,7 +22,7 @@ export function readRenderedSubtitleText(root, platform) {
   const immersiveText = visibleText(
     [...root.querySelectorAll(IMMERSIVE_CONTAINER_SELECTOR)]
       .filter(isVisible)
-      .flatMap((container) => container.querySelectorAll(IMMERSIVE_CUE_SELECTOR)),
+      .flatMap((container) => [...container.querySelectorAll(IMMERSIVE_CUE_SELECTOR)]),
     "\n",
   );
   if (immersiveText) return immersiveText;
