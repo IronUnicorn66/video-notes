@@ -2,6 +2,7 @@ import { acquirePlaybackLease, markPlaybackIntervention, releasePlaybackLease } 
 import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
+import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 let currentMedia = null;
@@ -122,22 +123,14 @@ async function releaseMarker(markerId, { allowResume = true } = {}) {
   return allowResume && result.shouldPlay;
 }
 
-function renderedSubtitleText(context) {
-  const selector = context.platform === "youtube"
-    ? ".ytp-caption-segment"
-    : ".bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle";
-  return [...document.querySelectorAll(selector)]
-    .filter((element) => element.getClientRects().length > 0)
-    .map((element) => element.textContent?.trim())
-    .filter(Boolean)
-    .join(" ");
-}
-
 function collectSubtitles() {
   const context = getContext();
   const media = bindMedia();
   if (!context || !media) return;
-  subtitleCapture.add(media.currentTime, renderedSubtitleText(context));
+  subtitleCapture.add(
+    media.currentTime,
+    readRenderedSubtitleText(document, context.platform),
+  );
 }
 
 function markerSnapshot(markerId, { deferPause = false } = {}) {
