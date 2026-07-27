@@ -87,6 +87,89 @@ test("新增、修改、删除和跨实例撤销共享持久历史", async () =>
   await second.destroy();
 });
 
+test("已删除笔记拒绝陈旧正文编辑且删除仍可撤销", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putNote({
+    id: "n1",
+    sessionId: "youtube:abc",
+    status: "saved",
+    body: "删除前正文",
+    subtitleContext: "删除前字幕",
+    createdAt: 1,
+  });
+
+  await repository.deleteSavedNote("n1", 10);
+  await assert.rejects(
+    repository.editNoteBody("n1", "陈旧正文", 20),
+    /笔记历史动作已过期/,
+  );
+  assert.deepEqual(
+    (await repository.read("history", "youtube:abc")).undo.map((action) => action.type),
+    ["delete-note"],
+  );
+
+  await repository.undoNoteAction("youtube:abc", 30);
+  assert.equal((await repository.listNotes("youtube:abc"))[0].body, "删除前正文");
+  await repository.destroy();
+});
+
+test("已删除笔记拒绝陈旧字幕编辑且删除仍可撤销", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putNote({
+    id: "n1",
+    sessionId: "youtube:abc",
+    status: "saved",
+    body: "删除前正文",
+    subtitleContext: "删除前字幕",
+    createdAt: 1,
+  });
+
+  await repository.deleteSavedNote("n1", 10);
+  await assert.rejects(
+    repository.editNoteSubtitle("n1", "陈旧字幕", 20),
+    /笔记历史动作已过期/,
+  );
+  assert.deepEqual(
+    (await repository.read("history", "youtube:abc")).undo.map((action) => action.type),
+    ["delete-note"],
+  );
+
+  await repository.undoNoteAction("youtube:abc", 30);
+  assert.equal((await repository.listNotes("youtube:abc"))[0].subtitleContext, "删除前字幕");
+  await repository.destroy();
+});
+
+test("尚未保存的草稿拒绝正文编辑且不产生历史", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putNote({
+    id: "n1",
+    sessionId: "youtube:abc",
+    status: "draft",
+    body: "草稿正文",
+    createdAt: 1,
+  });
+
+  await assert.rejects(
+    repository.editNoteBody("n1", "陈旧正文", 10),
+    /笔记历史动作已过期/,
+  );
+  assert.equal(await repository.read("history", "youtube:abc"), undefined);
+  assert.equal((await repository.getNote("n1")).body, "草稿正文");
+  await repository.destroy();
+});
+
 test("清空会话作为单个动作整体恢复可见笔记", async () => {
   const repository = new VideoNotesRepository({
     databaseName: `history-${crypto.randomUUID()}`,
@@ -299,4 +382,41 @@ test("抛出的笔记更新器不会提交笔记或历史的部分状态", async
   await repository.undoNoteAction("youtube:abc", 20);
   assert.deepEqual(await repository.listNotes("youtube:abc"), []);
   await repository.destroy();
+});
+
+test("历史事务先派发 abort 再以原始回调错误拒绝", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  const database = await repository.dbPromise;
+  const originalTransaction = database.transaction.bind(database);
+  let abortObserved = false;
+  database.transaction = (...args) => {
+    const transaction = originalTransaction(...args);
+    if (Array.from(args[0]).includes("history")) {
+      transaction.addEventListener("abort", () => {
+        abortObserved = true;
+      });
+    }
+    return transaction;
+  };
+  const callbackError = new Error("停止历史事务");
+
+  try {
+    await assert.rejects(
+      repository.mutateHistory("youtube:abc", 10, () => {
+        throw callbackError;
+      }),
+      (error) => {
+        assert.equal(abortObserved, true);
+        assert.equal(error, callbackError);
+        return true;
+      },
+    );
+  } finally {
+    database.transaction = originalTransaction;
+    await repository.destroy();
+  }
 });

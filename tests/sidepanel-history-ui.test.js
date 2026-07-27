@@ -46,6 +46,10 @@ test("笔记卡片把删除放在编辑旁并先通过统一确认框", () => {
   assert.match(renderSource, /actions\.append\(kind, edit, deleteButton\)/);
   assert.ok(confirmation >= 0, "笔记删除应调用统一确认框");
   assert.match(renderSource.slice(confirmation), /formatTimestamp\(note\.seconds\)/);
+  assert.match(
+    renderSource.slice(confirmation),
+    /description: `将删除 \$\{formatTimestamp\(note\.seconds\)\} 的标记。可通过撤销恢复。`/,
+  );
   assert.match(renderSource.slice(confirmation), /operation: "delete", noteId: note\.id/);
   assert.match(
     source,

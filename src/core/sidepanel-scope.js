@@ -4,6 +4,74 @@ export function contextChangedSenderTab(sender) {
   return Number.isInteger(sender?.tab?.id) ? sender.tab : null;
 }
 
+function validContextId(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+export function activeContextChangedMessage(tabId, windowId) {
+  if (!validContextId(tabId) || !validContextId(windowId)) return null;
+  return { type: "ACTIVE_CONTEXT_CHANGED", tabId, windowId };
+}
+
+export function sidePanelContextForSender(sender, contexts, fallbackTab = null) {
+  const context = contexts.find((candidate) => (
+    candidate.contextType === "SIDE_PANEL"
+    && candidate.documentId === sender?.documentId
+  ));
+  const contextWindowId = validContextId(context?.windowId) ? context.windowId : null;
+  const fallbackMatchesWindow = contextWindowId === null
+    || fallbackTab?.windowId === contextWindowId;
+
+  return {
+    tabId: validContextId(context?.tabId)
+      ? context.tabId
+      : fallbackMatchesWindow && validContextId(fallbackTab?.id) ? fallbackTab.id : null,
+    windowId: contextWindowId
+      ?? (validContextId(fallbackTab?.windowId) ? fallbackTab.windowId : null),
+  };
+}
+
+export function createActiveTabActivationHandler({
+  tabs,
+  runtime,
+  configureSidePanelForTab,
+  onError = () => {},
+}) {
+  return async ({ tabId, windowId }) => {
+    let tab;
+    try {
+      tab = await tabs.get(tabId);
+      await configureSidePanelForTab(tab);
+      const message = activeContextChangedMessage(tabId, windowId);
+      if (message) await runtime.sendMessage(message).catch(() => {});
+    } catch (error) {
+      onError(tab ?? { id: tabId }, error);
+    }
+  };
+}
+
+export function createSidePanelContextResolver({ runtime, tabs }) {
+  return async (sender) => {
+    const contexts = await runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
+    let context = sidePanelContextForSender(sender, contexts);
+    let fallbackTab = null;
+
+    if (context.tabId === null) {
+      const query = context.windowId === null
+        ? { active: true, lastFocusedWindow: true }
+        : { active: true, windowId: context.windowId };
+      [fallbackTab] = await tabs.query(query);
+    } else if (context.windowId === null) {
+      fallbackTab = await tabs.get(context.tabId);
+    }
+    if (fallbackTab) context = sidePanelContextForSender(sender, contexts, fallbackTab);
+    if (context.tabId === null || context.windowId === null) {
+      throw new Error("无法确定侧栏所属标签页");
+    }
+    return { context, contexts, fallbackTab };
+  };
+}
+
 export function sidePanelMessageForTabUpdate(tabId, changeInfo, tab) {
   if (
     !Number.isInteger(tabId)
@@ -62,6 +130,7 @@ export function createSidePanelRefreshController(refresh, {
   shouldDeferRefresh = () => false,
 } = {}) {
   let tabId = null;
+  let windowId = null;
   let deferredMessage = null;
 
   function refreshOrDefer(message) {
@@ -79,11 +148,22 @@ export function createSidePanelRefreshController(refresh, {
     get tabId() {
       return tabId;
     },
-    setTabId(value) {
-      tabId = Number.isInteger(value) ? value : null;
+    get windowId() {
+      return windowId;
+    },
+    setTabId(value, ownerWindowId) {
+      tabId = validContextId(value) ? value : null;
+      if (arguments.length > 1) {
+        windowId = validContextId(ownerWindowId) ? ownerWindowId : null;
+      }
     },
     handleContextChanged(message) {
-      if (message?.type === "ACTIVE_CONTEXT_CHANGED" && Number.isInteger(message.tabId)) {
+      if (message?.type === "ACTIVE_CONTEXT_CHANGED") {
+        if (
+          !validContextId(message.tabId)
+          || !validContextId(message.windowId)
+          || message.windowId !== windowId
+        ) return false;
         tabId = message.tabId;
       }
       if (!Number.isInteger(tabId) || message?.tabId !== tabId) return false;

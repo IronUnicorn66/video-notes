@@ -28,11 +28,13 @@ import {
   isMicrophonePermissionError,
 } from "./core/media-permissions.js";
 import {
+  activeContextChangedMessage,
   contextChangedSenderTab,
+  createActiveTabActivationHandler,
+  createSidePanelContextResolver,
   sidePanelMessageForTabUpdate,
   sidePanelOptionsForTab,
   sidePanelRequestTabIdForSender,
-  sidePanelTabIdForSender,
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
 
@@ -62,6 +64,16 @@ const noteHistoryCommandRouter = createNoteHistoryCommandRouter({
   getCurrentContext: currentPageContext,
   onTypedNoteCommitted: releaseMarker,
 });
+const resolveSidePanelContext = createSidePanelContextResolver({
+  runtime: chrome.runtime,
+  tabs: chrome.tabs,
+});
+const handleActiveTabActivation = createActiveTabActivationHandler({
+  runtime: chrome.runtime,
+  tabs: chrome.tabs,
+  configureSidePanelForTab,
+  onError: logSidePanelConfigurationError,
+});
 
 function logSidePanelConfigurationError(tab, error) {
   console.warn("配置标签页侧栏失败", tab?.id, error);
@@ -86,9 +98,10 @@ async function configureExistingSidePanels() {
   await Promise.all(tabs.map((tab) => configureSidePanelForTab(tab)));
 }
 
-function notifyActiveContextChanged(tabId) {
-  if (!Number.isInteger(tabId)) return;
-  void chrome.runtime.sendMessage({ type: "ACTIVE_CONTEXT_CHANGED", tabId }).catch(() => {});
+function notifyActiveContextChanged(tabId, windowId) {
+  const message = activeContextChangedMessage(tabId, windowId);
+  if (!message) return;
+  void chrome.runtime.sendMessage(message).catch(() => {});
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -140,17 +153,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.tabs.onActivated.addListener(({ tabId }) => {
-  void (async () => {
-    let tab;
-    try {
-      tab = await chrome.tabs.get(tabId);
-      await configureSidePanelForTab(tab);
-      notifyActiveContextChanged(tabId);
-    } catch (error) {
-      logSidePanelConfigurationError(tab ?? { id: tabId }, error);
-    }
-  })();
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  void handleActiveTabActivation(activeInfo);
 });
 
 async function activeSupportedTab() {
@@ -751,15 +755,13 @@ async function noteHistoryRequest(message, sender) {
     return { sender, tabId: message.tabId };
   }
 
-  const contexts = await chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
-  const contextTabId = sidePanelTabIdForSender(sender, contexts);
-  const fallbackTabId = contextTabId === null ? (await activeSupportedTab()).id : null;
+  const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
   return {
     sender,
     tabId: sidePanelRequestTabIdForSender(
       sender,
       contexts,
-      fallbackTabId,
+      fallbackTab?.id ?? context.tabId,
       message.tabId,
     ),
   };
@@ -792,13 +794,8 @@ async function handleMessage(message, sender) {
         }),
       };
     case "GET_SIDEPANEL_CONTEXT": {
-      const [contexts, activeTab] = await Promise.all([
-        chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] }),
-        activeSupportedTab(),
-      ]);
-      const tabId = sidePanelTabIdForSender(sender, contexts, activeTab.id);
-      if (tabId === null) throw new Error("无法确定侧栏所属标签页");
-      return { tabId };
+      const { context } = await resolveSidePanelContext(sender);
+      return context;
     }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
@@ -924,7 +921,7 @@ async function handleMessage(message, sender) {
         return {};
       }
       await configureSidePanelForTab(tab);
-      notifyActiveContextChanged(tab.id);
+      notifyActiveContextChanged(tab.id, tab.windowId);
       return {};
     }
     default:

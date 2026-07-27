@@ -8,6 +8,7 @@ export function createSidePanelInlineEditController({
   onEditStarted = () => {},
   onError = () => {},
   flushDeferredRefresh = () => false,
+  isStartBlocked = () => false,
 } = {}) {
   const editing = new Set();
   const pendingSaves = new Set();
@@ -35,7 +36,12 @@ export function createSidePanelInlineEditController({
     save,
     applySaved,
   }) {
-    if (button.disabled || editing.has(content) || pendingSaves.has(content)) return null;
+    if (
+      isStartBlocked()
+      || button.disabled
+      || editing.has(content)
+      || pendingSaves.has(content)
+    ) return null;
 
     const generation = (generations.get(content) ?? 0) + 1;
     generations.set(content, generation);
@@ -159,27 +165,30 @@ export function createSidePanelRefreshRunner({
   let generation = 0;
   let pendingCount = 0;
   let appliedGeneration = 0;
+  let appliedError = null;
   const appliedWaiters = new Set();
 
-  function markApplied() {
+  function markApplied(error = null) {
     appliedGeneration += 1;
-    for (const resolve of appliedWaiters) {
-      resolve(true);
+    appliedError = error;
+    for (const waiter of appliedWaiters) {
+      if (error) waiter.reject(error);
+      else waiter.resolve(true);
     }
     appliedWaiters.clear();
   }
 
   function waitForApplied(generationToWaitFor) {
     if (appliedGeneration !== generationToWaitFor) {
-      return Promise.resolve(true);
+      return appliedError ? Promise.reject(appliedError) : Promise.resolve(true);
     }
 
-    return new Promise((resolve) => {
-      appliedWaiters.add(resolve);
+    return new Promise((resolve, reject) => {
+      appliedWaiters.add({ reject, resolve });
     });
   }
 
-  async function run() {
+  async function run({ rejectOnError = false } = {}) {
     const currentGeneration = ++generation;
     pendingCount += 1;
     try {
@@ -199,7 +208,8 @@ export function createSidePanelRefreshRunner({
         return false;
       }
       applyError(error);
-      markApplied();
+      markApplied(error);
+      if (rejectOnError) throw error;
       return true;
     } finally {
       pendingCount -= 1;
@@ -216,7 +226,7 @@ export function createSidePanelRefreshRunner({
   async function runUntilApplied() {
     while (true) {
       const currentAppliedGeneration = appliedGeneration;
-      if (await run()) return true;
+      if (await run({ rejectOnError: true })) return true;
       if (isBlocked()) {
         return waitForApplied(currentAppliedGeneration);
       }

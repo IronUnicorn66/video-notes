@@ -30,6 +30,15 @@ export function historyShortcut(event) {
   return event.shiftKey ? "redo" : "undo";
 }
 
+export function historyOperationSuccessMessage(type) {
+  return {
+    DELETE_NOTE: "已删除标记",
+    CLEAR_SESSION_NOTES: "已清空标记",
+    UNDO_NOTE_ACTION: "已撤销",
+    REDO_NOTE_ACTION: "已反撤销",
+  }[type] ?? null;
+}
+
 export function createHistoryConfirmationController({ getContext, isBlocked, run }) {
   let pending = null;
 
@@ -86,7 +95,12 @@ export function createHistoryConfirmationController({ getContext, isBlocked, run
   };
 }
 
-export function createHistoryOperationController({ request, refresh, showError }) {
+export function createHistoryOperationController({
+  request,
+  refresh,
+  showError,
+  showSuccess = () => {},
+}) {
   let pending = false;
 
   return {
@@ -100,6 +114,7 @@ export function createHistoryOperationController({ request, refresh, showError }
       try {
         await request(operation);
         await refresh();
+        showSuccess(operation);
         return true;
       } catch (error) {
         showError(error);

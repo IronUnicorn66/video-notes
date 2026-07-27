@@ -207,11 +207,10 @@ export class VideoNotesRepository {
       let historyLoaded = false;
       let outcome;
       let settled = false;
+      let abortError = null;
 
-      const fail = (error) => {
-        if (settled) return;
-        settled = true;
-        reject(error);
+      const rememberAbortError = (error) => {
+        if (abortError === null) abortError = error;
       };
 
       const run = () => {
@@ -259,8 +258,8 @@ export class VideoNotesRepository {
             }
           }
         } catch (error) {
+          rememberAbortError(error);
           transaction.abort();
-          fail(error);
         }
       };
 
@@ -274,16 +273,21 @@ export class VideoNotesRepository {
         historyLoaded = true;
         run();
       };
-      notesRequest.onerror = () => fail(notesRequest.error);
-      historyRequest.onerror = () => fail(historyRequest.error);
+      notesRequest.onerror = () => rememberAbortError(notesRequest.error);
+      historyRequest.onerror = () => rememberAbortError(historyRequest.error);
       transaction.oncomplete = () => {
         if (!settled) {
           settled = true;
           resolve(outcome?.result);
         }
       };
-      transaction.onerror = () => fail(transaction.error ?? new Error("笔记历史更新失败"));
-      transaction.onabort = () => fail(transaction.error ?? new Error("笔记历史更新失败"));
+      transaction.onerror = () => rememberAbortError(transaction.error);
+      transaction.onabort = () => {
+        if (!settled) {
+          settled = true;
+          reject(abortError ?? transaction.error ?? new Error("笔记历史更新失败"));
+        }
+      };
     });
   }
 
@@ -311,6 +315,9 @@ export class VideoNotesRepository {
       return this.mutateHistory(existing.sessionId, now, ({ notes }) => {
         const note = notes.get(id);
         if (note === undefined) throw new Error(`标记不存在：${id}`);
+        if (note.status !== "saved" || note.deletedAt !== undefined) {
+          throw new Error("笔记历史动作已过期");
+        }
         if (note[field] === value) return { changed: false, result: note };
         const updated = {
           ...note,

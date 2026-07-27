@@ -2,14 +2,123 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  activeContextChangedMessage,
+  createActiveTabActivationHandler,
+  createSidePanelContextResolver,
   createSidePanelRefreshController,
   contextChangedSenderTab,
   isSidePanelRefreshMessage,
   sidePanelMessageForTabUpdate,
+  sidePanelContextForSender,
   sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
   sidePanelOptionsForTab,
 } from "../src/core/sidepanel-scope.js";
+
+test("后台标签激活处理器把浏览器窗口标识写入实际广播", async () => {
+  const calls = [];
+  const handler = createActiveTabActivationHandler({
+    tabs: {
+      async get(tabId) {
+        calls.push(["get", tabId]);
+        return { id: tabId, windowId: 20, url: "https://www.youtube.com/watch?v=a" };
+      },
+    },
+    runtime: {
+      async sendMessage(message) {
+        calls.push(["send", message]);
+      },
+    },
+    async configureSidePanelForTab(tab) {
+      calls.push(["configure", tab.id]);
+    },
+    onError(error) {
+      throw error;
+    },
+  });
+
+  await handler({ tabId: 3, windowId: 20 });
+  assert.deepEqual(calls, [
+    ["get", 3],
+    ["configure", 3],
+    ["send", { type: "ACTIVE_CONTEXT_CHANGED", tabId: 3, windowId: 20 }],
+  ]);
+});
+
+test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回退", async () => {
+  let contexts = [];
+  const calls = [];
+  const resolveContext = createSidePanelContextResolver({
+    runtime: {
+      async getContexts(filter) {
+        calls.push(["contexts", filter]);
+        return contexts;
+      },
+    },
+    tabs: {
+      async get(tabId) {
+        calls.push(["get", tabId]);
+        return { id: tabId, windowId: 30 };
+      },
+      async query(query) {
+        calls.push(["query", query]);
+        return query.windowId === 10
+          ? [{ id: 17, windowId: 10 }]
+          : [{ id: 27, windowId: 20 }];
+      },
+    },
+  });
+
+  contexts = [
+    { contextType: "SIDE_PANEL", documentId: "panel-a", tabId: 1, windowId: 10 },
+    { contextType: "SIDE_PANEL", documentId: "panel-b", tabId: 2, windowId: 20 },
+  ];
+  assert.deepEqual((await resolveContext({ documentId: "panel-b" })).context, {
+    tabId: 2,
+    windowId: 20,
+  });
+  assert.deepEqual(calls.splice(0), [
+    ["contexts", { contextTypes: ["SIDE_PANEL"] }],
+  ]);
+
+  contexts = [{
+    contextType: "SIDE_PANEL",
+    documentId: "panel-a",
+    tabId: -1,
+    windowId: 10,
+  }];
+  assert.deepEqual((await resolveContext({ documentId: "panel-a" })).context, {
+    tabId: 17,
+    windowId: 10,
+  });
+  assert.deepEqual(calls.splice(0), [
+    ["contexts", { contextTypes: ["SIDE_PANEL"] }],
+    ["query", { active: true, windowId: 10 }],
+  ]);
+
+  contexts = [{
+    contextType: "SIDE_PANEL",
+    documentId: "edge-panel",
+    tabId: -1,
+    windowId: -1,
+  }];
+  assert.deepEqual((await resolveContext({ documentId: "edge-panel" })).context, {
+    tabId: 27,
+    windowId: 20,
+  });
+  assert.deepEqual(calls.splice(0), [
+    ["contexts", { contextTypes: ["SIDE_PANEL"] }],
+    ["query", { active: true, lastFocusedWindow: true }],
+  ]);
+});
+
+test("活动标签广播同时携带标签页和窗口标识", () => {
+  assert.deepEqual(
+    activeContextChangedMessage(7, 3),
+    { type: "ACTIVE_CONTEXT_CHANGED", tabId: 7, windowId: 3 },
+  );
+  assert.equal(activeContextChangedMessage(7, -1), null);
+});
 
 test("侧栏历史请求拒绝已经切换前的旧标签页标识", () => {
   const sender = { documentId: "panel-a" };
@@ -139,11 +248,36 @@ test("活动课程标签切换时侧栏接管新标签并刷新", () => {
   const panel = createSidePanelRefreshController((message) => {
     refreshedMessage = message;
   });
-  panel.setTabId(1);
+  panel.setTabId(1, 10);
 
-  assert.equal(panel.handleContextChanged({ type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 }), true);
+  assert.equal(panel.handleContextChanged({
+    type: "ACTIVE_CONTEXT_CHANGED",
+    tabId: 2,
+    windowId: 10,
+  }), true);
   assert.equal(panel.tabId, 2);
-  assert.deepEqual(refreshedMessage, { type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 });
+  assert.deepEqual(refreshedMessage, {
+    type: "ACTIVE_CONTEXT_CHANGED",
+    tabId: 2,
+    windowId: 10,
+  });
+});
+
+test("两个窗口只让匹配窗口的侧栏接管活动标签", () => {
+  let refreshesA = 0;
+  let refreshesB = 0;
+  const panelA = createSidePanelRefreshController(() => { refreshesA += 1; });
+  const panelB = createSidePanelRefreshController(() => { refreshesB += 1; });
+  panelA.setTabId(1, 10);
+  panelB.setTabId(2, 20);
+
+  const message = { type: "ACTIVE_CONTEXT_CHANGED", tabId: 3, windowId: 20 };
+  assert.equal(panelA.handleContextChanged(message), false);
+  assert.equal(panelB.handleContextChanged(message), true);
+  assert.equal(panelA.tabId, 1);
+  assert.equal(panelB.tabId, 3);
+  assert.equal(refreshesA, 0);
+  assert.equal(refreshesB, 1);
 });
 
 test("页面加载完成只刷新所属侧栏且不改写其他侧栏绑定", () => {
@@ -287,5 +421,21 @@ test("Edge 侧栏不提供有效标签页时回退到当前课程标签页", () 
       17,
     ),
     17,
+  );
+});
+
+test("侧栏文档解析自身窗口并在 context 缺少 tabId 时使用本窗口活动标签", () => {
+  assert.deepEqual(
+    sidePanelContextForSender(
+      { documentId: "panel-a" },
+      [{
+        contextType: "SIDE_PANEL",
+        documentId: "panel-a",
+        tabId: -1,
+        windowId: 10,
+      }],
+      { id: 17, windowId: 10 },
+    ),
+    { tabId: 17, windowId: 10 },
   );
 });

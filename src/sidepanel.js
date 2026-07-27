@@ -26,6 +26,7 @@ import {
   createHistoryConfirmationController,
   createHistoryOperationController,
   historyControlState,
+  historyOperationSuccessMessage,
   historyShortcut,
 } from "./core/note-history-controls.js";
 
@@ -145,6 +146,7 @@ function syncSubtitleSettingsControls() {
 }
 
 inlineEditController = createSidePanelInlineEditController({
+  isStartBlocked: () => Boolean(historyOperationController?.pending),
   onEditStarted() {
     refreshRunner?.invalidateForEdit();
     syncHistoryControls();
@@ -170,6 +172,10 @@ historyOperationController = createHistoryOperationController({
   refresh: () => refreshRunner.runUntilApplied(),
   showError(error) {
     showToast(error.message);
+  },
+  showSuccess(operation) {
+    const message = historyOperationSuccessMessage(operation.type);
+    if (message) showToast(message);
   },
 });
 
@@ -474,7 +480,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
       if (!canRunHistoryAction("delete")) return;
       confirmHistoryAction({
         title: "删除这条标记？",
-        description: `将删除 ${formatTimestamp(note.seconds)} 的标记。`,
+        description: `将删除 ${formatTimestamp(note.seconds)} 的标记。可通过撤销恢复。`,
       }, { operation: "delete", noteId: note.id });
     });
     const actions = document.createElement("span");
@@ -1168,7 +1174,7 @@ await initializeSidepanel({
   noteSortBinding,
   setPanelContext: async () => {
     const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
-    sidePanelRefresh.setTabId(panelContext.tabId);
+    sidePanelRefresh.setTabId(panelContext.tabId, panelContext.windowId);
   },
   refresh,
   renderWhisperStatus,

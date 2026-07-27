@@ -5,6 +5,7 @@ import {
   createSidePanelInlineEditController,
   createSidePanelRefreshRunner,
 } from "../src/core/sidepanel-interaction.js";
+import { createHistoryOperationController } from "../src/core/note-history-controls.js";
 
 class FakeClassList {
   values = new Set();
@@ -114,6 +115,40 @@ test("保存等待期间禁用重复编辑并使用提交时文本", async () =>
     submittedText: "第一次提交",
   }]);
   assert.equal(button.disabled, false);
+});
+
+test("历史操作等待期间不能开始正文或字幕行内编辑", async () => {
+  let historyPending = true;
+  const button = new FakeElement();
+  const content = new FakeElement();
+  const editor = createSidePanelInlineEditController({
+    isStartBlocked: () => historyPending,
+  });
+  editor.bind({
+    noteId: "note-1",
+    button,
+    content,
+    getInitialText: () => "当前正文",
+    restore() {},
+    async save() {},
+    applySaved() {},
+  });
+
+  assert.equal(button.click(), null);
+  assert.equal(content.contentEditable, "false");
+  assert.equal(editor.blocked, false);
+
+  historyPending = false;
+  const session = button.click();
+  assert.equal(content.contentEditable, "true");
+  content.dispatch("keydown", {
+    isComposing: false,
+    key: "Escape",
+    metaKey: false,
+    ctrlKey: false,
+    preventDefault() {},
+  });
+  await session.completion;
 });
 
 test("刷新响应应用前发现编辑会登记延迟刷新并丢弃响应", async () => {
@@ -252,6 +287,36 @@ test("必须应用的刷新遇到编辑阻塞时等待既有延迟刷新且不�
   assert.equal(await deferredRefresh, true);
   assert.equal(await requiredRefresh, true);
   assert.deepEqual(applied, ["解除编辑后的响应"]);
+});
+
+test("历史操作刷新失败时只报告错误且不显示成功反馈", async () => {
+  const events = [];
+  const refreshError = new Error("刷新失败");
+  const refreshRunner = createSidePanelRefreshRunner({
+    async load() {
+      throw refreshError;
+    },
+    apply() {},
+    applyError(error) {
+      events.push(`refresh-error:${error.message}`);
+    },
+  });
+  const historyController = createHistoryOperationController({
+    request: async () => {},
+    refresh: () => refreshRunner.runUntilApplied(),
+    showError(error) {
+      events.push(`operation-error:${error.message}`);
+    },
+    showSuccess() {
+      events.push("success");
+    },
+  });
+
+  assert.equal(await historyController.run({ type: "UNDO_NOTE_ACTION" }), false);
+  assert.deepEqual(events, [
+    "refresh-error:刷新失败",
+    "operation-error:刷新失败",
+  ]);
 });
 
 test("保存失败保留可见文本并允许点击重试", async () => {
