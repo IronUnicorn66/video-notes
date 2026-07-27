@@ -29,8 +29,13 @@ import {
   sidePanelOptionsForTab,
   sidePanelTabIdForSender,
 } from "./core/sidepanel-scope.js";
+import { createTabMessenger } from "./core/tab-messaging.js";
 
 const repository = new VideoNotesRepository();
+const tabMessenger = createTabMessenger({
+  tabs: chrome.tabs,
+  scripting: chrome.scripting,
+});
 const microphoneNavigation = createMicrophoneNavigation({
   storageSession: chrome.storage.session,
   tabs: chrome.tabs,
@@ -181,7 +186,7 @@ async function openMicrophonePermissionPage(returnTab) {
 }
 
 async function sendToTab(tabId, message) {
-  const response = await chrome.tabs.sendMessage(tabId, message);
+  const response = await tabMessenger.send(tabId, message);
   if (!response?.ok) throw new Error(response?.error ?? "视频页面没有响应");
   return response;
 }

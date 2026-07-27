@@ -20,7 +20,7 @@ const packageLock = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.2.1");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
