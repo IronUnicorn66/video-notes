@@ -234,11 +234,27 @@ export class VideoNotesRepository {
           }
           if (outcome.changed) {
             const referencedIds = referencedNoteIds(nextHistory);
-            for (const note of notes.values()) {
-              if (note.deletedAt !== undefined && !referencedIds.has(note.id)) {
-                noteStore.delete(note.id);
-                if (note.screenshotKey) assetStore.delete(note.screenshotKey);
-                if (note.audioKey) assetStore.delete(note.audioKey);
+            const allNotesById = new Map(allNotes.map((note) => [note.id, note]));
+            for (const note of outcome.changedNotes ?? []) {
+              allNotesById.set(note.id, note);
+            }
+            const deletedNotes = [...notes.values()].filter((note) => (
+              note.deletedAt !== undefined && !referencedIds.has(note.id)
+            ));
+            const deletedNoteIds = new Set(deletedNotes.map((note) => note.id));
+            const retainedAssetKeys = new Set(
+              [...allNotesById.values()]
+                .filter((note) => !deletedNoteIds.has(note.id))
+                .flatMap((note) => [note.screenshotKey, note.audioKey])
+                .filter(Boolean),
+            );
+            for (const note of deletedNotes) {
+              noteStore.delete(note.id);
+              if (note.screenshotKey && !retainedAssetKeys.has(note.screenshotKey)) {
+                assetStore.delete(note.screenshotKey);
+              }
+              if (note.audioKey && !retainedAssetKeys.has(note.audioKey)) {
+                assetStore.delete(note.audioKey);
               }
             }
           }
@@ -289,7 +305,7 @@ export class VideoNotesRepository {
     });
   }
 
-  mutateNoteValue(id, field, value, type, now) {
+  mutateNoteValue(id, field, value, type, now, incrementsUserEditVersion) {
     return this.getNote(id).then((existing) => {
       if (existing === undefined) throw new Error(`标记不存在：${id}`);
       return this.mutateHistory(existing.sessionId, now, ({ notes }) => {
@@ -299,7 +315,9 @@ export class VideoNotesRepository {
         const updated = {
           ...note,
           [field]: value,
-          userEditVersion: (note.userEditVersion ?? 0) + 1,
+          ...(incrementsUserEditVersion
+            ? { userEditVersion: (note.userEditVersion ?? 0) + 1 }
+            : {}),
           updatedAt: now,
         };
         notes.set(id, updated);
@@ -314,7 +332,14 @@ export class VideoNotesRepository {
   }
 
   editNoteBody(id, value, now = Date.now()) {
-    return this.mutateNoteValue(id, "body", String(value ?? "").trim(), "edit-body", now);
+    return this.mutateNoteValue(
+      id,
+      "body",
+      String(value ?? "").trim(),
+      "edit-body",
+      now,
+      true,
+    );
   }
 
   editNoteSubtitle(id, value, now = Date.now()) {
@@ -324,6 +349,7 @@ export class VideoNotesRepository {
       String(value ?? "").trim(),
       "edit-subtitle",
       now,
+      false,
     );
   }
 
@@ -382,7 +408,9 @@ export class VideoNotesRepository {
         const updated = {
           ...note,
           [field]: undo ? action.before : action.after,
-          userEditVersion: (note.userEditVersion ?? 0) + 1,
+          ...(action.type === "edit-body"
+            ? { userEditVersion: (note.userEditVersion ?? 0) + 1 }
+            : {}),
           updatedAt: now,
         };
         notes.set(updated.id, updated);

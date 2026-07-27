@@ -142,6 +142,38 @@ test("规范化后未变化的编辑不新增历史动作", async () => {
   await repository.destroy();
 });
 
+test("字幕编辑及其撤销反撤销不改变正文编辑版本", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putNote({
+    id: "n1",
+    sessionId: "youtube:abc",
+    status: "saved",
+    subtitleContext: "旧字幕",
+    userEditVersion: 0,
+    createdAt: 1,
+  });
+
+  await repository.editNoteSubtitle("n1", "新字幕", 10);
+  assert.equal((await repository.getNote("n1")).userEditVersion, 0);
+  await repository.undoNoteAction("youtube:abc", 20);
+  assert.deepEqual(await repository.getNote("n1"), {
+    id: "n1",
+    sessionId: "youtube:abc",
+    status: "saved",
+    subtitleContext: "旧字幕",
+    userEditVersion: 0,
+    createdAt: 1,
+    updatedAt: 20,
+  });
+  await repository.redoNoteAction("youtube:abc", 30);
+  assert.equal((await repository.getNote("n1")).userEditVersion, 0);
+  await repository.destroy();
+});
+
 test("待转写扫描忽略已软删除笔记", async () => {
   const repository = new VideoNotesRepository({
     databaseName: `history-${crypto.randomUUID()}`,
@@ -199,6 +231,46 @@ test("超过五十条历史后会清理不可恢复笔记及其资产", async ()
   assert.equal(await repository.getNote("expired"), undefined);
   assert.equal(await repository.getAsset("screenshot/expired"), undefined);
   assert.equal(await repository.getAsset("audio/expired"), undefined);
+  await repository.destroy();
+});
+
+test("清理不可恢复笔记时保留跨会话仍在引用的共享资产", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putAsset("screenshot/shared", new Blob(["image"], { type: "image/png" }));
+  await repository.putAsset("audio/shared", new Blob(["audio"], { type: "audio/webm" }));
+  await repository.putNote({
+    id: "expired",
+    sessionId: "youtube:abc",
+    status: "draft",
+    screenshotKey: "screenshot/shared",
+    audioKey: "audio/shared",
+    createdAt: 1,
+  });
+  await repository.putNote({
+    id: "visible",
+    sessionId: "youtube:def",
+    status: "saved",
+    screenshotKey: "screenshot/shared",
+    audioKey: "audio/shared",
+    createdAt: 2,
+  });
+  await repository.commitSavedNote("expired", { status: "saved" }, 1);
+  await repository.updateNote("expired", (note) => ({ ...note, deletedAt: 2 }));
+
+  for (let index = 0; index < 50; index += 1) {
+    const id = `n${index}`;
+    await repository.putNote({ id, sessionId: "youtube:abc", status: "draft", createdAt: index + 3 });
+    await repository.commitSavedNote(id, { status: "saved" }, index + 3);
+  }
+
+  assert.equal(await repository.getNote("expired"), undefined);
+  assert.equal((await repository.listNotes("youtube:def"))[0].id, "visible");
+  assert.equal(await (await repository.getAsset("screenshot/shared")).text(), "image");
+  assert.equal(await (await repository.getAsset("audio/shared")).text(), "audio");
   await repository.destroy();
 });
 
