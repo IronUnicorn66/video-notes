@@ -1,6 +1,9 @@
 import { computeScreenshotCrop } from "./core/screenshot.js";
 import { VideoNotesRepository } from "./core/storage.js";
-import { applySubtitleEdit } from "./core/note-editing.js";
+import {
+  createNoteHistoryCommandRouter,
+  isNoteHistoryCommand,
+} from "./core/note-history-commands.js";
 import {
   STUDY_SOUND_EXTENSION_ID,
   noteHoldMessage,
@@ -53,6 +56,11 @@ let microphonePermissionPagePromise = null;
 let microphonePermissionTabId = null;
 const whisperModelOperationLock = createWhisperOperationLock();
 const coordinateNoteTranscription = createNoteTaskCoordinator();
+const noteHistoryCommandRouter = createNoteHistoryCommandRouter({
+  repository,
+  getCurrentContext: currentPageContext,
+  onTypedNoteCommitted: releaseMarker,
+});
 
 function logSidePanelConfigurationError(tab, error) {
   console.warn("配置标签页侧栏失败", tab?.id, error);
@@ -601,24 +609,20 @@ async function stopVoiceUnlocked(reason) {
   } catch (error) {
     if (fallbackNote) {
       const note = await repository.getNote(fallbackNote.id) ?? fallbackNote;
-      note.status = "saved";
-      note.transcriptionStatus = "error";
-      note.warnings = [...(note.warnings ?? []), `录音保存失败：${error.message}`];
-      note.updatedAt = Date.now();
-      await repository.putNote(note);
-      await releaseMarker(note, true);
-      await finishVoiceUi(note);
+      const warning = `录音保存失败：${error.message}`;
+      const savedNote = await repository.commitSavedNote(note.id, {
+        status: "saved",
+        transcriptionStatus: "error",
+        warnings: [...(note.warnings ?? []), warning],
+      });
+      await releaseMarker(savedNote, true);
+      await finishVoiceUi(savedNote);
     }
     activeVoiceNote = null;
     throw error;
   }
   const note = await repository.getNote(result.noteId);
   if (!note) throw new Error("录音对应的标记已丢失");
-  note.audioKey = result.audioKey;
-  note.status = "saved";
-  note.updatedAt = Date.now();
-  note.transcriptionStatus = result.whisperReady ? "pending" : "disabled";
-  await repository.putNote(note);
   await releaseMarker(note, true);
   activeVoiceNote = null;
   await finishVoiceUi(note);
@@ -671,12 +675,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   })().catch(() => {});
 });
 
-async function currentContextAndNotes(sender, tabId) {
+async function currentPageContext({ sender, tabId }) {
   const tab = await targetTab(sender, tabId);
   const response = await sendToTab(tab.id, { type: "GET_PAGE_CONTEXT" });
-  const context = response.context;
-  if (!context) return { context: null, notes: [] };
-  return { context, notes: await repository.listNotes(context.sessionId) };
+  return response.context ?? null;
 }
 
 async function enableWhisper(modelId = DEFAULT_WHISPER_MODEL_ID) {
@@ -736,6 +738,9 @@ async function selectWhisperModelCore(modelId) {
 }
 
 async function handleMessage(message, sender) {
+  if (isNoteHistoryCommand(message.type)) {
+    return noteHistoryCommandRouter(message, { sender, tabId: message.tabId });
+  }
   switch (message.type) {
     case "OFFSCREEN_STORAGE_GET":
       assertOffscreenSender(sender);
@@ -757,8 +762,6 @@ async function handleMessage(message, sender) {
           saveAs: true,
         }),
       };
-    case "GET_ACTIVE_STATE":
-      return currentContextAndNotes(sender, message.tabId);
     case "GET_SIDEPANEL_CONTEXT": {
       const [contexts, activeTab] = await Promise.all([
         chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] }),
@@ -771,32 +774,6 @@ async function handleMessage(message, sender) {
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
       return beginMarker(tab, "typed");
-    }
-    case "COMMIT_TYPED_NOTE": {
-      const note = await repository.getNote(message.noteId);
-      if (!note) throw new Error("待保存标记不存在");
-      note.body = String(message.body ?? "").trim();
-      note.userEditVersion += 1;
-      note.status = "saved";
-      note.updatedAt = Date.now();
-      await repository.putNote(note);
-      await releaseMarker(note);
-      return { note };
-    }
-    case "UPDATE_NOTE_BODY": {
-      const note = await repository.updateNote(message.noteId, (current) => ({
-        ...current,
-        body: String(message.body ?? "").trim(),
-        userEditVersion: (current.userEditVersion ?? 0) + 1,
-        updatedAt: Date.now(),
-      }));
-      return { note };
-    }
-    case "UPDATE_NOTE_SUBTITLE": {
-      const note = await repository.updateNote(message.noteId, (current) => (
-        applySubtitleEdit(current, message.subtitleContext)
-      ));
-      return { note };
     }
     case "CANCEL_NOTE":
       await cancelNote(message.noteId);

@@ -5,6 +5,7 @@ import { WHISPER_MODEL, WHISPER_MODELS, getWhisperModel } from "./core/model-con
 import { createModelDownloader } from "./core/model-download.js";
 import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
 import { VideoNotesRepository } from "./core/storage.js";
+import { persistRecordedNote } from "./core/note-history-commands.js";
 import { createTranscriberManager } from "./core/transcriber-manager.js";
 import { createWhisperOperationLock } from "./core/whisper-operation.js";
 import {
@@ -274,7 +275,6 @@ async function stopRecordingCore() {
       recorder.stop();
       await stopped;
       audio = new Blob(audioChunks, { type: mimeType });
-      await repository.putAsset(audioKey, audio);
     } finally {
       releaseRecordingResources();
     }
@@ -282,13 +282,13 @@ async function stopRecordingCore() {
     const whisperReady = shouldTranscribe && Boolean(
       await cachedModelResponse(whisperModel ?? WHISPER_MODEL).catch(() => undefined),
     );
-    await repository.updateNote(noteId, (note) => ({
-      ...note,
+    await persistRecordedNote({
+      repository,
+      noteId,
+      audio,
       audioKey,
-      status: "saved",
       transcriptionStatus: whisperReady ? "pending" : "disabled",
-      updatedAt: Date.now(),
-    }));
+    });
     if (whisperReady) await setWhisperState("transcribing").catch(() => {});
     return { noteId, audioKey, whisperReady, size: audio.size, mimeType };
   } finally {

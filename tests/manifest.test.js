@@ -3,6 +3,13 @@ import { execFile } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { promisify } from "node:util";
+import { IDBKeyRange, indexedDB } from "fake-indexeddb";
+
+import {
+  createNoteHistoryCommandRouter,
+  persistRecordedNote,
+} from "../src/core/note-history-commands.js";
+import { VideoNotesRepository } from "../src/core/storage.js";
 
 const execFileAsync = promisify(execFile);
 await execFileAsync(process.execPath, ["scripts/build-extension.mjs"], {
@@ -24,6 +31,124 @@ test("发布版本在 Manifest、包元数据和锁文件中保持一致", () =>
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
+});
+
+test("后台笔记命令基于当前页面会话路由历史操作", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `background-history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  const context = { sessionId: "youtube:one", title: "第一课" };
+  let releasedNote = null;
+  const route = createNoteHistoryCommandRouter({
+    repository,
+    getCurrentContext: async () => context,
+    onTypedNoteCommitted: async (note) => {
+      releasedNote = note;
+    },
+  });
+  await repository.putNote({
+    id: "typed",
+    sessionId: context.sessionId,
+    status: "draft",
+    body: "",
+    userEditVersion: 0,
+    createdAt: 1,
+  });
+
+  const committed = await route({ type: "COMMIT_TYPED_NOTE", noteId: "typed", body: "课堂重点" });
+  assert.equal(committed.note.status, "saved");
+  assert.equal(committed.note.body, "课堂重点");
+  assert.equal(releasedNote.id, "typed");
+  assert.equal(releasedNote.status, "saved");
+  assert.equal((await route({ type: "UPDATE_NOTE_BODY", noteId: "typed", body: "修订重点" })).note.body, "修订重点");
+  assert.equal((await route({
+    type: "UPDATE_NOTE_SUBTITLE",
+    noteId: "typed",
+    subtitleContext: "字幕重点",
+  })).note.subtitleContext, "字幕重点");
+
+  const active = await route({ type: "GET_ACTIVE_STATE" });
+  assert.deepEqual(active.context, context);
+  assert.deepEqual(active.notes.map((note) => note.id), ["typed"]);
+  assert.deepEqual(active.history, { canUndo: true, canRedo: false });
+
+  await route({ type: "DELETE_NOTE", noteId: "typed" });
+  assert.deepEqual(await repository.listNotes(context.sessionId), []);
+  await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
+  assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
+  await route({ type: "REDO_NOTE_ACTION", sessionId: context.sessionId });
+  assert.deepEqual(await repository.listNotes(context.sessionId), []);
+  await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
+  await route({ type: "CLEAR_SESSION_NOTES", sessionId: context.sessionId });
+  assert.deepEqual(await repository.listNotes(context.sessionId), []);
+  await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
+  assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
+
+  await assert.rejects(
+    route({ type: "CLEAR_SESSION_NOTES", sessionId: "youtube:other" }),
+    /当前页面会话不匹配/,
+  );
+  assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
+  await repository.destroy();
+});
+
+test("录音保存先持久化音频并只提交一次可撤销新增", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `voice-history-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+  await repository.putNote({
+    id: "voice",
+    sessionId: "youtube:voice",
+    status: "recording",
+    createdAt: 1,
+  });
+
+  const saved = await persistRecordedNote({
+    repository,
+    noteId: "voice",
+    audio: new Blob(["voice"], { type: "audio/webm" }),
+    audioKey: "audio/voice",
+    transcriptionStatus: "disabled",
+    now: 10,
+  });
+  assert.equal(saved.status, "saved");
+  assert.equal(saved.audioKey, "audio/voice");
+  assert.equal(await (await repository.getAsset("audio/voice")).text(), "voice");
+  assert.deepEqual(await repository.getNoteHistoryState("youtube:voice"), {
+    canUndo: true,
+    canRedo: false,
+  });
+
+  await repository.undoNoteAction("youtube:voice", 20);
+  assert.deepEqual(await repository.listNotes("youtube:voice"), []);
+  assert.equal(await repository.undoNoteAction("youtube:voice", 30), null);
+  await repository.destroy();
+});
+
+test("录音提交失败时删除未被笔记引用的音频资产", async () => {
+  const repository = new VideoNotesRepository({
+    databaseName: `voice-history-failure-${crypto.randomUUID()}`,
+    indexedDB,
+    IDBKeyRange,
+  });
+
+  await assert.rejects(
+    persistRecordedNote({
+      repository,
+      noteId: "missing",
+      audio: new Blob(["voice"], { type: "audio/webm" }),
+      audioKey: "audio/missing",
+      transcriptionStatus: "disabled",
+      now: 10,
+    }),
+    /标记不存在/,
+  );
+  assert.equal(await repository.getAsset("audio/missing"), undefined);
+  await repository.destroy();
 });
 
 test("Manifest V3 权限保持在计划范围内", () => {
