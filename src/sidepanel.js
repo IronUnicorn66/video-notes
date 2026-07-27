@@ -13,6 +13,12 @@ import {
 } from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
+import {
+  createSidePanelInlineEditController,
+  createSidePanelRefreshRunner,
+} from "./core/sidepanel-interaction.js";
+import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
+import { subtitleBlockState } from "./core/subtitle-view.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -36,6 +42,8 @@ const elements = {
   screenshotPermissionDetail: document.querySelector("#screenshot-permission-detail"),
   microphonePermissionButton: document.querySelector("#microphone-permission-button"),
   microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
+  subtitleEnabled: document.querySelector("#subtitle-enabled"),
+  subtitleWindowSeconds: document.querySelector("#subtitle-window-seconds"),
   keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
   screenshotDialog: document.querySelector("#screenshot-dialog"),
@@ -58,26 +66,28 @@ let recordingStartedAt = 0;
 let recordingInterval = null;
 let recordingTimeout = null;
 let toastTimeout = null;
-let editingNoteId = null;
 let refreshAfterEdit = false;
+let inlineEditController = null;
+let refreshRunner = null;
 let microphoneReady = false;
 let microphonePermissionStatus = null;
 let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
 let currentNotes = [];
+let subtitleSettings = normalizeSubtitleSettings();
 
 const noteSortBinding = createSidepanelNoteSortBinding({
   buttons: elements.noteSortButtons,
   storage: chrome.storage,
   getNotes: () => currentNotes,
   renderNotes,
-  isEditing: () => Boolean(editingNoteId),
+  isEditing: () => Boolean(inlineEditController?.blocked),
   showToast,
 });
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
-  void refresh();
+  void refreshNow();
 }, {
   onContextEvent(message) {
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
@@ -86,7 +96,7 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
   },
   shouldDeferRefresh(message) {
-    if (!editingNoteId) return false;
+    if (!inlineEditController?.blocked) return false;
     refreshAfterEdit = true;
     return true;
   },
@@ -100,6 +110,30 @@ function showToast(message) {
     elements.toast.hidden = true;
   }, 3600);
 }
+
+function syncSubtitleSettingsControls() {
+  elements.subtitleEnabled.checked = subtitleSettings.enabled;
+  elements.subtitleWindowSeconds.value = String(subtitleSettings.windowSeconds);
+  elements.subtitleWindowSeconds.disabled = !subtitleSettings.enabled;
+}
+
+inlineEditController = createSidePanelInlineEditController({
+  onEditStarted() {
+    refreshRunner?.invalidateForEdit();
+  },
+  onError(error) {
+    showToast(error.message);
+  },
+  flushDeferredRefresh() {
+    if (!refreshAfterEdit) {
+      noteSortBinding.finishEditing();
+      return false;
+    }
+    refreshAfterEdit = false;
+    noteSortBinding.finishEditing({ render: false });
+    return sidePanelRefresh.flushDeferredRefresh();
+  },
+});
 
 function whisperModelLabel(modelId) {
   return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? "当前模型";
@@ -305,66 +339,73 @@ function renderNotes(notes, order = noteSortBinding.order) {
     assets.className = "note-assets";
     item.append(assets);
     void renderNoteAssets(note, assets, generation);
-    edit.addEventListener("click", () => {
-      let canceled = false;
-      editingNoteId = note.id;
-      edit.disabled = true;
-      body.textContent = note.body ?? "";
-      body.contentEditable = "true";
-      body.classList.add("is-editing");
-      body.focus();
-      let keyHandler;
-      const finish = async () => {
-        body.removeEventListener("keydown", keyHandler);
-        body.contentEditable = "false";
-        body.classList.remove("is-editing");
-        edit.disabled = false;
-        editingNoteId = null;
-        const shouldRefreshAfterEdit = refreshAfterEdit;
-        if (canceled) {
-          body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-          if (shouldRefreshAfterEdit) {
-            refreshAfterEdit = false;
-            noteSortBinding.finishEditing({ render: false });
-            void sidePanelRefresh.flushDeferredRefresh();
-          } else {
-            noteSortBinding.finishEditing();
-          }
-          return;
-        }
-        try {
-          const response = await request({
-            type: "UPDATE_NOTE_BODY",
-            noteId: note.id,
-            body: body.textContent,
-          });
-          note.body = response.note.body;
-          body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
-        } catch (error) {
-          showToast(error.message);
-        } finally {
-          if (shouldRefreshAfterEdit) {
-            refreshAfterEdit = false;
-            noteSortBinding.finishEditing({ render: false });
-            void sidePanelRefresh.flushDeferredRefresh();
-          } else {
-            noteSortBinding.finishEditing();
-          }
-        }
-      };
-      body.addEventListener("blur", () => void finish(), { once: true });
-      keyHandler = (event) => {
-        if (event.isComposing) return;
-        if (event.key === "Escape") {
-          canceled = true;
-          body.blur();
-        } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-          event.preventDefault();
-          body.blur();
-        }
-      };
-      body.addEventListener("keydown", keyHandler);
+    inlineEditController.bind({
+      noteId: note.id,
+      button: edit,
+      content: body,
+      getInitialText: () => note.body ?? "",
+      restore() {
+        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+      },
+      save(text) {
+        return request({
+          type: "UPDATE_NOTE_BODY",
+          noteId: note.id,
+          body: text,
+        });
+      },
+      applySaved(response) {
+        note.body = response.note.body;
+        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+      },
     });
+    const subtitleState = subtitleBlockState(note, subtitleSettings.enabled);
+    if (subtitleState.visible) {
+      const subtitleBlock = document.createElement("section");
+      subtitleBlock.className = "note-subtitle";
+      const subtitleHeader = document.createElement("div");
+      subtitleHeader.className = "note-subtitle-header";
+      const subtitleTitle = document.createElement("strong");
+      subtitleTitle.textContent = "前置字幕";
+      const subtitleEdit = document.createElement("button");
+      subtitleEdit.className = "note-edit-button";
+      subtitleEdit.type = "button";
+      subtitleEdit.textContent = "编辑字幕";
+      const subtitle = document.createElement("p");
+      subtitle.className = "note-subtitle-text";
+
+      const renderSubtitle = () => {
+        const state = subtitleBlockState(note, true);
+        subtitle.textContent = state.empty
+          ? "未读取到字幕，请确认播放器已开启字幕"
+          : state.text;
+        subtitle.classList.toggle("is-empty", state.empty);
+      };
+
+      renderSubtitle();
+      subtitleHeader.append(subtitleTitle, subtitleEdit);
+      subtitleBlock.append(subtitleHeader, subtitle);
+      item.append(subtitleBlock);
+
+      inlineEditController.bind({
+        noteId: note.id,
+        button: subtitleEdit,
+        content: subtitle,
+        getInitialText: () => note.subtitleContext ?? "",
+        restore: renderSubtitle,
+        save(text) {
+          return request({
+            type: "UPDATE_NOTE_SUBTITLE",
+            noteId: note.id,
+            subtitleContext: text,
+          });
+        },
+        applySaved(response) {
+          note.subtitleContext = response.note.subtitleContext;
+          renderSubtitle();
+        },
+      });
+    }
     if (note.transcriptionStatus === "transcribing" || note.transcriptionStatus === "pending") {
       const pending = document.createElement("span");
       pending.className = "note-pending";
@@ -429,9 +470,26 @@ function renderNotes(notes, order = noteSortBinding.order) {
 }
 
 async function refresh() {
-  try {
+  if (inlineEditController.blocked) {
+    sidePanelRefresh.requestRefresh({ type: "SIDE_PANEL_REFRESH_REQUEST" });
+    return;
+  }
+  await refreshNow();
+}
+
+async function refreshNow() {
+  await refreshRunner.run();
+}
+
+refreshRunner = createSidePanelRefreshRunner({
+  async load() {
     const response = await request({ type: "GET_ACTIVE_STATE" });
-    whisperStatus = await request({ type: "GET_WHISPER_STATUS" }).catch(() => whisperStatus);
+    const nextWhisperStatus = await request({ type: "GET_WHISPER_STATUS" })
+      .catch(() => whisperStatus);
+    return { nextWhisperStatus, response };
+  },
+  apply({ nextWhisperStatus, response }) {
+    whisperStatus = nextWhisperStatus;
     activeContext = response.context;
     if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
     elements.videoTitle.textContent = activeContext.title;
@@ -440,7 +498,8 @@ async function refresh() {
     elements.input.disabled = false;
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
-  } catch (error) {
+  },
+  applyError(error) {
     activeContext = null;
     elements.videoTitle.textContent = error.message;
     elements.videoUrl.hidden = true;
@@ -448,8 +507,12 @@ async function refresh() {
     elements.voiceButton.disabled = true;
     elements.exportButton.disabled = true;
     renderNotes([]);
-  }
-}
+  },
+  isBlocked: () => inlineEditController.blocked,
+  defer() {
+    sidePanelRefresh.requestRefresh({ type: "SIDE_PANEL_REFRESH_RESPONSE_DEFERRED" });
+  },
+});
 
 async function beginTypedDraft() {
   if (currentDraft || draftPromise || !activeContext) return;
@@ -675,6 +738,32 @@ elements.microphonePermissionButton.addEventListener("click", async () => {
   }
 });
 
+elements.subtitleEnabled.addEventListener("change", async () => {
+  const previous = subtitleSettings;
+  elements.subtitleWindowSeconds.disabled = !elements.subtitleEnabled.checked;
+  try {
+    await chrome.storage.local.set({
+      subtitleEnabled: elements.subtitleEnabled.checked,
+    });
+  } catch (error) {
+    elements.subtitleEnabled.checked = previous.enabled;
+    elements.subtitleWindowSeconds.disabled = !previous.enabled;
+    showToast(error.message);
+  }
+});
+
+elements.subtitleWindowSeconds.addEventListener("change", async () => {
+  const previous = subtitleSettings;
+  try {
+    await chrome.storage.local.set({
+      subtitleWindowSeconds: Number(elements.subtitleWindowSeconds.value),
+    });
+  } catch (error) {
+    elements.subtitleWindowSeconds.value = String(previous.windowSeconds);
+    showToast(error.message);
+  }
+});
+
 elements.screenshotDialogClose.addEventListener("click", () => {
   elements.screenshotDialog.close();
 });
@@ -791,6 +880,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
     microphoneReady = changes.microphoneReady.newValue === true;
     void renderPermissionStatus();
   }
+  if (area === "local" && (
+    changes.subtitleEnabled
+    || changes.subtitleWindowSeconds
+  )) {
+    subtitleSettings = normalizeSubtitleSettings({
+      subtitleEnabled: changes.subtitleEnabled
+        ? changes.subtitleEnabled.newValue
+        : subtitleSettings.enabled,
+      subtitleWindowSeconds: changes.subtitleWindowSeconds
+        ? changes.subtitleWindowSeconds.newValue
+        : subtitleSettings.windowSeconds,
+    });
+    syncSubtitleSettingsControls();
+    sidePanelRefresh.requestRefresh({ type: "SUBTITLE_SETTINGS_CHANGED" });
+  }
 });
 
 window.addEventListener("pagehide", () => {
@@ -810,6 +914,14 @@ window.addEventListener("pagehide", () => {
     })).catch(() => {});
   }
 });
+
+subtitleSettings = normalizeSubtitleSettings(
+  await chrome.storage.local.get({
+    subtitleEnabled: true,
+    subtitleWindowSeconds: 20,
+  }),
+);
+syncSubtitleSettingsControls();
 
 await initializeSidepanel({
   storage: chrome.storage,

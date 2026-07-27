@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { SubtitleBuffer } from "../src/core/subtitle-buffer.js";
+import { SubtitleCapture } from "../src/core/subtitle-capture.js";
+import { readRenderedSubtitleText } from "../src/core/subtitle-text.js";
 
 test("字幕缓冲去重并提取标记前窗口", () => {
   const buffer = new SubtitleBuffer({ retentionSeconds: 60 });
@@ -30,3 +32,27 @@ test("清理超过保留窗口的字幕", () => {
   assert.equal(buffer.before(62, { seconds: 60, maxChars: 500 }), "保留");
 });
 
+test("沉浸式双语字幕进入采集缓冲后保留换行", () => {
+  const cue = (text) => ({
+    textContent: text,
+    getClientRects: () => [{}],
+  });
+  const container = {
+    getClientRects: () => [{}],
+    querySelectorAll: () => [
+      cue("  source   text\n\n  continued  "),
+      cue("  target\ttext  "),
+    ],
+  };
+  const root = {
+    querySelectorAll: (selector) => selector === ".imt-captions-text" ? [container] : [],
+  };
+  const capture = new SubtitleCapture({ subtitleEnabled: true });
+
+  capture.add(10, readRenderedSubtitleText(root, "youtube"));
+
+  assert.equal(
+    capture.before(10),
+    "source text\ncontinued\ntarget text",
+  );
+});

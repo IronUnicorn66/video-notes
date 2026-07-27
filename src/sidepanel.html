@@ -84,6 +84,22 @@
             <button id="microphone-permission-button" class="secondary-button" type="button">授权</button>
           </div>
           <div class="setting-row">
+            <div class="subtitle-setting">
+              <label for="subtitle-enabled">
+                <input id="subtitle-enabled" type="checkbox" checked />
+                <strong>前置字幕</strong>
+              </label>
+              <p>读取播放器已经显示的字幕，并附在新标记中。</p>
+              <label for="subtitle-window-seconds">读取标记前</label>
+              <select id="subtitle-window-seconds">
+                <option value="5">5 秒</option>
+                <option value="10">10 秒</option>
+                <option value="20" selected>20 秒</option>
+                <option value="30">30 秒</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
             <div class="whisper-setting">
               <strong>本地 Whisper</strong>
               <p id="whisper-detail">尚未启用。首次下载约 57 MiB。</p>

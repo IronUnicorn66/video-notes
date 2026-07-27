@@ -1,9 +1,10 @@
 import { acquirePlaybackLease, markPlaybackIntervention, releasePlaybackLease } from "./core/playback-lease.js";
 import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
-import { SubtitleBuffer } from "./core/subtitle-buffer.js";
+import { SubtitleCapture } from "./core/subtitle-capture.js";
+import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 
-const subtitleBuffer = new SubtitleBuffer({ retentionSeconds: 60 });
+const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 let currentMedia = null;
 let activeLease = null;
 let activeLeaseTimer = null;
@@ -122,22 +123,14 @@ async function releaseMarker(markerId, { allowResume = true } = {}) {
   return allowResume && result.shouldPlay;
 }
 
-function renderedSubtitleText(context) {
-  const selector = context.platform === "youtube"
-    ? ".ytp-caption-segment"
-    : ".bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle";
-  return [...document.querySelectorAll(selector)]
-    .filter((element) => element.getClientRects().length > 0)
-    .map((element) => element.textContent?.trim())
-    .filter(Boolean)
-    .join(" ");
-}
-
 function collectSubtitles() {
   const context = getContext();
   const media = bindMedia();
   if (!context || !media) return;
-  subtitleBuffer.add(media.currentTime, renderedSubtitleText(context));
+  subtitleCapture.add(
+    media.currentTime,
+    readRenderedSubtitleText(document, context.platform),
+  );
 }
 
 function markerSnapshot(markerId, { deferPause = false } = {}) {
@@ -150,7 +143,7 @@ function markerSnapshot(markerId, { deferPause = false } = {}) {
     context,
     seconds,
     jumpUrl: buildJumpUrl(context, seconds),
-    subtitleContext: subtitleBuffer.before(seconds, { seconds: 20, maxChars: 500 }),
+    subtitleContext: subtitleCapture.before(seconds),
     rect: {
       x: rect.left,
       y: rect.top,
@@ -260,15 +253,35 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) void pushToTalk.forceStop("tab-hidden");
 });
 
-chrome.storage.local.get({ shortcutCode: "AltRight" }).then(({ shortcutCode: saved }) => {
+chrome.storage.local.get({
+  shortcutCode: "AltRight",
+  subtitleEnabled: true,
+  subtitleWindowSeconds: 20,
+}).then(({
+  shortcutCode: saved,
+  subtitleEnabled,
+  subtitleWindowSeconds,
+}) => {
   shortcutCode = saved;
   pushToTalk.keyCode = saved;
+  subtitleCapture.updateSettings({ subtitleEnabled, subtitleWindowSeconds });
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes.shortcutCode?.newValue) {
+  if (area !== "local") return;
+  if (changes.shortcutCode?.newValue) {
     shortcutCode = changes.shortcutCode.newValue;
     pushToTalk.keyCode = shortcutCode;
+  }
+  const subtitleSettings = {};
+  if (changes.subtitleEnabled) {
+    subtitleSettings.subtitleEnabled = changes.subtitleEnabled.newValue;
+  }
+  if (changes.subtitleWindowSeconds) {
+    subtitleSettings.subtitleWindowSeconds = changes.subtitleWindowSeconds.newValue;
+  }
+  if (Object.keys(subtitleSettings).length > 0) {
+    subtitleCapture.updateSettings(subtitleSettings);
   }
 });
 
@@ -318,7 +331,7 @@ setInterval(() => {
   if (location.href !== currentUrl) {
     currentUrl = location.href;
     if (activeLease) void releaseMarker(activeLease.markerId);
-    subtitleBuffer.items = [];
+    subtitleCapture.clear();
     chrome.runtime.sendMessage({ type: "CONTEXT_CHANGED", context: getContext() });
   }
 }, 400);

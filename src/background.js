@@ -1,5 +1,6 @@
 import { computeScreenshotCrop } from "./core/screenshot.js";
 import { VideoNotesRepository } from "./core/storage.js";
+import { applySubtitleEdit } from "./core/note-editing.js";
 import {
   STUDY_SOUND_EXTENSION_ID,
   noteHoldMessage,
@@ -779,6 +780,12 @@ async function handleMessage(message, sender) {
         userEditVersion: (current.userEditVersion ?? 0) + 1,
         updatedAt: Date.now(),
       }));
+      return { note };
+    }
+    case "UPDATE_NOTE_SUBTITLE": {
+      const note = await repository.updateNote(message.noteId, (current) => (
+        applySubtitleEdit(current, message.subtitleContext)
+      ));
       return { note };
     }
     case "CANCEL_NOTE":

@@ -54,6 +54,9 @@ export function createSidePanelRefreshController(refresh, {
       refreshOrDefer({ type: "SIDE_PANEL_VISIBLE", tabId });
       return true;
     },
+    requestRefresh(message) {
+      return refreshOrDefer(message);
+    },
     flushDeferredRefresh() {
       if (!deferredMessage) return false;
       const message = deferredMessage;
