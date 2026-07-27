@@ -86,12 +86,44 @@ test("后台笔记命令基于当前页面会话路由历史操作", async () =>
   await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
   assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
 
-  await assert.rejects(
-    route({ type: "CLEAR_SESSION_NOTES", sessionId: "youtube:other" }),
-    /当前页面会话不匹配/,
-  );
+  for (const type of ["CLEAR_SESSION_NOTES", "UNDO_NOTE_ACTION", "REDO_NOTE_ACTION"]) {
+    await assert.rejects(
+      route({ type, sessionId: "youtube:other" }),
+      /当前页面会话不匹配/,
+    );
+  }
   assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
   await repository.destroy();
+});
+
+test("后台和隐藏页通过历史提交边界保存笔记", async () => {
+  const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
+  const offscreen = await readFile(new URL("../src/offscreen.js", import.meta.url), "utf8");
+  const messageHandler = background.slice(
+    background.indexOf("async function handleMessage"),
+    background.indexOf("function assertOffscreenSender"),
+  );
+  const voiceStop = background.slice(
+    background.indexOf("async function stopVoiceUnlocked"),
+    background.indexOf("async function finishVoiceUi"),
+  );
+  const voiceSuccess = voiceStop.slice(
+    voiceStop.indexOf("const note = await repository.getNote(result.noteId)"),
+    voiceStop.indexOf("if (result.whisperReady)"),
+  );
+  const recordingStop = offscreen.slice(
+    offscreen.indexOf("async function stopRecordingCore"),
+    offscreen.indexOf("async function abortRecording"),
+  );
+
+  assert.match(
+    messageHandler,
+    /if \(isNoteHistoryCommand\(message\.type\)\) \{\s+return noteHistoryCommandRouter\(message, \{ sender, tabId: message\.tabId \}\)/,
+  );
+  assert.match(voiceStop, /repository\.commitSavedNote\(note\.id/);
+  assert.doesNotMatch(voiceSuccess, /repository\.putNote\(/);
+  assert.match(recordingStop, /await persistRecordedNote\(\{/);
+  assert.doesNotMatch(recordingStop, /repository\.updateNote\(noteId/);
 });
 
 test("录音保存先持久化音频并只提交一次可撤销新增", async () => {
