@@ -140,6 +140,26 @@ test("失败的注入会清理状态并允许后续恢复", async () => {
   assert.equal(injections, 2);
 });
 
+test("站点关闭扩展权限时提示重新允许并刷新页面", async () => {
+  const messenger = createTabMessenger({
+    tabs: {
+      async sendMessage() {
+        throw new Error("Could not establish connection. Receiving end does not exist.");
+      },
+    },
+    scripting: {
+      async executeScript() {
+        throw new Error("Blocked");
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => messenger.send(42, { type: "PING" }),
+    /允许在当前网站使用扩展.*刷新页面/,
+  );
+});
+
 test("注入后的重试失败时不重复注入", async () => {
   let sends = 0;
   let injections = 0;

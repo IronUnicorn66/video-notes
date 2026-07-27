@@ -1,13 +1,13 @@
-# Edge 150 实机验收清单（0.2.1）
+# Edge 150 实机验收清单（0.2.2）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge 150 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（138 个测试）。
-- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `0.2.1`。
-- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-0.2.1.zip`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-0.2.1.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm test` 通过（142 个测试）。
+- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `0.2.2`。
+- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-0.2.2.zip`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-0.2.2.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
 
@@ -35,6 +35,7 @@
 - [ ] 创建一条文字笔记和一条语音笔记，确认侧栏均显示截图。
 - [ ] 确认语音笔记可以播放保存的原始录音；点击缩略图可放大并关闭。
 - [ ] 保持受支持的视频页打开，重新加载扩展后不刷新视频页，直接打开侧栏；确认标题与快速标记输入框恢复，点击输入框可暂停视频并保存或取消标记。
+- [ ] 保持侧栏打开，在 Edge 扩展菜单中关闭再开启当前视频网站的扩展总开关并按提示刷新；确认侧栏先显示中文权限指引，随后自动恢复标题与快速标记输入框，无需关闭侧栏。
 - [ ] 依次切换课程 A、普通网页、课程 B、课程 A，确认侧栏依次显示 A、隐藏、显示 B、恢复 A。
 - [ ] 确认侧栏只在 YouTube 普通视频页和哔哩哔哩普通 BV 视频页启用。
 - [ ] 与网课声伴一起使用时，确认语音期间 A/B 都暂停，松开后按恢复资格恢复；文字输入保留现有 A/B 接力行为。

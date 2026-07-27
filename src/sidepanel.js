@@ -12,7 +12,10 @@ import {
   stopNoteMedia,
 } from "./core/asset-url-registry.js";
 import { VideoNotesRepository } from "./core/storage.js";
-import { createSidePanelRefreshController } from "./core/sidepanel-scope.js";
+import {
+  createSidePanelRefreshController,
+  isSidePanelRefreshMessage,
+} from "./core/sidepanel-scope.js";
 import {
   createSidePanelInlineEditController,
   createSidePanelRefreshRunner,
@@ -852,7 +855,7 @@ elements.keyButton.addEventListener("keydown", async (event) => {
 });
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (["ACTIVE_CONTEXT_CHANGED", "NOTE_TRANSCRIBED", "VOICE_STATE_CHANGED"].includes(message.type)) {
+  if (isSidePanelRefreshMessage(message)) {
     sidePanelRefresh.handleContextChanged(message);
   }
 });

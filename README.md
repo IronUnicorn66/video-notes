@@ -47,7 +47,7 @@ npm run build
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-0.2.1.zip
+unzip -t artifacts/video-notes-edge-0.2.2.zip
 ```
 
 网课声伴的协作测试位于 `/Users/psh/codes/browser_always_play/tests`，覆盖固定发送者校验、A/B 全暂停、全局暂停保护、心跳续租和超时恢复。

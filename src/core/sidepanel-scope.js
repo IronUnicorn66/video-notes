@@ -4,6 +4,28 @@ export function contextChangedSenderTab(sender) {
   return Number.isInteger(sender?.tab?.id) ? sender.tab : null;
 }
 
+export function sidePanelMessageForTabUpdate(tabId, changeInfo, tab) {
+  if (
+    !Number.isInteger(tabId)
+    || changeInfo?.status !== "complete"
+    || tab?.active !== true
+    || !tab.url
+    || !parseVideoContext(tab.url)
+  ) {
+    return null;
+  }
+  return { type: "TAB_LOAD_COMPLETE", tabId };
+}
+
+export function isSidePanelRefreshMessage(message) {
+  return [
+    "ACTIVE_CONTEXT_CHANGED",
+    "TAB_LOAD_COMPLETE",
+    "NOTE_TRANSCRIBED",
+    "VOICE_STATE_CHANGED",
+  ].includes(message?.type);
+}
+
 export function sidePanelTabIdForSender(sender, contexts, fallbackTabId = null) {
   const context = contexts.find((candidate) => (
     candidate.contextType === "SIDE_PANEL"

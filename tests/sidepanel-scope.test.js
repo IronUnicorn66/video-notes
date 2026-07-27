@@ -4,9 +4,51 @@ import test from "node:test";
 import {
   createSidePanelRefreshController,
   contextChangedSenderTab,
+  isSidePanelRefreshMessage,
+  sidePanelMessageForTabUpdate,
   sidePanelTabIdForSender,
   sidePanelOptionsForTab,
 } from "../src/core/sidepanel-scope.js";
+
+test("标签页加载完成后通知已打开侧栏重试当前页面", () => {
+  assert.deepEqual(
+    sidePanelMessageForTabUpdate(7, { status: "complete" }, {
+      active: true,
+      url: "https://www.youtube.com/watch?v=course-a",
+    }),
+    { type: "TAB_LOAD_COMPLETE", tabId: 7 },
+  );
+  assert.equal(sidePanelMessageForTabUpdate(7, { status: "complete" }, {
+    active: false,
+    url: "https://www.youtube.com/watch?v=course-a",
+  }), null);
+  assert.equal(sidePanelMessageForTabUpdate(7, { status: "loading" }, {
+    active: true,
+    url: "https://www.youtube.com/watch?v=course-a",
+  }), null);
+  assert.equal(sidePanelMessageForTabUpdate(
+    7,
+    { url: "https://www.youtube.com/watch?v=next" },
+    { active: true, url: "https://www.youtube.com/watch?v=course-a" },
+  ), null);
+  assert.equal(sidePanelMessageForTabUpdate(7, { status: "complete" }, {
+    active: true,
+    url: "https://example.com/",
+  }), null);
+  assert.equal(sidePanelMessageForTabUpdate(7, { status: "complete" }, {
+    active: true,
+    url: "https://www.youtube.com/",
+  }), null);
+  assert.equal(sidePanelMessageForTabUpdate(7, { status: "complete" }, {
+    active: true,
+    url: "https://www.bilibili.com/",
+  }), null);
+});
+
+test("侧栏接收页面加载完成消息", () => {
+  assert.equal(isSidePanelRefreshMessage({ type: "TAB_LOAD_COMPLETE" }), true);
+  assert.equal(isSidePanelRefreshMessage({ type: "UNRELATED" }), false);
+});
 
 test("YouTube 和哔哩哔哩视频标签启用侧栏", () => {
   assert.deepEqual(sidePanelOptionsForTab({ id: 7, url: "https://www.youtube.com/watch?v=abc123" }), {
@@ -86,6 +128,23 @@ test("活动课程标签切换时侧栏接管新标签并刷新", () => {
   assert.equal(panel.handleContextChanged({ type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 }), true);
   assert.equal(panel.tabId, 2);
   assert.deepEqual(refreshedMessage, { type: "ACTIVE_CONTEXT_CHANGED", tabId: 2 });
+});
+
+test("页面加载完成只刷新所属侧栏且不改写其他侧栏绑定", () => {
+  let refreshesA = 0;
+  let refreshesB = 0;
+  const panelA = createSidePanelRefreshController(() => { refreshesA += 1; });
+  const panelB = createSidePanelRefreshController(() => { refreshesB += 1; });
+  panelA.setTabId(1);
+  panelB.setTabId(2);
+
+  const message = { type: "TAB_LOAD_COMPLETE", tabId: 2 };
+  assert.equal(panelA.handleContextChanged(message), false);
+  assert.equal(panelB.handleContextChanged(message), true);
+  assert.equal(panelA.tabId, 1);
+  assert.equal(panelB.tabId, 2);
+  assert.equal(refreshesA, 0);
+  assert.equal(refreshesB, 1);
 });
 
 test("编辑中重新可见延后刷新，并在编辑完成后只刷新一次", () => {

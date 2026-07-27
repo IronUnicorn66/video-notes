@@ -26,6 +26,7 @@ import {
 } from "./core/media-permissions.js";
 import {
   contextChangedSenderTab,
+  sidePanelMessageForTabUpdate,
   sidePanelOptionsForTab,
   sidePanelTabIdForSender,
 } from "./core/sidepanel-scope.js";
@@ -123,6 +124,10 @@ chrome.tabs.onCreated.addListener((tab) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || changeInfo.status === "complete") {
     void configureSidePanelForTab({ ...tab, id: tabId });
+  }
+  const refreshMessage = sidePanelMessageForTabUpdate(tabId, changeInfo, tab);
+  if (refreshMessage) {
+    void chrome.runtime.sendMessage(refreshMessage).catch(() => {});
   }
 });
 
