@@ -147,8 +147,9 @@ test("后台和隐藏页通过历史提交边界保存笔记", async () => {
 
   assert.match(
     messageHandler,
-    /if \(isNoteHistoryCommand\(message\.type\)\) \{\s+return noteHistoryCommandRouter\(message, \{ sender, tabId: message\.tabId \}\)/,
+    /if \(isNoteHistoryCommand\(message\.type\)\) \{\s+const request = await noteHistoryRequest\(message, sender\);\s+return noteHistoryCommandRouter\(message, request\)/,
   );
+  assert.match(background, /sidePanelRequestTabIdForSender/);
   assert.match(voiceStop, /repository\.commitSavedNote\(note\.id/);
   assert.doesNotMatch(voiceSuccess, /repository\.putNote\(/);
   assert.match(recordingStop, /await persistRecordedNote\(\{/);

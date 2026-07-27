@@ -6,9 +6,25 @@ import {
   contextChangedSenderTab,
   isSidePanelRefreshMessage,
   sidePanelMessageForTabUpdate,
+  sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
   sidePanelOptionsForTab,
 } from "../src/core/sidepanel-scope.js";
+
+test("侧栏历史请求拒绝已经切换前的旧标签页标识", () => {
+  const sender = { documentId: "panel-a" };
+  const contexts = [{
+    contextType: "SIDE_PANEL",
+    documentId: "panel-a",
+    tabId: 2,
+  }];
+
+  assert.throws(
+    () => sidePanelRequestTabIdForSender(sender, contexts, 2, 1),
+    /侧栏所属标签页已变化/,
+  );
+  assert.equal(sidePanelRequestTabIdForSender(sender, contexts, 2, 2), 2);
+});
 
 test("标签页加载完成后通知已打开侧栏重试当前页面", () => {
   assert.deepEqual(

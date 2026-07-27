@@ -37,6 +37,25 @@ export function sidePanelTabIdForSender(sender, contexts, fallbackTabId = null) 
     ?? (Number.isInteger(fallbackTabId) && fallbackTabId >= 0 ? fallbackTabId : null);
 }
 
+export function sidePanelRequestTabIdForSender(
+  sender,
+  contexts,
+  fallbackTabId,
+  requestedTabId,
+) {
+  const tabId = sidePanelTabIdForSender(sender, contexts, fallbackTabId);
+
+  if (tabId === null) {
+    throw new Error("无法确定侧栏所属标签页");
+  }
+
+  if (!Number.isInteger(requestedTabId) || requestedTabId !== tabId) {
+    throw new Error("侧栏所属标签页已变化");
+  }
+
+  return tabId;
+}
+
 export function createSidePanelRefreshController(refresh, {
   onContextEvent = () => {},
   shouldRefresh = () => true,

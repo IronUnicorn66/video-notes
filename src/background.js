@@ -31,6 +31,7 @@ import {
   contextChangedSenderTab,
   sidePanelMessageForTabUpdate,
   sidePanelOptionsForTab,
+  sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
@@ -737,9 +738,37 @@ async function selectWhisperModelCore(modelId) {
   return sendToOffscreen({ type: "SELECT_WHISPER_MODEL", modelId });
 }
 
+const PAGE_SCOPED_NOTE_HISTORY_COMMANDS = new Set([
+  "GET_ACTIVE_STATE",
+  "DELETE_NOTE",
+  "CLEAR_SESSION_NOTES",
+  "UNDO_NOTE_ACTION",
+  "REDO_NOTE_ACTION",
+]);
+
+async function noteHistoryRequest(message, sender) {
+  if (!PAGE_SCOPED_NOTE_HISTORY_COMMANDS.has(message.type)) {
+    return { sender, tabId: message.tabId };
+  }
+
+  const contexts = await chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
+  const contextTabId = sidePanelTabIdForSender(sender, contexts);
+  const fallbackTabId = contextTabId === null ? (await activeSupportedTab()).id : null;
+  return {
+    sender,
+    tabId: sidePanelRequestTabIdForSender(
+      sender,
+      contexts,
+      fallbackTabId,
+      message.tabId,
+    ),
+  };
+}
+
 async function handleMessage(message, sender) {
   if (isNoteHistoryCommand(message.type)) {
-    return noteHistoryCommandRouter(message, { sender, tabId: message.tabId });
+    const request = await noteHistoryRequest(message, sender);
+    return noteHistoryCommandRouter(message, request);
   }
   switch (message.type) {
     case "OFFSCREEN_STORAGE_GET":

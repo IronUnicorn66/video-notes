@@ -214,6 +214,46 @@ test("必须应用的刷新被更晚代次取代时会继续等待下一次应�
   assert.deepEqual(applied, ["已应用的历史状态"]);
 });
 
+test("必须应用的刷新遇到编辑阻塞时等待既有延迟刷新且不主动循环", async () => {
+  const loads = [];
+  const applied = [];
+  let blocked = true;
+  let deferredRefreshes = 0;
+  const refreshRunner = createSidePanelRefreshRunner({
+    load() {
+      const gate = deferred();
+      loads.push(gate);
+      return gate.promise;
+    },
+    apply(value) { applied.push(value); },
+    applyError(error) { throw error; },
+    isBlocked: () => blocked,
+    defer() { deferredRefreshes += 1; },
+  });
+
+  let settled = false;
+  const requiredRefresh = refreshRunner.runUntilApplied().then((value) => {
+    settled = true;
+    return value;
+  });
+  loads[0].resolve("编辑中的响应");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(loads.length, 1);
+  assert.equal(deferredRefreshes, 1);
+  assert.equal(settled, false);
+  assert.deepEqual(applied, []);
+
+  blocked = false;
+  const deferredRefresh = refreshRunner.run();
+  assert.equal(loads.length, 2);
+  loads[1].resolve("解除编辑后的响应");
+
+  assert.equal(await deferredRefresh, true);
+  assert.equal(await requiredRefresh, true);
+  assert.deepEqual(applied, ["解除编辑后的响应"]);
+});
+
 test("保存失败保留可见文本并允许点击重试", async () => {
   const firstSave = deferred();
   const secondSave = deferred();

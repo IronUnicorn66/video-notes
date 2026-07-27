@@ -114,6 +114,7 @@ test("历史请求忙碌时同步禁用控件且快捷键只拦截可执行操�
   assert.match(source, /const operation = historyOperationController\.run\(/);
   assert.match(source, /const succeeded = await operation/);
   assert.match(source, /syncHistoryControls\(\)/);
+  assert.match(source, /refresh: \(\) => refreshRunner\.runUntilApplied\(\)/);
   assert.match(source, /deleteButton\.disabled = controls\.deleteDisabled/);
   assert.match(source, /elements\.clearButton\.disabled = controls\.clearDisabled/);
   assert.match(source, /elements\.undoButton\.disabled = controls\.undoDisabled/);

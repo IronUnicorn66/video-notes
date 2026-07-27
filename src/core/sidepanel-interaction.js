@@ -158,6 +158,26 @@ export function createSidePanelRefreshRunner({
 }) {
   let generation = 0;
   let pendingCount = 0;
+  let appliedGeneration = 0;
+  const appliedWaiters = new Set();
+
+  function markApplied() {
+    appliedGeneration += 1;
+    for (const resolve of appliedWaiters) {
+      resolve(true);
+    }
+    appliedWaiters.clear();
+  }
+
+  function waitForApplied(generationToWaitFor) {
+    if (appliedGeneration !== generationToWaitFor) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      appliedWaiters.add(resolve);
+    });
+  }
 
   async function run() {
     const currentGeneration = ++generation;
@@ -170,6 +190,7 @@ export function createSidePanelRefreshRunner({
         return false;
       }
       apply(value);
+      markApplied();
       return true;
     } catch (error) {
       if (currentGeneration !== generation) return false;
@@ -178,6 +199,7 @@ export function createSidePanelRefreshRunner({
         return false;
       }
       applyError(error);
+      markApplied();
       return true;
     } finally {
       pendingCount -= 1;
@@ -192,10 +214,13 @@ export function createSidePanelRefreshRunner({
   }
 
   async function runUntilApplied() {
-    while (!await run()) {
-      // A newer refresh generation owns the stale response. Retry until this caller applies one.
+    while (true) {
+      const currentAppliedGeneration = appliedGeneration;
+      if (await run()) return true;
+      if (isBlocked()) {
+        return waitForApplied(currentAppliedGeneration);
+      }
     }
-    return true;
   }
 
   return {
