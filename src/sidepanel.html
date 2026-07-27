@@ -59,6 +59,9 @@
                 title="最新笔记在前"
               >倒序</button>
             </div>
+            <button id="undo-button" class="secondary-button" type="button" disabled>撤销</button>
+            <button id="redo-button" class="secondary-button" type="button" disabled>反撤销</button>
+            <button id="clear-button" class="danger-button" type="button" disabled>清空</button>
             <button id="export-button" class="secondary-button" type="button" disabled>导出 ZIP</button>
           </div>
         </div>
@@ -125,6 +128,16 @@
     <dialog id="screenshot-dialog" aria-label="标记截图预览">
       <button id="screenshot-dialog-close" type="button" aria-label="关闭截图">关闭</button>
       <img id="screenshot-dialog-image" alt="标记时的播放器截图大图" />
+    </dialog>
+    <dialog id="history-confirm-dialog" aria-labelledby="history-confirm-title" aria-describedby="history-confirm-description">
+      <form method="dialog" class="confirm-dialog-card">
+        <h2 id="history-confirm-title"></h2>
+        <p id="history-confirm-description"></p>
+        <div class="confirm-dialog-actions">
+          <button value="cancel" class="secondary-button">取消</button>
+          <button id="history-confirm-button" value="confirm" class="danger-button">确认</button>
+        </div>
+      </form>
     </dialog>
     <script type="module" src="sidepanel.js"></script>
   </body>

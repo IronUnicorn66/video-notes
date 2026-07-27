@@ -302,6 +302,23 @@ test("侧栏提供截图预览对话框和音频样式入口", async () => {
   assert.match(css, /\.note-audio/);
 });
 
+test("构建产物包含侧栏历史工具栏和确认框", async () => {
+  const html = await readFile(new URL("../dist/sidepanel.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("../dist/sidepanel.js", import.meta.url), "utf8");
+
+  for (const id of [
+    "undo-button",
+    "redo-button",
+    "clear-button",
+    "history-confirm-dialog",
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(source, /CLEAR_SESSION_NOTES/);
+  assert.match(source, /UNDO_NOTE_ACTION/);
+  assert.match(source, /REDO_NOTE_ACTION/);
+});
+
 test("首次麦克风授权从普通扩展页发起", async () => {
   const sidepanel = await readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8");
   const permissionHtml = await readFile(

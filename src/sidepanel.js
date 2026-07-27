@@ -22,6 +22,11 @@ import {
 } from "./core/sidepanel-interaction.js";
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
+import {
+  createHistoryOperationController,
+  historyControlState,
+  historyShortcut,
+} from "./core/note-history-controls.js";
 
 const elements = {
   videoTitle: document.querySelector("#video-title"),
@@ -35,6 +40,9 @@ const elements = {
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
   noteSortButtons: document.querySelectorAll("[data-note-sort-order]"),
+  undoButton: document.querySelector("#undo-button"),
+  redoButton: document.querySelector("#redo-button"),
+  clearButton: document.querySelector("#clear-button"),
   exportButton: document.querySelector("#export-button"),
   whisperDetail: document.querySelector("#whisper-detail"),
   whisperModelSelect: document.querySelector("#whisper-model-select"),
@@ -52,6 +60,9 @@ const elements = {
   screenshotDialog: document.querySelector("#screenshot-dialog"),
   screenshotDialogClose: document.querySelector("#screenshot-dialog-close"),
   screenshotDialogImage: document.querySelector("#screenshot-dialog-image"),
+  historyConfirmDialog: document.querySelector("#history-confirm-dialog"),
+  historyConfirmTitle: document.querySelector("#history-confirm-title"),
+  historyConfirmDescription: document.querySelector("#history-confirm-description"),
 };
 
 const repository = new VideoNotesRepository();
@@ -60,10 +71,12 @@ const assetUrls = createAssetUrlRegistry();
 let activeContext = null;
 let currentDraft = null;
 let draftPromise = null;
+let typedDraftSaving = false;
 let isComposing = false;
 let commitAfterComposition = false;
 let recording = false;
 let voiceStarting = false;
+let voiceStopping = false;
 let pendingVoiceStopReason = null;
 let recordingStartedAt = 0;
 let recordingInterval = null;
@@ -78,6 +91,10 @@ let pendingWhisperModelId = null;
 let whisperStatus = null;
 let renderGeneration = 0;
 let currentNotes = [];
+let canUndo = false;
+let canRedo = false;
+let pendingHistoryAction = null;
+let historyOperationController = null;
 let subtitleSettings = normalizeSubtitleSettings();
 
 const noteSortBinding = createSidepanelNoteSortBinding({
@@ -123,11 +140,14 @@ function syncSubtitleSettingsControls() {
 inlineEditController = createSidePanelInlineEditController({
   onEditStarted() {
     refreshRunner?.invalidateForEdit();
+    syncHistoryControls();
   },
   onError(error) {
     showToast(error.message);
+    syncHistoryControls();
   },
   flushDeferredRefresh() {
+    syncHistoryControls();
     if (!refreshAfterEdit) {
       noteSortBinding.finishEditing();
       return false;
@@ -137,6 +157,72 @@ inlineEditController = createSidePanelInlineEditController({
     return sidePanelRefresh.flushDeferredRefresh();
   },
 });
+
+historyOperationController = createHistoryOperationController({
+  request,
+  refresh,
+  showError(error) {
+    showToast(error.message);
+  },
+});
+
+function savedNoteCount() {
+  return currentNotes.filter((note) => note.status === "saved").length;
+}
+
+function currentHistoryControlState() {
+  return historyControlState({
+    noteCount: savedNoteCount(),
+    canUndo,
+    canRedo,
+    blocked: Boolean(
+      currentDraft
+      || draftPromise
+      || recording
+      || voiceStarting
+      || inlineEditController.blocked
+      || typedDraftSaving
+      || voiceStopping
+    ),
+    pending: historyOperationController.pending,
+  });
+}
+
+function syncHistoryControls() {
+  const controls = currentHistoryControlState();
+  elements.clearButton.disabled = controls.clearDisabled;
+  elements.undoButton.disabled = controls.undoDisabled;
+  elements.redoButton.disabled = controls.redoDisabled;
+  for (const deleteButton of elements.noteList.querySelectorAll(".note-delete-button")) {
+    deleteButton.disabled = controls.deleteDisabled;
+  }
+}
+
+function canRunHistoryAction(operation) {
+  const controls = currentHistoryControlState();
+  if (!activeContext || !Number.isInteger(sidePanelRefresh.tabId)) return false;
+  if (operation === "undo") return !controls.undoDisabled;
+  if (operation === "redo") return !controls.redoDisabled;
+  if (operation === "clear" || operation === "delete") return !controls.clearDisabled;
+  return false;
+}
+
+async function runHistoryOperation(message) {
+  const operation = historyOperationController.run(message);
+  syncHistoryControls();
+  const succeeded = await operation;
+  syncHistoryControls();
+  return succeeded;
+}
+
+function confirmHistoryAction({ title, description }, action) {
+  if (elements.historyConfirmDialog.open) return;
+  elements.historyConfirmTitle.textContent = title;
+  elements.historyConfirmDescription.textContent = description;
+  elements.historyConfirmDialog.returnValue = "";
+  pendingHistoryAction = action;
+  elements.historyConfirmDialog.showModal();
+}
 
 function whisperModelLabel(modelId) {
   return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? "当前模型";
@@ -328,9 +414,23 @@ function renderNotes(notes, order = noteSortBinding.order) {
     edit.className = "note-edit-button";
     edit.type = "button";
     edit.textContent = "编辑";
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "note-delete-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "删除";
+    deleteButton.addEventListener("click", () => {
+      if (!canRunHistoryAction("delete")) return;
+      confirmHistoryAction({
+        title: "删除这条标记？",
+        description: `将删除 ${formatTimestamp(note.seconds)} 的标记。`,
+      }, () => runHistoryOperation({
+        type: "DELETE_NOTE",
+        noteId: note.id,
+      }));
+    });
     const actions = document.createElement("span");
     actions.className = "note-card-actions";
-    actions.append(kind, edit);
+    actions.append(kind, edit, deleteButton);
     header.append(time, actions);
     item.append(header);
 
@@ -470,6 +570,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
     }
     elements.noteList.append(item);
   }
+  syncHistoryControls();
 }
 
 async function refresh() {
@@ -494,6 +595,8 @@ refreshRunner = createSidePanelRefreshRunner({
   apply({ nextWhisperStatus, response }) {
     whisperStatus = nextWhisperStatus;
     activeContext = response.context;
+    canUndo = response.history.canUndo;
+    canRedo = response.history.canRedo;
     if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
     elements.videoTitle.textContent = activeContext.title;
     elements.videoUrl.href = activeContext.canonicalUrl;
@@ -504,6 +607,8 @@ refreshRunner = createSidePanelRefreshRunner({
   },
   applyError(error) {
     activeContext = null;
+    canUndo = false;
+    canRedo = false;
     elements.videoTitle.textContent = error.message;
     elements.videoUrl.hidden = true;
     elements.input.disabled = true;
@@ -520,6 +625,7 @@ refreshRunner = createSidePanelRefreshRunner({
 async function beginTypedDraft() {
   if (currentDraft || draftPromise || !activeContext) return;
   draftPromise = request({ type: "BEGIN_TYPED_NOTE" });
+  syncHistoryControls();
   try {
     const response = await draftPromise;
     currentDraft = response.note;
@@ -530,6 +636,7 @@ async function beginTypedDraft() {
     elements.input.blur();
   } finally {
     draftPromise = null;
+    syncHistoryControls();
   }
 }
 
@@ -539,6 +646,7 @@ async function commitTypedDraft() {
   const noteId = currentDraft.id;
   const body = elements.input.value.trim();
   currentDraft = null;
+  typedDraftSaving = true;
   elements.markerTime.hidden = true;
   elements.input.value = "";
   autoGrow();
@@ -548,6 +656,9 @@ async function commitTypedDraft() {
     await refresh();
   } catch (error) {
     showToast(error.message);
+  } finally {
+    typedDraftSaving = false;
+    syncHistoryControls();
   }
 }
 
@@ -556,6 +667,7 @@ async function cancelTypedDraft() {
   if (!currentDraft) return;
   const noteId = currentDraft.id;
   currentDraft = null;
+  typedDraftSaving = true;
   elements.input.value = "";
   elements.markerTime.hidden = true;
   autoGrow();
@@ -563,11 +675,15 @@ async function cancelTypedDraft() {
     await request({ type: "CANCEL_NOTE", noteId });
   } catch (error) {
     showToast(error.message);
+  } finally {
+    typedDraftSaving = false;
+    syncHistoryControls();
   }
 }
 
 function setRecordingUi(active) {
   recording = active;
+  syncHistoryControls();
   elements.recordingStatus.hidden = !active;
   elements.voiceButton.classList.toggle("is-recording", active);
   elements.voiceLabel.textContent = active ? "松开结束" : "按住说话";
@@ -587,6 +703,7 @@ function setRecordingUi(active) {
 async function startVoice() {
   if (recording || voiceStarting || !activeContext) return;
   voiceStarting = true;
+  syncHistoryControls();
   try {
     if (!microphoneReady) {
       await openMicrophonePermissionPage();
@@ -606,6 +723,7 @@ async function startVoice() {
     showToast(error.message);
   } finally {
     voiceStarting = false;
+    syncHistoryControls();
   }
 }
 
@@ -616,11 +734,16 @@ async function stopVoice(reason = "button-release") {
   }
   if (!recording) return;
   setRecordingUi(false);
+  voiceStopping = true;
+  syncHistoryControls();
   try {
     await request({ type: "VOICE_STOP_REQUEST", reason });
     await refresh();
   } catch (error) {
     showToast(error.message);
+  } finally {
+    voiceStopping = false;
+    syncHistoryControls();
   }
 }
 
@@ -784,6 +907,44 @@ elements.screenshotDialog.addEventListener("close", () => {
   elements.screenshotDialogImage.removeAttribute("src");
 });
 
+elements.historyConfirmDialog.addEventListener("close", () => {
+  const action = pendingHistoryAction;
+  pendingHistoryAction = null;
+  if (elements.historyConfirmDialog.returnValue !== "confirm") return;
+  if (!action) return;
+  void action();
+});
+
+elements.undoButton.addEventListener("click", () => {
+  if (!canRunHistoryAction("undo")) return;
+  void runHistoryOperation({
+    type: "UNDO_NOTE_ACTION",
+    sessionId: activeContext.sessionId,
+    tabId: sidePanelRefresh.tabId,
+  });
+});
+
+elements.redoButton.addEventListener("click", () => {
+  if (!canRunHistoryAction("redo")) return;
+  void runHistoryOperation({
+    type: "REDO_NOTE_ACTION",
+    sessionId: activeContext.sessionId,
+    tabId: sidePanelRefresh.tabId,
+  });
+});
+
+elements.clearButton.addEventListener("click", () => {
+  if (!canRunHistoryAction("clear")) return;
+  confirmHistoryAction({
+    title: "清空全部标记？",
+    description: `将清空 ${savedNoteCount()} 条已保存标记。可通过撤销恢复。`,
+  }, () => runHistoryOperation({
+    type: "CLEAR_SESSION_NOTES",
+    sessionId: activeContext.sessionId,
+    tabId: sidePanelRefresh.tabId,
+  }));
+});
+
 elements.exportButton.addEventListener("click", async () => {
   if (!activeContext) return;
   elements.exportButton.disabled = true;
@@ -851,6 +1012,25 @@ elements.keyButton.addEventListener("keydown", async (event) => {
     showToast(error.message);
   } finally {
     elements.keyButton.classList.remove("is-listening");
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const operation = historyShortcut(event);
+  if (!operation || !canRunHistoryAction(operation)) return;
+  event.preventDefault();
+  if (operation === "undo") {
+    void runHistoryOperation({
+      type: "UNDO_NOTE_ACTION",
+      sessionId: activeContext.sessionId,
+      tabId: sidePanelRefresh.tabId,
+    });
+  } else {
+    void runHistoryOperation({
+      type: "REDO_NOTE_ACTION",
+      sessionId: activeContext.sessionId,
+      tabId: sidePanelRefresh.tabId,
+    });
   }
 });
 
