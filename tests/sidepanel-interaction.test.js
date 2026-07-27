@@ -183,6 +183,37 @@ test("刷新开始后进入并结束编辑仍会废弃旧代次响应", async ()
   assert.equal(deferredRefreshes, 1);
 });
 
+test("必须应用的刷新被更晚代次取代时会继续等待下一次应用", async () => {
+  const loads = [];
+  const applied = [];
+  const refreshRunner = createSidePanelRefreshRunner({
+    load() {
+      const gate = deferred();
+      loads.push(gate);
+      return gate.promise;
+    },
+    apply(value) { applied.push(value); },
+    applyError(error) { throw error; },
+  });
+
+  const requiredRefresh = refreshRunner.runUntilApplied();
+  const newerRefresh = refreshRunner.run();
+  assert.equal(loads.length, 2);
+
+  loads[0].resolve("旧历史状态");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(loads.length, 3);
+  assert.deepEqual(applied, []);
+
+  loads[1].resolve("被重试取代的状态");
+  assert.equal(await newerRefresh, false);
+  assert.deepEqual(applied, []);
+
+  loads[2].resolve("已应用的历史状态");
+  assert.equal(await requiredRefresh, true);
+  assert.deepEqual(applied, ["已应用的历史状态"]);
+});
+
 test("保存失败保留可见文本并允许点击重试", async () => {
   const firstSave = deferred();
   const secondSave = deferred();

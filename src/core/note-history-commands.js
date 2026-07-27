@@ -55,8 +55,14 @@ export function createNoteHistoryCommandRouter({
         return { note: await repository.editNoteBody(message.noteId, message.body) };
       case "UPDATE_NOTE_SUBTITLE":
         return { note: await repository.editNoteSubtitle(message.noteId, message.subtitleContext) };
-      case "DELETE_NOTE":
+      case "DELETE_NOTE": {
+        await requireCurrentSession(message.sessionId, request);
+        const note = await repository.getNote(message.noteId);
+        if (!note || note.sessionId !== message.sessionId) {
+          throw new Error("标记不属于当前页面会话");
+        }
         return repository.deleteSavedNote(message.noteId);
+      }
       case "CLEAR_SESSION_NOTES":
         await requireCurrentSession(message.sessionId, request);
         return repository.clearSessionNotes(message.sessionId);

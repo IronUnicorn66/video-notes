@@ -74,10 +74,39 @@ test("后台笔记命令基于当前页面会话路由历史操作", async () =>
   assert.deepEqual(active.notes.map((note) => note.id), ["typed"]);
   assert.deepEqual(active.history, { canUndo: true, canRedo: false });
 
-  await route({ type: "DELETE_NOTE", noteId: "typed" });
+  await route({
+    type: "DELETE_NOTE",
+    noteId: "typed",
+    sessionId: context.sessionId,
+  });
   assert.deepEqual(await repository.listNotes(context.sessionId), []);
   await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
   assert.equal((await repository.listNotes(context.sessionId))[0].id, "typed");
+
+  await repository.putNote({
+    id: "other-session-note",
+    sessionId: "youtube:other",
+    status: "saved",
+    body: "其他课程",
+    createdAt: 2,
+  });
+  await assert.rejects(
+    route({
+      type: "DELETE_NOTE",
+      noteId: "other-session-note",
+      sessionId: context.sessionId,
+    }),
+    /不属于当前页面会话/,
+  );
+  await assert.rejects(
+    route({
+      type: "DELETE_NOTE",
+      noteId: "typed",
+      sessionId: "youtube:other",
+    }),
+    /当前页面会话不匹配/,
+  );
+  assert.equal((await repository.getNote("other-session-note")).deletedAt, undefined);
   await route({ type: "REDO_NOTE_ACTION", sessionId: context.sessionId });
   assert.deepEqual(await repository.listNotes(context.sessionId), []);
   await route({ type: "UNDO_NOTE_ACTION", sessionId: context.sessionId });
@@ -315,6 +344,7 @@ test("构建产物包含侧栏历史工具栏和确认框", async () => {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(source, /CLEAR_SESSION_NOTES/);
+  assert.match(source, /DELETE_NOTE/);
   assert.match(source, /UNDO_NOTE_ACTION/);
   assert.match(source, /REDO_NOTE_ACTION/);
 });

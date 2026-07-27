@@ -23,6 +23,7 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  createHistoryConfirmationController,
   createHistoryOperationController,
   historyControlState,
   historyShortcut,
@@ -93,7 +94,9 @@ let renderGeneration = 0;
 let currentNotes = [];
 let canUndo = false;
 let canRedo = false;
-let pendingHistoryAction = null;
+let historyContextToken = 0;
+let activeContextTabId = null;
+let historyConfirmationController = null;
 let historyOperationController = null;
 let subtitleSettings = normalizeSubtitleSettings();
 
@@ -110,6 +113,10 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refreshNow();
 }, {
   onContextEvent(message) {
+    if (["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"].includes(message.type)) {
+      historyContextToken += 1;
+      closeStaleHistoryConfirmation();
+    }
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
   },
   shouldRefresh(message) {
@@ -160,14 +167,40 @@ inlineEditController = createSidePanelInlineEditController({
 
 historyOperationController = createHistoryOperationController({
   request,
-  refresh,
+  refresh: () => refreshRunner.runUntilApplied(),
   showError(error) {
     showToast(error.message);
   },
 });
 
+historyConfirmationController = createHistoryConfirmationController({
+  getContext() {
+    if (!activeContext) return null;
+    return {
+      token: historyContextToken,
+      sessionId: activeContext.sessionId,
+      tabId: sidePanelRefresh.tabId,
+    };
+  },
+  isBlocked: historyInteractionBlocked,
+  run: runConfirmedHistoryAction,
+});
+
 function savedNoteCount() {
   return currentNotes.filter((note) => note.status === "saved").length;
+}
+
+function historyInteractionBlocked() {
+  return Boolean(
+    currentDraft
+    || draftPromise
+    || recording
+    || voiceStarting
+    || inlineEditController.blocked
+    || typedDraftSaving
+    || voiceStopping
+    || historyOperationController?.pending
+  );
 }
 
 function currentHistoryControlState() {
@@ -175,20 +208,13 @@ function currentHistoryControlState() {
     noteCount: savedNoteCount(),
     canUndo,
     canRedo,
-    blocked: Boolean(
-      currentDraft
-      || draftPromise
-      || recording
-      || voiceStarting
-      || inlineEditController.blocked
-      || typedDraftSaving
-      || voiceStopping
-    ),
+    blocked: historyInteractionBlocked(),
     pending: historyOperationController.pending,
   });
 }
 
 function syncHistoryControls() {
+  closeStaleHistoryConfirmation();
   const controls = currentHistoryControlState();
   elements.clearButton.disabled = controls.clearDisabled;
   elements.undoButton.disabled = controls.undoDisabled;
@@ -198,9 +224,19 @@ function syncHistoryControls() {
   }
 }
 
+function closeStaleHistoryConfirmation() {
+  if (!historyConfirmationController?.pending) return;
+  if (historyConfirmationController.revalidate()) return;
+  if (elements.historyConfirmDialog.open) elements.historyConfirmDialog.close("cancel");
+}
+
 function canRunHistoryAction(operation) {
   const controls = currentHistoryControlState();
-  if (!activeContext || !Number.isInteger(sidePanelRefresh.tabId)) return false;
+  if (
+    !activeContext
+    || !Number.isInteger(sidePanelRefresh.tabId)
+    || activeContextTabId !== sidePanelRefresh.tabId
+  ) return false;
   if (operation === "undo") return !controls.undoDisabled;
   if (operation === "redo") return !controls.redoDisabled;
   if (operation === "clear" || operation === "delete") return !controls.clearDisabled;
@@ -215,12 +251,28 @@ async function runHistoryOperation(message) {
   return succeeded;
 }
 
+function runConfirmedHistoryAction(action) {
+  if (action.operation === "delete") {
+    return runHistoryOperation({
+      type: "DELETE_NOTE",
+      noteId: action.noteId,
+      sessionId: action.sessionId,
+      tabId: action.tabId,
+    });
+  }
+  return runHistoryOperation({
+    type: "CLEAR_SESSION_NOTES",
+    sessionId: action.sessionId,
+    tabId: action.tabId,
+  });
+}
+
 function confirmHistoryAction({ title, description }, action) {
   if (elements.historyConfirmDialog.open) return;
+  if (!historyConfirmationController.open(action)) return;
   elements.historyConfirmTitle.textContent = title;
   elements.historyConfirmDescription.textContent = description;
   elements.historyConfirmDialog.returnValue = "";
-  pendingHistoryAction = action;
   elements.historyConfirmDialog.showModal();
 }
 
@@ -423,10 +475,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
       confirmHistoryAction({
         title: "删除这条标记？",
         description: `将删除 ${formatTimestamp(note.seconds)} 的标记。`,
-      }, () => runHistoryOperation({
-        type: "DELETE_NOTE",
-        noteId: note.id,
-      }));
+      }, { operation: "delete", noteId: note.id });
     });
     const actions = document.createElement("span");
     actions.className = "note-card-actions";
@@ -582,7 +631,7 @@ async function refresh() {
 }
 
 async function refreshNow() {
-  await refreshRunner.run();
+  return refreshRunner.run();
 }
 
 refreshRunner = createSidePanelRefreshRunner({
@@ -594,7 +643,14 @@ refreshRunner = createSidePanelRefreshRunner({
   },
   apply({ nextWhisperStatus, response }) {
     whisperStatus = nextWhisperStatus;
+    if (
+      activeContext?.sessionId !== response.context?.sessionId
+      || activeContextTabId !== sidePanelRefresh.tabId
+    ) {
+      historyContextToken += 1;
+    }
     activeContext = response.context;
+    activeContextTabId = sidePanelRefresh.tabId;
     canUndo = response.history.canUndo;
     canRedo = response.history.canRedo;
     if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
@@ -606,7 +662,9 @@ refreshRunner = createSidePanelRefreshRunner({
     renderNotes(response.notes);
   },
   applyError(error) {
+    if (activeContext || activeContextTabId !== null) historyContextToken += 1;
     activeContext = null;
+    activeContextTabId = null;
     canUndo = false;
     canRedo = false;
     elements.videoTitle.textContent = error.message;
@@ -908,11 +966,11 @@ elements.screenshotDialog.addEventListener("close", () => {
 });
 
 elements.historyConfirmDialog.addEventListener("close", () => {
-  const action = pendingHistoryAction;
-  pendingHistoryAction = null;
-  if (elements.historyConfirmDialog.returnValue !== "confirm") return;
-  if (!action) return;
-  void action();
+  if (elements.historyConfirmDialog.returnValue !== "confirm") {
+    historyConfirmationController.cancel();
+    return;
+  }
+  void historyConfirmationController.confirm();
 });
 
 elements.undoButton.addEventListener("click", () => {
@@ -938,11 +996,7 @@ elements.clearButton.addEventListener("click", () => {
   confirmHistoryAction({
     title: "清空全部标记？",
     description: `将清空 ${savedNoteCount()} 条已保存标记。可通过撤销恢复。`,
-  }, () => runHistoryOperation({
-    type: "CLEAR_SESSION_NOTES",
-    sessionId: activeContext.sessionId,
-    tabId: sidePanelRefresh.tabId,
-  }));
+  }, { operation: "clear" });
 });
 
 elements.exportButton.addEventListener("click", async () => {

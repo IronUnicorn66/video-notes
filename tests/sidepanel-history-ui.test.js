@@ -41,15 +41,19 @@ test("笔记卡片把删除放在编辑旁并先通过统一确认框", () => {
   const renderEnd = source.indexOf("\nasync function refresh(", renderStart);
   const renderSource = source.slice(renderStart, renderEnd);
   const confirmation = renderSource.indexOf("confirmHistoryAction(");
-  const deletion = renderSource.indexOf('type: "DELETE_NOTE"');
 
   assert.match(renderSource, /deleteButton\.textContent = "删除"/);
   assert.match(renderSource, /actions\.append\(kind, edit, deleteButton\)/);
   assert.ok(confirmation >= 0, "笔记删除应调用统一确认框");
-  assert.ok(deletion > confirmation, "DELETE_NOTE 只能出现在确认回调之后");
+  assert.match(renderSource.slice(confirmation), /formatTimestamp\(note\.seconds\)/);
+  assert.match(renderSource.slice(confirmation), /operation: "delete", noteId: note\.id/);
   assert.match(
-    renderSource.slice(confirmation, deletion),
-    /formatTimestamp\(note\.seconds\)/,
+    source,
+    /type: "DELETE_NOTE",\s*noteId: action\.noteId,\s*sessionId: action\.sessionId,\s*tabId: action\.tabId/,
+  );
+  assert.match(
+    source,
+    /type: "CLEAR_SESSION_NOTES",\s*sessionId: action\.sessionId,\s*tabId: action\.tabId/,
   );
 });
 
@@ -61,25 +65,31 @@ test("取消或关闭确认框不执行待定操作", () => {
   const closeEnd = source.indexOf("\n});", closeStart) + 4;
   const closeSource = source.slice(closeStart, closeEnd);
 
-  assert.match(confirmSource, /pendingHistoryAction = action/);
+  assert.match(confirmSource, /historyConfirmationController\.open\(/);
   assert.match(confirmSource, /showModal\(\)/);
-  assert.match(closeSource, /pendingHistoryAction = null/);
+  assert.match(closeSource, /historyConfirmationController\.cancel\(\)/);
+  assert.match(closeSource, /historyConfirmationController\.confirm\(\)/);
   assert.match(closeSource, /returnValue !== "confirm"/);
-  assert.match(closeSource, /if \(!action\) return/);
   assert.ok(
-    closeSource.indexOf('returnValue !== "confirm"') < closeSource.indexOf("void action()"),
+    closeSource.indexOf('returnValue !== "confirm"')
+      < closeSource.indexOf("historyConfirmationController.confirm()"),
     "取消判断应先于执行待定操作",
   );
+});
+
+test("确认接线使用可复核的上下文快照且不保留闭包回调", () => {
+  assert.match(source, /createHistoryConfirmationController\(\{/);
+  assert.match(source, /historyContextToken/);
+  assert.match(source, /historyConfirmationController\.cancel\(\)/);
+  assert.match(source, /historyConfirmationController\.confirm\(\)/);
+  assert.doesNotMatch(source, /pendingHistoryAction/);
 });
 
 test("活动状态驱动历史控件且所有会话历史请求携带侧栏标签页", () => {
   assert.match(source, /canUndo = response\.history\.canUndo/);
   assert.match(source, /canRedo = response\.history\.canRedo/);
   assert.match(source, /historyControlState\(\{/);
-  assert.match(
-    source,
-    /blocked: Boolean\(\s*currentDraft\s*\|\| draftPromise\s*\|\| recording\s*\|\| voiceStarting\s*\|\| inlineEditController\.blocked[\s\S]{0,120}\)/,
-  );
+  assert.match(source, /blocked: historyInteractionBlocked\(\)/);
   assert.match(source, /\|\| typedDraftSaving/);
   assert.match(source, /\|\| voiceStopping/);
   assert.match(source, /pending: historyOperationController\.pending/);
@@ -89,7 +99,6 @@ test("活动状态驱动历史控件且所有会话历史请求携带侧栏标�
   );
 
   for (const type of [
-    "CLEAR_SESSION_NOTES",
     "UNDO_NOTE_ACTION",
     "REDO_NOTE_ACTION",
   ]) {

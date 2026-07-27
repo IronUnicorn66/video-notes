@@ -191,11 +191,19 @@ export function createSidePanelRefreshRunner({
     return hadPendingRefresh;
   }
 
+  async function runUntilApplied() {
+    while (!await run()) {
+      // A newer refresh generation owns the stale response. Retry until this caller applies one.
+    }
+    return true;
+  }
+
   return {
     get pendingCount() {
       return pendingCount;
     },
     invalidateForEdit,
     run,
+    runUntilApplied,
   };
 }

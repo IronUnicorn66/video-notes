@@ -30,6 +30,62 @@ export function historyShortcut(event) {
   return event.shiftKey ? "redo" : "undo";
 }
 
+export function createHistoryConfirmationController({ getContext, isBlocked, run }) {
+  let pending = null;
+
+  function isCurrent(action) {
+    if (!action || isBlocked()) return false;
+    const context = getContext();
+    return Boolean(
+      context
+      && context.token === action.token
+      && context.sessionId === action.sessionId
+      && context.tabId === action.tabId
+    );
+  }
+
+  function takePending() {
+    const action = pending;
+    pending = null;
+    return action;
+  }
+
+  function revalidate() {
+    if (isCurrent(pending)) return true;
+    pending = null;
+    return false;
+  }
+
+  return {
+    get pending() {
+      return pending !== null;
+    },
+    open({ operation, noteId }) {
+      if (pending || isBlocked()) return null;
+      const context = getContext();
+      if (!context || !Number.isInteger(context.tabId) || !context.sessionId) return null;
+      pending = {
+        operation,
+        ...(noteId === undefined ? {} : { noteId }),
+        token: context.token,
+        sessionId: context.sessionId,
+        tabId: context.tabId,
+      };
+      return { ...pending };
+    },
+    cancel() {
+      return takePending() !== null;
+    },
+    revalidate,
+    async confirm() {
+      if (!revalidate()) return false;
+      const action = takePending();
+      await run(action);
+      return true;
+    },
+  };
+}
+
 export function createHistoryOperationController({ request, refresh, showError }) {
   let pending = false;
 

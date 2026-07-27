@@ -2,10 +2,88 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createHistoryConfirmationController,
   createHistoryOperationController,
   historyControlState,
   historyShortcut,
 } from "../src/core/note-history-controls.js";
+
+test("确认操作快照会话、标签页和笔记且只在上下文未变化时执行", async () => {
+  let context = { token: 1, sessionId: "youtube:a", tabId: 7 };
+  const requests = [];
+  const controller = createHistoryConfirmationController({
+    getContext: () => context,
+    isBlocked: () => false,
+    run: async (action) => requests.push(action),
+  });
+
+  assert.deepEqual(controller.open({ operation: "delete", noteId: "note-a" }), {
+    operation: "delete",
+    noteId: "note-a",
+    token: 1,
+    sessionId: "youtube:a",
+    tabId: 7,
+  });
+  context = { token: 2, sessionId: "youtube:b", tabId: 8 };
+
+  assert.equal(controller.revalidate(), false);
+  assert.equal(await controller.confirm(), false);
+  assert.deepEqual(requests, []);
+  assert.equal(await controller.confirm(), false);
+});
+
+test("确认框打开后进入忙碌状态不会执行待定操作", async () => {
+  let blocked = false;
+  const requests = [];
+  const controller = createHistoryConfirmationController({
+    getContext: () => ({ token: 1, sessionId: "youtube:a", tabId: 7 }),
+    isBlocked: () => blocked,
+    run: async (action) => requests.push(action),
+  });
+
+  controller.open({ operation: "clear" });
+  blocked = true;
+  assert.equal(controller.revalidate(), false);
+  blocked = false;
+
+  assert.equal(await controller.confirm(), false);
+  assert.deepEqual(requests, []);
+});
+
+test("取消或关闭确认框会清空快照且不执行请求", async () => {
+  const requests = [];
+  const controller = createHistoryConfirmationController({
+    getContext: () => ({ token: 1, sessionId: "youtube:a", tabId: 7 }),
+    isBlocked: () => false,
+    run: async (action) => requests.push(action),
+  });
+
+  controller.open({ operation: "delete", noteId: "note-a" });
+  assert.equal(controller.cancel(), true);
+  assert.equal(await controller.confirm(), false);
+  assert.deepEqual(requests, []);
+});
+
+test("上下文稳定时确认使用打开时快照执行", async () => {
+  const requests = [];
+  const context = { token: 3, sessionId: "youtube:a", tabId: 7 };
+  const controller = createHistoryConfirmationController({
+    getContext: () => context,
+    isBlocked: () => false,
+    run: async (action) => requests.push(action),
+  });
+
+  controller.open({ operation: "delete", noteId: "note-a" });
+
+  assert.equal(await controller.confirm(), true);
+  assert.deepEqual(requests, [{
+    operation: "delete",
+    noteId: "note-a",
+    token: 3,
+    sessionId: "youtube:a",
+    tabId: 7,
+  }]);
+});
 
 test("忙碌或无可用动作时禁用对应历史控件", () => {
   assert.deepEqual(historyControlState({
