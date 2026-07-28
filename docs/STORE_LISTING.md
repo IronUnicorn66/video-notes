@@ -16,6 +16,10 @@
 - 网站：https://ironunicorn66.github.io/video-notes/
 - 隐私政策：https://ironunicorn66.github.io/video-notes/privacy/
 - 支持页面：https://github.com/IronUnicorn66/video-notes/issues
+- Edge Product ID：`ce0862d8-274e-4f87-9cfb-bf523f3f792a`
+- Edge Store ID：`0RDCKGDTZD56`
+- Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
+- 首次提交：2026-07-28，状态为 `In review`
 
 ## 2. 商店名称与说明
 
