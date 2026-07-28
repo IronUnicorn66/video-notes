@@ -4,6 +4,7 @@ import {
   createSidepanelNoteSortBinding,
   initializeSidepanel,
 } from "./core/sidepanel-note-sort.js";
+import { createSidepanelZoomBinding } from "./core/sidepanel-zoom.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
@@ -107,6 +108,13 @@ const noteSortBinding = createSidepanelNoteSortBinding({
   getNotes: () => currentNotes,
   renderNotes,
   isEditing: () => Boolean(inlineEditController?.blocked),
+  showToast,
+});
+
+const sidepanelZoomBinding = createSidepanelZoomBinding({
+  target: window,
+  root: document.documentElement,
+  storage: chrome.storage,
   showToast,
 });
 
@@ -1119,6 +1127,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.noteSortOrder) {
     noteSortBinding.sync(changes.noteSortOrder.newValue);
   }
+  if (area === "local" && changes.sidepanelZoom) {
+    sidepanelZoomBinding.sync(changes.sidepanelZoom.newValue);
+  }
   if (area === "local" && changes.microphoneReady) {
     microphoneReady = changes.microphoneReady.newValue === true;
     void renderPermissionStatus();
@@ -1172,6 +1183,7 @@ await initializeSidepanel({
     elements.keyButton.textContent = shortcutLabel(shortcutCode);
   },
   noteSortBinding,
+  sidepanelZoomBinding,
   setPanelContext: async () => {
     const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
     sidePanelRefresh.setTabId(panelContext.tabId, panelContext.windowId);

@@ -66,6 +66,7 @@ export async function initializeSidepanel({
   storage,
   onShortcutCode,
   noteSortBinding,
+  sidepanelZoomBinding,
   setPanelContext,
   refresh,
   renderWhisperStatus,
@@ -73,10 +74,16 @@ export async function initializeSidepanel({
 }) {
   let shortcutCode = "AltRight";
   let noteSortOrder = "newest";
+  let sidepanelZoom = 100;
   try {
-    ({ shortcutCode = "AltRight", noteSortOrder = "newest" } = await storage.local.get({
+    ({
+      shortcutCode = "AltRight",
+      noteSortOrder = "newest",
+      sidepanelZoom = 100,
+    } = await storage.local.get({
       shortcutCode,
       noteSortOrder,
+      sidepanelZoom,
     }));
   } catch {
     // 保留默认值，以便侧栏仍可完成首次渲染。
@@ -84,6 +91,7 @@ export async function initializeSidepanel({
 
   onShortcutCode(shortcutCode);
   noteSortBinding.initialize(noteSortOrder);
+  sidepanelZoomBinding.initialize(sidepanelZoom);
   await setPanelContext();
   await Promise.all([
     refresh(),

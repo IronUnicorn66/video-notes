@@ -146,6 +146,45 @@ test("延后上下文刷新接管重排时会清除排序待渲染标记", () =>
   assert.equal(fixture.binding.finishEditing(), false);
 });
 
+test("侧栏启动时读取并恢复保存的缩放比例", async () => {
+  const fixture = createFixture();
+  const requestedDefaults = [];
+  const zooms = [];
+
+  await sidepanelSort.initializeSidepanel({
+    storage: {
+      local: {
+        async get(defaults) {
+          requestedDefaults.push(defaults);
+          return {
+            shortcutCode: "AltRight",
+            noteSortOrder: "newest",
+            sidepanelZoom: 130,
+          };
+        },
+      },
+    },
+    onShortcutCode: () => {},
+    noteSortBinding: fixture.binding,
+    sidepanelZoomBinding: {
+      initialize(value) {
+        zooms.push(value);
+      },
+    },
+    setPanelContext: async () => {},
+    refresh: async () => {},
+    renderWhisperStatus: async () => {},
+    renderPermissionStatus: async () => {},
+  });
+
+  assert.deepEqual(requestedDefaults, [{
+    shortcutCode: "AltRight",
+    noteSortOrder: "newest",
+    sidepanelZoom: 100,
+  }]);
+  assert.deepEqual(zooms, [130]);
+});
+
 test("读取偏好失败时仍用默认值完成侧栏启动", async () => {
   const oldest = new FakeButton("oldest");
   const newest = new FakeButton("newest");
@@ -159,12 +198,18 @@ test("读取偏好失败时仍用默认值完成侧栏启动", async () => {
   });
   const shortcuts = [];
   const tabIds = [];
+  const zooms = [];
   let refreshes = 0;
 
   await sidepanelSort.initializeSidepanel({
     storage: { local: { get: async () => { throw new Error("存储不可用"); } } },
     onShortcutCode: (code) => shortcuts.push(code),
     noteSortBinding: binding,
+    sidepanelZoomBinding: {
+      initialize(value) {
+        zooms.push(value);
+      },
+    },
     setPanelContext: async () => tabIds.push(7),
     refresh: async () => { refreshes += 1; },
     renderWhisperStatus: async () => {},
@@ -176,4 +221,5 @@ test("读取偏好失败时仍用默认值完成侧栏启动", async () => {
   assert.equal(oldest.getAttribute("aria-pressed"), "false");
   assert.deepEqual(tabIds, [7]);
   assert.equal(refreshes, 1);
+  assert.deepEqual(zooms, [100]);
 });
