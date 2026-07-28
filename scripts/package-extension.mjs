@@ -27,6 +27,10 @@ const files = await Promise.all((await filesBelow(dist)).map(async (path) => ({
   name: relative(dist, path).replaceAll("\\", "/"),
   data: new Uint8Array(await readFile(path)),
 })));
+const manifestFile = files.find((file) => file.name === "manifest.json");
+const packagedManifest = JSON.parse(new TextDecoder().decode(manifestFile.data));
+delete packagedManifest.key;
+manifestFile.data = new TextEncoder().encode(`${JSON.stringify(packagedManifest, null, 2)}\n`);
 const version = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")).version;
 const artifactName = `video-notes-edge-${version}.zip`;
 const archive = createZip(files);

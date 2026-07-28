@@ -29,6 +29,11 @@ test('发布包包含 Edge 运行文件和本地化资源', async () => {
   assert.ok(files.every((name) => !name.endsWith('.map')));
   assert.ok(files.every((name) => !name.startsWith('store-assets/')));
   assert.ok(files.every((name) => !name.startsWith('node_modules/')));
+
+  const { stdout: manifestText } = await execute('unzip', ['-p', artifactPath, 'manifest.json']);
+  const packagedManifest = JSON.parse(manifestText);
+  assert.equal(packagedManifest.version, '0.3.0');
+  assert.ok(!('key' in packagedManifest), 'Edge 商店包不得包含开发环境 key');
 });
 
 test('发布包生成可核验的 SHA-256 文件', async () => {
