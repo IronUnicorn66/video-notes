@@ -1127,9 +1127,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.noteSortOrder) {
     noteSortBinding.sync(changes.noteSortOrder.newValue);
   }
-  if (area === "local" && changes.sidepanelZoom) {
-    sidepanelZoomBinding.sync(changes.sidepanelZoom.newValue);
-  }
   if (area === "local" && changes.microphoneReady) {
     microphoneReady = changes.microphoneReady.newValue === true;
     void renderPermissionStatus();

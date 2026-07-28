@@ -4,7 +4,7 @@
 
 **Goal:** 让用户通过 Ctrl/Command + 滚轮缩放整个 Edge 扩展侧栏，并在重新打开侧栏后恢复上次比例。
 
-**Architecture:** 新增一个无页面全局依赖的缩放绑定模块，集中处理比例校验、滚轮事件、根节点样式、持久化和提示。`sidepanel.js` 只注入 `window`、文档根节点、`chrome.storage` 与现有提示函数，并复用当前启动和存储同步流程。
+**Architecture:** 新增一个无页面全局依赖的缩放绑定模块，集中处理比例校验、滚轮事件、根节点样式、持久化和提示。`sidepanel.js` 只注入 `window`、文档根节点、`chrome.storage` 与现有提示函数，并复用当前启动偏好读取流程。
 
 **Tech Stack:** 原生 JavaScript ES modules、Chrome Extension Side Panel API、`chrome.storage.local`、CSS `zoom`、Node.js `node:test`
 
@@ -27,7 +27,7 @@
 
 **Interfaces:**
 - Consumes: 带 `addEventListener` 的事件目标、带 `style.zoom` 的根节点、形如 `chrome.storage` 的存储对象、`showToast(message)` 回调。
-- Produces: `normalizeSidepanelZoom(value): number`、`sidepanelZoomAfterWheel(currentZoom, deltaY): number`、`createSidepanelZoomBinding(options): { zoom, initialize, sync }`。
+- Produces: `normalizeSidepanelZoom(value): number`、`sidepanelZoomAfterWheel(currentZoom, deltaY): number`、`createSidepanelZoomBinding(options): { zoom, initialize }`。
 
 - [ ] **Step 1: 写比例校验和步进的失败测试**
 
@@ -124,6 +124,18 @@ test("普通滚轮和边界外滚轮不产生多余副作用", async () => {
   assert.deepEqual(fixture.saves, []);
   assert.deepEqual(fixture.toasts, []);
 });
+
+test("初始化不会覆盖读取期间发生的滚轮缩放", async () => {
+  const fixture = createFixture();
+
+  fixture.wheel({ ctrlKey: true, deltaY: -1 });
+  fixture.binding.initialize(90);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(fixture.binding.zoom, 110);
+  assert.equal(fixture.root.style.zoom, "1.1");
+  assert.deepEqual(fixture.saves, [{ sidepanelZoom: 110 }]);
+});
 ```
 
 - [ ] **Step 6: 运行测试并确认失败原因是绑定接口缺失**
@@ -137,6 +149,7 @@ Expected: FAIL，提示 `createSidepanelZoomBinding` 未定义或无法调用。
 ```javascript {.line-numbers}
 export function createSidepanelZoomBinding({ target, root, storage, showToast }) {
   let zoom = DEFAULT_ZOOM;
+  let hasNewerPreference = false;
 
   function apply(value) {
     zoom = normalizeSidepanelZoom(value);
@@ -155,6 +168,7 @@ export function createSidepanelZoomBinding({ target, root, storage, showToast })
   target.addEventListener("wheel", (event) => {
     if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
     event.preventDefault();
+    hasNewerPreference = true;
     const nextZoom = sidepanelZoomAfterWheel(zoom, event.deltaY);
     if (nextZoom === zoom) return;
     apply(nextZoom);
@@ -166,8 +180,10 @@ export function createSidepanelZoomBinding({ target, root, storage, showToast })
     get zoom() {
       return zoom;
     },
-    initialize: apply,
-    sync: apply,
+    initialize(value) {
+      if (hasNewerPreference) return zoom;
+      return apply(value);
+    },
   };
 }
 ```
@@ -185,7 +201,7 @@ git add src/core/sidepanel-zoom.js tests/sidepanel-zoom.test.js
 git commit -m "新增: 实现侧栏滚轮缩放模块"
 ```
 
-### Task 2: 接入侧栏启动与偏好同步
+### Task 2: 接入侧栏启动与偏好恢复
 
 **Files:**
 - Modify: `src/core/sidepanel-note-sort.js`
@@ -193,8 +209,8 @@ git commit -m "新增: 实现侧栏滚轮缩放模块"
 - Modify: `src/sidepanel.js`
 
 **Interfaces:**
-- Consumes: Task 1 的 `createSidepanelZoomBinding`，以及绑定的 `initialize(value)`、`sync(value)`。
-- Produces: 启动时恢复 `sidepanelZoom`，存储变化时同步当前根节点缩放比例。
+- Consumes: Task 1 的 `createSidepanelZoomBinding`，以及绑定的 `initialize(value)`。
+- Produces: 启动时恢复 `sidepanelZoom`，读取期间的用户滚轮更新不会被旧快照覆盖。
 
 - [ ] **Step 1: 写启动恢复的失败测试**
 
@@ -266,13 +282,7 @@ const sidepanelZoomBinding = createSidepanelZoomBinding({
 });
 ```
 
-将绑定传入 `initializeSidepanel`，并在 `chrome.storage.onChanged` 中同步外部变化：
-
-```javascript {.line-numbers}
-if (area === "local" && changes.sidepanelZoom) {
-  sidepanelZoomBinding.sync(changes.sidepanelZoom.newValue);
-}
-```
+将绑定传入 `initializeSidepanel`。其他已打开的侧栏保持各自当前比例，重新打开时使用最后一次保存值。
 
 - [ ] **Step 6: 运行相关测试与构建**
 

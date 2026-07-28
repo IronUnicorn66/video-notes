@@ -137,3 +137,15 @@ test("保存缩放偏好失败时保留当前比例并显示错误", async () =>
   assert.equal(fixture.root.style.zoom, "1.1");
   assert.deepEqual(fixture.toasts, ["侧栏缩放 110%", "存储不可用"]);
 });
+
+test("初始化不会覆盖读取期间发生的滚轮缩放", async () => {
+  const fixture = createFixture();
+
+  fixture.wheel({ ctrlKey: true, deltaY: -1 });
+  fixture.binding.initialize(90);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(fixture.binding.zoom, 110);
+  assert.equal(fixture.root.style.zoom, "1.1");
+  assert.deepEqual(fixture.saves, [{ sidepanelZoom: 110 }]);
+});

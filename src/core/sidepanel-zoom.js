@@ -21,6 +21,7 @@ export function createSidepanelZoomBinding({
   showToast,
 }) {
   let zoom = DEFAULT_ZOOM;
+  let hasNewerPreference = false;
 
   function apply(value) {
     zoom = normalizeSidepanelZoom(value);
@@ -39,6 +40,7 @@ export function createSidepanelZoomBinding({
   target.addEventListener("wheel", (event) => {
     if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
     event.preventDefault();
+    hasNewerPreference = true;
     const nextZoom = sidepanelZoomAfterWheel(zoom, event.deltaY);
     if (nextZoom === zoom) return;
     apply(nextZoom);
@@ -50,7 +52,9 @@ export function createSidepanelZoomBinding({
     get zoom() {
       return zoom;
     },
-    initialize: apply,
-    sync: apply,
+    initialize(value) {
+      if (hasNewerPreference) return zoom;
+      return apply(value);
+    },
   };
 }
