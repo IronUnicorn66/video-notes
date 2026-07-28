@@ -25,12 +25,40 @@ const packageJson = JSON.parse(
 const packageLock = JSON.parse(
   await readFile(new URL("../package-lock.json", import.meta.url), "utf8"),
 );
+const zhCnMessages = JSON.parse(
+  await readFile(
+    new URL("../_locales/zh_CN/messages.json", import.meta.url),
+    "utf8",
+  ).catch(() => "{}"),
+);
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
   assert.equal(manifest.version, "0.3.0");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
+});
+
+test("Edge 发布包声明简体中文和公开主页", async () => {
+  assert.equal(manifest.default_locale, "zh_CN");
+  assert.equal(manifest.name, "__MSG_extensionName__");
+  assert.equal(manifest.description, "__MSG_extensionDescription__");
+  assert.equal(
+    manifest.homepage_url,
+    "https://ironunicorn66.github.io/video-notes/",
+  );
+  assert.equal(zhCnMessages.extensionName?.message, "视频笔记");
+  assert.equal(
+    zhCnMessages.extensionDescription?.message,
+    "在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。",
+  );
+  const builtMessages = JSON.parse(
+    await readFile(
+      new URL("../dist/_locales/zh_CN/messages.json", import.meta.url),
+      "utf8",
+    ).catch(() => "{}"),
+  );
+  assert.deepEqual(builtMessages, zhCnMessages);
 });
 
 test("后台笔记命令基于当前页面会话路由历史操作", async () => {

@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA01Ixrd7V62YRHdphM+lTLfIic66oEdvB2IePl6jVFpo0JQ41Klsbf1uQQa+SsM9UunM5r6Iu3Zkm54zLMNHkJ3IVU2U0INIF+xOUgM+nLT2T3fyjVR0dC+ZbIZl+4HWSu7aSecT3t8VXDW9rnmtqNBtEqV2ohIkRqRpofTRl3ArbZVOqzr+oxKYeczWVnGOxG24RDDGYrMh+2hQC2gY7dfnshIrACBh+XKtaNVBiyAfY/s00dqnVtsGI4ojSTB9V/1cfQj3QLn/ihQCmrQpO2rYPLI5+0mvQoyN10YAYG36yiBgXL0iWAPhv2sodmFG8ERh1eeWPJ6YGyUWJRc5y5wIDAQAB",
-  "name": "视频笔记",
+  "name": "__MSG_extensionName__",
   "version": "0.3.0",
-  "description": "在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "zh_CN",
+  "homepage_url": "https://ironunicorn66.github.io/video-notes/",
   "icons": {
     "16": "assets/icon-16.png",
     "32": "assets/icon-32.png",

@@ -46,6 +46,7 @@ if (process.env.VIDEO_NOTES_BUNDLED_MODEL) {
 
 await Promise.all([
   cp(resolve(root, "assets"), resolve(output, "assets"), { recursive: true }),
+  cp(resolve(root, "_locales"), resolve(output, "_locales"), { recursive: true }),
   cp(resolve(root, "manifest.json"), resolve(output, "manifest.json")),
   cp(resolve(root, "src/sidepanel.html"), resolve(output, "sidepanel.html")),
   cp(resolve(root, "src/sidepanel.css"), resolve(output, "sidepanel.css")),
