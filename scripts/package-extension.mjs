@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -27,6 +28,9 @@ const files = await Promise.all((await filesBelow(dist)).map(async (path) => ({
   data: new Uint8Array(await readFile(path)),
 })));
 const version = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")).version;
+const artifactName = `video-notes-edge-${version}.zip`;
+const archive = createZip(files);
 await mkdir(artifacts, { recursive: true });
-await writeFile(resolve(artifacts, `video-notes-edge-${version}.zip`), createZip(files));
-
+await writeFile(resolve(artifacts, artifactName), archive);
+const checksum = createHash("sha256").update(archive).digest("hex");
+await writeFile(resolve(artifacts, `${artifactName}.sha256`), `${checksum}  ${artifactName}\n`);

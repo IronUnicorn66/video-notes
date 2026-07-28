@@ -29,6 +29,7 @@
 ### GitHub Release 测试版
 
 [下载视频笔记 0.3.0 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v0.3.0/video-notes-edge-0.3.0.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v0.3.0/video-notes-edge-0.3.0.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`。
@@ -67,6 +68,7 @@ npm test
 npm run build
 npm run package
 unzip -t artifacts/video-notes-edge-0.3.0.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-0.3.0.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 中加载本项目的 `dist` 目录。

@@ -6,8 +6,8 @@
   "scripts": {
     "build": "node scripts/build-extension.mjs",
     "build:store-assets": "node scripts/render-store-assets.mjs",
-    "test": "node --test",
-    "test:watch": "node --test --watch",
+    "test": "node --test --test-concurrency=1",
+    "test:watch": "node --test --test-concurrency=1 --watch",
     "package": "node scripts/package-extension.mjs"
   },
   "dependencies": {
