@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="视频笔记 Microsoft Edge 扩展隐私政策。">
+    <meta name="theme-color" content="#f5f2ea">
+    <title>隐私政策 · 视频笔记</title>
+    <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#policy">跳到隐私政策</a>
+    <header class="site-header shell">
+      <nav class="nav" aria-label="主导航">
+        <a class="brand" href="../">
+          <img src="../assets/icon.svg" alt="">
+          <span>视频笔记</span>
+        </a>
+        <div class="nav-links">
+          <a href="../">返回首页</a>
+          <a aria-current="page" href="./">隐私政策</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="policy" class="policy shell">
+      <header class="policy-header">
+        <p class="eyebrow"><span></span>Privacy Policy</p>
+        <h1>视频笔记隐私政策</h1>
+        <p>生效日期：2026 年 7 月 28 日</p>
+      </header>
+
+      <article class="policy-body">
+        <section>
+          <h2>概述</h2>
+          <p>视频笔记用于在 YouTube 和哔哩哔哩课程中记录带时点的个人笔记，并按用户选择附带播放器截图、已经渲染的字幕、原始录音和本地语音转写。本政策说明扩展处理的信息、用途、权限、存储和删除方式。</p>
+        </section>
+
+        <section>
+          <h2>处理的信息</h2>
+          <ul>
+            <li>当前视频地址、标题、站点、视频标识、分 P 和播放时点。</li>
+            <li>用户输入的笔记正文、字幕修订和撤销/反撤销历史。</li>
+            <li>当前页面已经渲染的原生字幕或沉浸式翻译双语字幕。</li>
+            <li>用户主动启用播放器截图后截取的可见播放器画面。</li>
+            <li>用户按住说话期间的麦克风录音与本地 Whisper 转写结果。</li>
+            <li>快捷键、字幕时长、时间线顺序、权限和模型状态设置。</li>
+          </ul>
+          <p>扩展不会在后台建立浏览历史，也不会读取受支持视频页以外的网站内容来生成笔记。</p>
+        </section>
+
+        <section>
+          <h2>存储与处理位置</h2>
+          <p>笔记、字幕、截图、录音、转写结果和视频会话信息保存在扩展自己的 IndexedDB。设置保存在扩展存储中，模型权重保存在 Cache Storage。上述内容都在用户设备本地处理。</p>
+          <p>扩展没有开发者服务器，不会把笔记、字幕、截图、录音、转写结果或视频访问记录上传给开发者。扩展不包含账户、广告或分析统计，也不会出售、出租或共享用户数据。</p>
+        </section>
+
+        <section>
+          <h2>Whisper 模型下载</h2>
+          <p>用户主动选择本地语音模型后，扩展会从 Hugging Face 的 <code>ggerganov/whisper.cpp</code> 固定 revision 下载 Base、Small 或 Medium 静态权重。下载后会校验固定文件大小和 SHA-256，校验通过才会写入本地缓存。下载完成后，扩展撤销模型主机权限。</p>
+          <p>远程响应只包含静态模型数据。JavaScript、Worker 和 WASM 均由扩展安装包提供，转写在本机运行。</p>
+        </section>
+
+        <section>
+          <h2>权限用途</h2>
+          <ul>
+            <li><strong>存储：</strong>保存设置、权限、模型状态和用户记录。</li>
+            <li><strong>当前标签页与脚本：</strong>在受支持的课程页读取视频时点、已经渲染的字幕，并在连接失败时恢复本地内容脚本。</li>
+            <li><strong>侧栏：</strong>提供笔记输入、设置和时间线。</li>
+            <li><strong>隐藏页：</strong>在授权后维持录音、本地转写和导出文件生成。</li>
+            <li><strong>下载：</strong>保存用户主动导出的 ZIP。</li>
+            <li><strong>可选截图权限：</strong>只在用户启用播放器截图并同意 Edge 提示后授予。</li>
+            <li><strong>可选模型主机权限：</strong>只用于用户主动发起的固定 Whisper 权重下载。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>麦克风与播放器截图</h2>
+          <p>麦克风只在用户按住右 Option/Alt 或侧栏“按住说话”按钮期间录音。窗口失焦、页面隐藏、侧栏关闭或达到 60 秒上限时会停止录音。</p>
+          <p>播放器截图默认关闭。用户必须在侧栏中单独启用并接受 Edge 的可选权限提示。关闭权限后，新笔记不再保存截图。</p>
+        </section>
+
+        <section>
+          <h2>保留与删除</h2>
+          <p>扩展会保留视频会话和已下载模型，便于再次打开同一视频时继续记录。用户可以删除单条笔记、清空当前视频会话，或在 Edge 扩展管理页清除本扩展数据。卸载扩展会由浏览器清除扩展存储。</p>
+          <p>导出 ZIP 不会删除浏览器中的会话。已经保存到下载目录的 ZIP 由用户自行管理。</p>
+        </section>
+
+        <section>
+          <h2>政策更新</h2>
+          <p>如果扩展的数据处理方式、权限或联网范围发生变化，本页面会在新版本发布前更新，并修改顶部生效日期。</p>
+        </section>
+
+        <section>
+          <h2>联系我们</h2>
+          <p>一般问题请使用 <a href="https://github.com/IronUnicorn66/video-notes/issues">GitHub Issues</a>。安全问题请通过 <a href="https://github.com/IronUnicorn66/video-notes/security/advisories/new">GitHub Security Advisory</a> 私下报告。</p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer-inner">
+        <p>© 2026 IronUnicorn66 · 视频笔记</p>
+        <a href="../">返回首页</a>
+      </div>
+    </footer>
+  </body>
+</html>
