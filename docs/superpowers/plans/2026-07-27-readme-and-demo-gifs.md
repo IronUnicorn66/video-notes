@@ -210,7 +210,7 @@ Run:
 node --test tests/readme.test.js
 ```
 
-Expected: FAIL，因为旧 README 尚未引用两段 GIF，并且仍包含 `/Users/psh/`。
+Expected: FAIL，因为旧 README 尚未引用两段 GIF，并且仍包含本机用户目录绝对路径。
 
 - [ ] **Step 3: 用精简首页内容重写 README**
 
@@ -225,7 +225,7 @@ Expected: FAIL，因为旧 README 尚未引用两段 GIF，并且仍包含 `/Use
 7. `## 开发验证`，包含 `npm test`、`npm run build`、`npm run package`。
 8. `## 支持范围`，链接 `docs/ACCEPTANCE.md`、`docs/PRIVACY.md` 和 `THIRD_PARTY_NOTICES.md`。
 
-删除旧 README 中 `/Users/psh/codes/browser_always_play` 等本机绝对路径；网课声伴改为通用项目名称说明。
+删除旧 README 中的本机绝对路径；网课声伴改为通用项目名称说明。
 
 - [ ] **Step 4: 运行 README 行为测试并确认通过**
 

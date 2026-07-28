@@ -324,7 +324,7 @@ git commit -m "更新: 校验 Edge 发布包边界"
 ```bash {.line-numbers}
 git status --short
 git log --all -p
-git grep -n -I -E "gho_|github_pat_|AKIA|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|/Users/psh|@gmail\.com"
+git grep -n -I -E "gho_|github_pat_|AKIA|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|/(Users|home)/[^/]+|@gmail\.com"
 ```
 
 人工区分固定扩展公钥与私钥，确保没有令牌、Cookie、录音、个人笔记或临时截图进入历史。
@@ -384,11 +384,11 @@ gh release create v0.3.0 artifacts/video-notes-edge-0.3.0.zip artifacts/video-no
 ### Task 8: 创建并验证 `publish-edge-extension` Skill
 
 **Files:**
-- Create: `/Users/psh/.codex/skills/publish-edge-extension/SKILL.md`
-- Create: `/Users/psh/.codex/skills/publish-edge-extension/references/first-release.md`
-- Create: `/Users/psh/.codex/skills/publish-edge-extension/references/update-release.md`
-- Create: `/Users/psh/.codex/skills/publish-edge-extension/references/store-field-map.md`
-- Create: `/Users/psh/.codex/skills/publish-edge-extension/scripts/audit_edge_release.py`
+- Create: `~/.codex/skills/publish-edge-extension/SKILL.md`
+- Create: `~/.codex/skills/publish-edge-extension/references/first-release.md`
+- Create: `~/.codex/skills/publish-edge-extension/references/update-release.md`
+- Create: `~/.codex/skills/publish-edge-extension/references/store-field-map.md`
+- Create: `~/.codex/skills/publish-edge-extension/scripts/audit_edge_release.py`
 
 **Interfaces:**
 - Consumes: 本次 Tasks 1–7 的实际流程和 Microsoft 官方 Edge 发布文档。
@@ -401,7 +401,7 @@ gh release create v0.3.0 artifacts/video-notes-edge-0.3.0.zip artifacts/video-no
 - [ ] **Step 2: 使用官方初始化器创建 Skill**
 
 ```bash {.line-numbers}
-python3 /Users/psh/.codex/skills/.system/skill-creator/scripts/init_skill.py publish-edge-extension --path /Users/psh/.codex/skills --resources scripts,references
+python3 ~/.codex/skills/.system/skill-creator/scripts/init_skill.py publish-edge-extension --path ~/.codex/skills --resources scripts,references
 ```
 
 - [ ] **Step 3: 实现最小 Skill 和审计脚本**
@@ -419,8 +419,8 @@ python3 scripts/audit_edge_release.py --repo /absolute/project --zip /absolute/r
 - [ ] **Step 5: 校验 Skill 与实战回放**
 
 ```bash {.line-numbers}
-python3 /Users/psh/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/psh/.codex/skills/publish-edge-extension
-python3 /Users/psh/.codex/skills/publish-edge-extension/scripts/audit_edge_release.py --repo /Users/psh/codes/video_notes --zip /Users/psh/codes/video_notes/artifacts/video-notes-edge-0.3.0.zip --assets /Users/psh/codes/video_notes/store-assets/edge
+python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py ~/.codex/skills/publish-edge-extension
+python3 ~/.codex/skills/publish-edge-extension/scripts/audit_edge_release.py --root . --zip artifacts/video-notes-edge-0.3.0.zip --store-assets store-assets/edge
 ```
 
 预期：两个命令均退出 0，审计输出列出版本、包边界、素材和公开 URL 的通过状态。

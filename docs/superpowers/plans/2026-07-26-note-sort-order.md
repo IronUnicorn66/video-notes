@@ -342,7 +342,7 @@ Expected: 命令退出码为 0，`dist/sidepanel.html` 包含“正序”和“�
 
 - [ ] **Step 10: 在 Edge 中完成实机验收**
 
-1. 重新加载 `/Users/psh/codes/video_notes/.worktrees/note-sort-order/dist`。
+1. 重新加载当前功能 worktree 的 `dist` 目录。
 2. 打开已有多条笔记的 YouTube 视频，确认首次显示倒序且最新笔记位于顶部。
 3. 单击“正序”，确认一次点击后最早笔记移动到顶部。
 4. 关闭并重开侧栏，确认仍为正序。

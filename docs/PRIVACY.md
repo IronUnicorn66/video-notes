@@ -21,7 +21,7 @@
 
 ## 存储与处理位置
 
-笔记、字幕、截图、录音、转写结果和视频会话信息保存在扩展自己的 IndexedDB。设置保存在扩展存储中，模型权重保存在 Cache Storage。上述内容都在用户设备本地处理。
+笔记、字幕、截图、录音、转写结果和视频会话信息保存在扩展自己的 IndexedDB。设置保存在扩展存储中，模型权重保存在 Cache Storage。这些个人内容都在用户设备本地处理。
 
 扩展没有开发者服务器，不会把笔记、字幕、截图、录音、转写结果或视频访问记录上传给开发者。扩展不包含账户、广告或分析统计，也不会出售、出租或共享用户数据。
 
@@ -30,6 +30,8 @@
 用户主动选择本地语音模型后，扩展会从 Hugging Face 的 `ggerganov/whisper.cpp` 固定 revision `98aa99a0a9db05ae2342309f5096248665f7cba3` 下载 Base、Small 或 Medium 静态权重。下载后会校验固定文件大小和 SHA-256，校验通过才会写入本地缓存。下载完成后，扩展撤销模型主机权限。
 
 远程响应只包含静态模型数据。JavaScript、Worker 和 WASM 均由扩展安装包提供，转写在本机运行。
+
+模型下载请求会直接连接 Hugging Face、其 CDN 或 XetHub。和普通 HTTPS 请求一样，这些服务会收到完成下载所需的连接元数据，例如 IP 地址、User-Agent、请求时间和模型文件地址；请求不会包含笔记、字幕、截图、录音或转写内容。扩展和开发者不读取或保存这些连接元数据。第三方如何处理连接元数据请参阅 [Hugging Face 隐私政策](https://huggingface.co/privacy)。
 
 ## 权限用途
 
@@ -61,4 +63,4 @@
 
 ## 联系方式
 
-一般问题请使用 [GitHub Issues](https://github.com/IronUnicorn66/video-notes/issues)。安全问题请通过 [GitHub Security Advisory](https://github.com/IronUnicorn66/video-notes/security/advisories/new) 私下报告。
+一般问题请使用 [GitHub Issues](https://github.com/IronUnicorn66/video-notes/issues)。仓库和现有问题可公开读取，提交新问题需要登录 GitHub；仓库已启用公开 Issues。安全问题请通过 [GitHub Security Advisory](https://github.com/IronUnicorn66/video-notes/security/advisories/new) 私下报告。

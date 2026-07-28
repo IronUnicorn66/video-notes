@@ -4,12 +4,20 @@
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（180 个测试）。
+- [x] 已自动验证：`npm test` 通过（205 个测试）。
 - [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `0.3.0`。
 - [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-0.3.0.zip`。
 - [x] 已自动验证：`unzip -t artifacts/video-notes-edge-0.3.0.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
+
+### 已完成的 Edge 150 实机烟测
+
+- [x] 用户在 Edge 150 加载当前生产构建，确认扩展和视频笔记侧栏可以打开。
+- [x] 用户在 YouTube 开启原生字幕后创建标记，确认卡片能读取标记前字幕。
+- [x] 用户在 YouTube 开启沉浸式翻译双语字幕后创建标记，确认卡片保留双语字幕。
+
+以下人工项目尚未全部执行，保持待验收状态。
 
 ## 二、模型下载与转写（待用户手动验收）
 

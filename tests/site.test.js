@@ -27,12 +27,14 @@ test("隐私页覆盖本地存储、模型下载、权限和删除", async () =>
     "IndexedDB",
     "Cache Storage",
     "Hugging Face",
+    "连接元数据",
     "麦克风",
     "播放器截图",
     "删除",
   ]) {
     assert.ok(html.includes(term), `隐私页缺少 ${term}`);
   }
+  assert.match(html, /https:\/\/huggingface\.co\/privacy/);
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
 });
 

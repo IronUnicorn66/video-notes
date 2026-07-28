@@ -27,6 +27,7 @@ const files = await Promise.all((await filesBelow(dist)).map(async (path) => ({
   name: relative(dist, path).replaceAll("\\", "/"),
   data: new Uint8Array(await readFile(path)),
 })));
+files.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 const manifestFile = files.find((file) => file.name === "manifest.json");
 const packagedManifest = JSON.parse(new TextDecoder().decode(manifestFile.data));
 delete packagedManifest.key;

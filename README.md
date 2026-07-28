@@ -52,11 +52,13 @@
 
 笔记、字幕、截图、录音和转写结果保存在扩展自己的浏览器存储中，不会上传给开发者。扩展不包含账户、广告或分析统计。
 
-首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。
+首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。下载服务会收到普通 HTTPS 请求的 IP、User-Agent、请求时间和模型文件地址等连接元数据；请求不包含用户笔记或媒体内容。
 
 - [产品主页](https://ironunicorn66.github.io/video-notes/)
 - [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
 - [问题反馈](https://github.com/IronUnicorn66/video-notes/issues)
+
+仓库和现有问题可公开读取；提交新问题需要登录 GitHub。仓库已启用公开 Issues。
 
 ## 本地开发
 
