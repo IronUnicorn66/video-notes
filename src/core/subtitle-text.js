@@ -1,3 +1,4 @@
+const IMMERSIVE_HOST_SELECTOR = "#immersive-translate-caption-window";
 const IMMERSIVE_CONTAINER_SELECTOR = ".imt-captions-text";
 const IMMERSIVE_CUE_SELECTOR = ".source-cue, .target-cue";
 const NATIVE_SELECTORS = {
@@ -19,8 +20,15 @@ function visibleText(elements, separator) {
 }
 
 export function readRenderedSubtitleText(root, platform) {
+  const immersiveRoots = [
+    root,
+    ...[...root.querySelectorAll(IMMERSIVE_HOST_SELECTOR)]
+      .map((host) => host.shadowRoot)
+      .filter(Boolean),
+  ];
   const immersiveText = visibleText(
-    [...root.querySelectorAll(IMMERSIVE_CONTAINER_SELECTOR)]
+    immersiveRoots
+      .flatMap((subtitleRoot) => [...subtitleRoot.querySelectorAll(IMMERSIVE_CONTAINER_SELECTOR)])
       .filter(isVisible)
       .flatMap((container) => [...container.querySelectorAll(IMMERSIVE_CUE_SELECTOR)]),
     "\n",

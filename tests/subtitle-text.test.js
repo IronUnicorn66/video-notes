@@ -59,6 +59,29 @@ test("沉浸式翻译字幕读取可迭代 NodeList 风格提示节点", () => {
   assert.equal(readRenderedSubtitleText(root, "youtube"), "source cue\ntarget cue");
 });
 
+test("沉浸式翻译字幕可从字幕宿主的开放 Shadow DOM 读取", () => {
+  const shadowRoot = subtitleRoot({
+    ".imt-captions-text": [subtitleNode("", {
+      children: {
+        ".source-cue, .target-cue": [
+          subtitleNode("Now, we go back to main."),
+          subtitleNode("现在，我们回到主界面。"),
+        ],
+      },
+    })],
+  });
+  const host = subtitleNode("");
+  host.shadowRoot = shadowRoot;
+  const root = subtitleRoot({
+    "#immersive-translate-caption-window": [host],
+  });
+
+  assert.equal(
+    readRenderedSubtitleText(root, "youtube"),
+    "Now, we go back to main.\n现在，我们回到主界面。",
+  );
+});
+
 test("沉浸式翻译字幕为空时回退到平台原生字幕", () => {
   const root = subtitleRoot({
     ".imt-captions-text": [subtitleNode("", {
