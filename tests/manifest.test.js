@@ -61,6 +61,29 @@ test("Edge 发布包声明简体中文和公开主页", async () => {
   assert.deepEqual(builtMessages, zhCnMessages);
 });
 
+test("公开文档提供一致的主页、隐私和支持入口", async () => {
+  const [readme, listing, privacy, license] = await Promise.all([
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/STORE_LISTING.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/PRIVACY.md", import.meta.url), "utf8"),
+    readFile(new URL("../LICENSE", import.meta.url), "utf8").catch(() => ""),
+  ]);
+  const homepage = "https://ironunicorn66.github.io/video-notes/";
+  const privacyUrl = `${homepage}privacy/`;
+  const supportUrl = "https://github.com/IronUnicorn66/video-notes/issues";
+
+  for (const content of [readme, listing]) {
+    assert.ok(content.includes(homepage));
+    assert.ok(content.includes(privacyUrl));
+    assert.ok(content.includes(supportUrl));
+  }
+  assert.ok(privacy.includes(supportUrl));
+  assert.match(license, /MIT License/);
+  for (const permission of manifest.permissions) {
+    assert.ok(listing.includes(`\`${permission}\``));
+  }
+});
+
 test("后台笔记命令基于当前页面会话路由历史操作", async () => {
   const repository = new VideoNotesRepository({
     databaseName: `background-history-${crypto.randomUUID()}`,

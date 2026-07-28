@@ -1,84 +1,92 @@
-# 视频笔记 Edge 插件
+<p align="center">
+  <img src="assets/icon.svg" width="96" alt="视频笔记图标">
+</p>
 
-在 YouTube 和哔哩哔哩看课程时快速留下时点标记。文字输入会自动暂停和续播；页面获得焦点时，按住右 Option/Alt 录音，松开后立即续播并在本机使用 Whisper 转写。
+<h1 align="center">视频笔记</h1>
 
-## 已实现范围
+<p align="center">看课程时快速留下时点、截图、字幕和自己的想法。</p>
 
-- YouTube 普通视频页、哔哩哔哩 BV 视频页和分 P 会话。
-- 文字输入聚焦暂停、失焦自动保存，支持中文输入法、普通换行、`Cmd/Ctrl + Enter` 和 `Esc`。
-- 右 Option/Alt 按住录音、松开结束，可重新录入物理按键；输入控件内不会触发。
-- 窗口失焦、标签页隐藏、页面关闭、侧边栏关闭和 60 秒上限均会结束录音。
-- 每条标记保存个人正文、播放器截图、标记前 20 秒已渲染字幕、原始 WebM/Opus 录音和跳转网址；前置字幕默认开启，可选择 5、10、20、30 秒范围。
-- 使用 IndexedDB 保存会话、标记和资产；同一视频再次打开会续接已有记录。
-- 导出 ZIP，根目录为 UTF-8 Markdown，图片和录音分别放入 `images/`、`audio/`。
-- 本地 `whisper.cpp` WASM 转写。可分别下载并切换固定的 Base、Small、Medium 模型，支持分块续传和 SHA-256 校验；缓存完成后撤销模型站点权限。多条录音按队列串行转写，浏览器重启后会恢复已保存音频的待办。
-- 与网课声伴 1.1.0 使用固定扩展 ID 和版本化租约协议协作。语音期间 A/B 都暂停，文字输入保留原有 A/B 接力规则。
+视频笔记是一款面向 Microsoft Edge 的开源扩展。它在 YouTube 和哔哩哔哩视频旁提供持续可见的笔记侧栏，让文字记录、播放器截图、标记前字幕、本地语音转写和 Markdown 导出保持在同一条时间线上。
 
-## 本地安装
+![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
 
-要求 Node.js 22 及以上，目标浏览器为桌面 Edge 150。
+## 核心能力
+
+- 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
+- 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
+- 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
+- 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
+- Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
+- 正序或倒序查看时间线，支持编辑、删除、清空、撤销和反撤销。
+- 导出 ZIP，包含 Markdown、截图和原始录音。
+
+## 安装
+
+### Edge 商店
+
+0.3.0 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+
+### GitHub Release 测试版
+
+[下载视频笔记 0.3.0 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v0.3.0/video-notes-edge-0.3.0.zip)
+
+1. 下载 ZIP 并解压到固定目录。
+2. 在 Edge 地址栏打开 `edge://extensions/`。
+3. 开启“开发人员模式”。
+4. 点击“加载解压缩的扩展”。
+5. 选择解压后的目录；该目录内应直接包含 `manifest.json`。
+
+测试版需要手动更新。新版本发布后，请重新下载并覆盖原目录，再在扩展管理页点击“重新加载”。
+
+## 使用方法
+
+1. 打开 YouTube 普通视频页或哔哩哔哩 BV 视频页，点击工具栏中的“视频笔记”。
+2. 点击快速标记输入框，输入想法后移开焦点；也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
+3. 在“权限、语音与快捷键”中按需启用播放器截图、麦克风和前置字幕。
+4. 需要语音记录时，按住右 Option/Alt 或“按住说话”按钮。
+5. 需要本地转写时，选择并下载固定的 Whisper 模型；下载完成后可离线转写。
+6. 看完后点击“导出 ZIP”。导出不会删除浏览器中的笔记。
+
+## 本地数据与联网范围
+
+笔记、字幕、截图、录音和转写结果保存在扩展自己的浏览器存储中，不会上传给开发者。扩展不包含账户、广告或分析统计。
+
+首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。
+
+- [产品主页](https://ironunicorn66.github.io/video-notes/)
+- [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
+- [问题反馈](https://github.com/IronUnicorn66/video-notes/issues)
+
+## 本地开发
+
+要求 Node.js 22 或更高版本。
 
 ```bash {.line-numbers}
 npm install
-npm run build
-```
-
-打开 `edge://extensions`，启用“开发人员模式”，点击“加载解压缩的扩展”，选择本项目的 `dist` 目录。正式版 Edge 150 会忽略命令行的 `--load-extension` 参数，因此加载动作需要在扩展管理页完成。
-
-若需同时验证网课声伴，先在 `/Users/psh/codes/browser_always_play` 运行其测试，再从该目录加载插件。两个项目的 Manifest 都带稳定公钥，开发环境 ID 会保持一致。
-
-## 使用流程
-
-1. 打开受支持的视频页，点击工具栏中的“视频笔记”图标打开侧边栏。
-2. 首次使用时，“权限、语音与快捷键”会自动展开。点击“播放器截图”的“启用”；再点击“麦克风”的“授权”，插件会打开独立授权页，请在该页点击“允许麦克风”并确认 Edge 权限提示。成功后会自动返回发起授权的课程标签。
-3. 在“权限、语音与快捷键”的“前置字幕”设置中，按需选择读取标记前 5、10、20 或 30 秒已经渲染的字幕；默认是 20 秒。
-4. 点击输入框。插件记录当前时点、字幕与截图并暂停视频；输入内容后移开光标即可保存和续播。
-5. 每条笔记卡片的“前置字幕”可独立编辑，失焦后保存；Markdown 导出会使用修订后的字幕内容。
-6. 关闭“前置字幕”后，插件停止采集新字幕并隐藏所有字幕块；已保存的历史字幕会保留，重新开启后再次显示。
-7. 页面焦点位于视频时，按住右 Option/Alt 说话，松开后视频立即恢复。未启用 Whisper 时仍会保留原始录音。
-8. 首次需要转写时，在“本地 Whisper”选择模型并点击“下载并使用”，同意一次模型下载权限。下载中的录音或转写任务完成前不能切换模型。
-9. 每次转写结果会按模型追加到候选和历史；再次转写不会覆盖已经编辑的个人正文。
-10. 时间线中的截图可点击放大并关闭；语音笔记还可播放保存的原始录音。
-11. 新建文字或语音笔记会记录为可撤销的时间点新增；新建视频会话本身不会进入撤销历史。
-12. 使用“撤销”与“反撤销”按钮，或 `Cmd/Ctrl + Z`、`Cmd/Ctrl + Shift + Z`，可在当前视频会话恢复或重做最近操作。每个会话将最近 50 次操作持久化到 IndexedDB，重启浏览器后仍可继续撤销或重做；执行新操作会清空重做记录。
-13. 删除单条笔记和清空当前会话都会先要求确认；清空是一个可撤销的原子操作。删除的笔记先软删除，仍被撤销/重做历史引用的截图和录音会保留；历史不再引用后才最终回收资产。
-14. 看完后点击“导出 ZIP”。导出不会删除浏览器中的会话或已下载模型。
-
-## 开发验证
-
-```bash {.line-numbers}
 npm test
 npm run build
 npm run package
 unzip -t artifacts/video-notes-edge-0.3.0.zip
 ```
 
-网课声伴的协作测试位于 `/Users/psh/codes/browser_always_play/tests`，覆盖固定发送者校验、A/B 全暂停、全局暂停保护、心跳续租和超时恢复。
+构建完成后，在 `edge://extensions/` 中加载本项目的 `dist` 目录。
 
-## 模型与发布策略
+## 支持范围
 
-三种模型均从 Hugging Face `ggerganov/whisper.cpp` 的固定 revision `98aa99a0a9db05ae2342309f5096248665f7cba3` 首次下载。远程响应只有静态权重；JavaScript、Worker 和 WASM 均进入安装包。录音、转写文本、截图和字幕不会上传。
+- YouTube 普通视频页。
+- 哔哩哔哩普通 BV 视频页与分 P。
+- 桌面版 Microsoft Edge 150 或更高版本。
 
-- Base · 57 MiB：`ggml-base-q5_1.bin`，59,707,625 字节，SHA-256 `422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898`；默认模型，适合日常本地转写。
-- Small · 181 MiB：`ggml-small-q5_1.bin`，190,085,487 字节，SHA-256 `ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb`；用于需要更大模型的本地转写。
-- Medium · 514 MiB：`ggml-medium-q5_0.bin`，539,212,467 字节，SHA-256 `19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f`；用于需要最大本地模型的场景。下载、加载和转写的内存占用及耗时明显更高，建议在内存充足的桌面 Edge 环境中使用。
+扩展只读取播放器已经渲染的字幕，不主动开启字幕，也不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
 
-每个已下载模型都会保留。当前版本未提供单模型删除入口；需要统一释放空间时，请在 Edge 扩展管理页清除本扩展数据。
-- 如果 Edge 商店拒绝运行时模型下载，可用下列方式把同一权重内置到发布包：
+## 贡献与安全
 
-```bash {.line-numbers}
-VIDEO_NOTES_BUNDLED_MODEL=/absolute/path/ggml-base-q5_1.bin npm run package
-```
+- 一般问题与功能建议：[GitHub Issues](https://github.com/IronUnicorn66/video-notes/issues)
+- 安全问题：请按 [安全政策](SECURITY.md) 私下报告。
+- 详细权限与数据说明：[本地数据与权限](docs/PRIVACY.md)
+- Edge 上架资料：[商店发布文案](docs/STORE_LISTING.md)
+- 第三方组件：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-构建脚本会再次校验文件大小和 SHA-256，校验失败会停止打包。
+## 许可证
 
-## 当前边界
-
-- 侧栏仅在 YouTube 普通视频页和哔哩哔哩普通 BV 视频页启用；普通网页不会启用侧栏。
-- 插件只读取页面已经渲染的字幕，不主动打开字幕，也不调用站点私有字幕接口；关闭前置字幕不会删除历史字幕，也不提供自定义时长或超过 30 秒的读取范围。
-- Edge 的可见页面截图接口要求 `<all_urls>` 或临时 `activeTab` 授权。侧栏打开方式不一定产生临时授权，因此插件把 `<all_urls>` 作为用户主动启用的可选权限；实际内容脚本仍只运行于 YouTube 和哔哩哔哩视频页。
-- 页面焦点离开视频后，单键按住说话无法收到键盘事件；侧边栏内可使用“按住说话”按钮。
-- Whisper 的准确率和性能门槛需要使用真实说话人的 12 条样本完成实机验收，记录方式见 [验收清单](docs/ACCEPTANCE.md)。门槛未通过时继续保留文字与原始录音，不接入云端转写。
-- 最终 Edge 商店 ID 由商店分配。发布前需把两个插件的互信 ID 更新为商店 ID，并重新执行协议测试。
-
-隐私说明见 [本地数据与权限](docs/PRIVACY.md)，第三方组件见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目使用 [MIT License](LICENSE)。第三方组件继续遵循各自许可证。
