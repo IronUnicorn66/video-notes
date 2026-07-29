@@ -7,6 +7,7 @@ import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-
 import { VideoNotesRepository } from "./core/storage.js";
 import { persistRecordedNote } from "./core/note-history-commands.js";
 import { createTranscriberManager } from "./core/transcriber-manager.js";
+import { reportWhisperRuntimeMessage } from "./core/whisper-log.js";
 import { createWhisperOperationLock } from "./core/whisper-operation.js";
 import {
   applyTranscript,
@@ -155,7 +156,7 @@ async function createFileTranscriber(modelId) {
     createModule: createWhisperModule,
     model: file,
     print: () => {},
-    printErr: (message) => console.warn("Whisper", message),
+    printErr: reportWhisperRuntimeMessage,
   });
   instance.Module.mainScriptUrlOrBlob = chrome.runtime.getURL("shout-worker.js");
   try {
