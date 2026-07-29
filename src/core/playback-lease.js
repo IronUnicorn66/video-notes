@@ -22,6 +22,11 @@ export function markPlaybackIntervention(lease, action, now = Date.now()) {
   };
 }
 
+export function markPlayerPointerIntervention(lease, player, target, now = Date.now()) {
+  if (!lease || !player?.contains(target)) return lease;
+  return markPlaybackIntervention(lease, "player-pointerdown", now);
+}
+
 export function releasePlaybackLease(lease, media, now = Date.now()) {
   if (!lease) return { shouldPlay: false, reason: "missing" };
   if (now > lease.expiresAt) return { shouldPlay: false, reason: "expired" };

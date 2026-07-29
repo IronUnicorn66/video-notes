@@ -1,4 +1,9 @@
-import { acquirePlaybackLease, markPlaybackIntervention, releasePlaybackLease } from "./core/playback-lease.js";
+import {
+  acquirePlaybackLease,
+  markPlayerPointerIntervention,
+  markPlaybackIntervention,
+  releasePlaybackLease,
+} from "./core/playback-lease.js";
 import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
@@ -72,6 +77,18 @@ function consumeExpectedEvent(type) {
 function onMediaStateChange(event) {
   if (!activeLease || consumeExpectedEvent(event.type)) return;
   activeLease = markPlaybackIntervention(activeLease, event.type);
+}
+
+function onPlayerPointerDown(event) {
+  if (!activeLease) return;
+  const context = getContext();
+  const media = bindMedia();
+  if (!context || !media) return;
+  activeLease = markPlayerPointerIntervention(
+    activeLease,
+    findPlayerElement(context, media),
+    event.target,
+  );
 }
 
 function bindMedia() {
@@ -252,6 +269,7 @@ window.addEventListener("pagehide", () => void pushToTalk.forceStop("pagehide"))
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) void pushToTalk.forceStop("tab-hidden");
 });
+document.addEventListener("pointerdown", onPlayerPointerDown, true);
 
 chrome.storage.local.get({
   shortcutCode: "AltRight",

@@ -12,7 +12,7 @@ test("主页提供产品流程、下载、隐私与支持入口", async () => {
   assert.match(html, /id="features"/);
   assert.match(
     html,
-    /https:\/\/github\.com\/IronUnicorn66\/video-notes\/releases\/download\/v1\.0\.1\/video-notes-edge-1\.0\.1\.zip/,
+    /https:\/\/github\.com\/IronUnicorn66\/video-notes\/releases\/download\/v1\.0\.2\/video-notes-edge-1\.0\.2\.zip/,
   );
   assert.match(html, /href="privacy\/"/);
   assert.match(html, /https:\/\/github\.com\/IronUnicorn66\/video-notes\/issues/);

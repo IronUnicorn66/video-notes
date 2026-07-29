@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   acquirePlaybackLease,
+  markPlayerPointerIntervention,
   markPlaybackIntervention,
   releasePlaybackLease,
 } from "../src/core/playback-lease.js";
@@ -33,6 +34,24 @@ test("用户后续操作会取消自动恢复资格", () => {
   const lease = acquirePlaybackLease({ paused: false }, { now: 100 });
   const intervened = markPlaybackIntervention(lease, "play", 150);
   assert.equal(releasePlaybackLease(intervened, { paused: true }, 200).shouldPlay, false);
+});
+
+test("播放器按下会把续播交给网站播放器", () => {
+  const target = {};
+  const player = { contains: (candidate) => candidate === target };
+  const lease = acquirePlaybackLease({ paused: false }, { now: 100 });
+  const intervened = markPlayerPointerIntervention(lease, player, target, 150);
+  assert.deepEqual(releasePlaybackLease(intervened, { paused: true }, 200), {
+    shouldPlay: false,
+    reason: "user-intervened",
+  });
+});
+
+test("播放器外按下不影响扩展自动续播", () => {
+  const player = { contains: () => false };
+  const lease = acquirePlaybackLease({ paused: false }, { now: 100 });
+  const unchanged = markPlayerPointerIntervention(lease, player, {}, 150);
+  assert.equal(releasePlaybackLease(unchanged, { paused: true }, 200).shouldPlay, true);
 });
 
 test("过期租约不恢复", () => {

@@ -24,12 +24,12 @@
 
 ### Edge 商店
 
-1.0.1 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.2 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.1 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.1/video-notes-edge-1.0.1.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.1/video-notes-edge-1.0.1.zip.sha256)
+[下载视频笔记 1.0.2 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.2/video-notes-edge-1.0.2.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.2/video-notes-edge-1.0.2.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`。
@@ -69,8 +69,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.1.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.1.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.2.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.2.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 中加载本项目的 `dist` 目录。
