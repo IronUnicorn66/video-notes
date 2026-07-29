@@ -4,20 +4,38 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("主页提供产品流程、下载、隐私与支持入口", async () => {
-  const html = await read("docs/index.html");
+test("双语主页按问题、用法和价值组织核心信息", async () => {
+  const [zhHome, enHome] = await Promise.all([
+    read("docs/index.html"),
+    read("docs/en/index.html"),
+  ]);
 
-  assert.match(html, /视频笔记/);
-  assert.match(html, /id="how"/);
-  assert.match(html, /id="features"/);
-  assert.match(
-    html,
-    /https:\/\/github\.com\/IronUnicorn66\/video-notes\/releases\/download\/v1\.0\.3\/video-notes-edge-1\.0\.3\.zip/,
-  );
-  assert.match(html, /href="privacy\/"/);
-  assert.match(html, /https:\/\/github\.com\/IronUnicorn66\/video-notes\/issues/);
-  assert.match(html, /YouTube/);
-  assert.match(html, /哔哩哔哩/);
+  for (const html of [zhHome, enHome]) {
+    const problem = html.indexOf('id="problem"');
+    const how = html.indexOf('id="how"');
+    const install = html.indexOf('id="install"');
+    const value = html.indexOf('id="value"');
+    assert.ok(problem >= 0 && problem < how, "问题区应位于用法区之前");
+    assert.ok(how < install && install < value, "安装说明应合并到用法区");
+    assert.equal(html.match(/class="step-number"/g)?.length, 4);
+    assert.equal(html.match(/class="value-card"/g)?.length, 3);
+    assert.doesNotMatch(
+      html,
+      /id="features"|class="numbers\b|feature-grid|local-section|support-section/,
+    );
+    assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
+    assert.match(
+      html,
+      /releases\/download\/v1\.0\.4\/video-notes-edge-1\.0\.4\.zip/,
+    );
+    assert.match(html, /YouTube/);
+    assert.match(html, /Bilibili|哔哩哔哩/);
+  }
+
+  assert.match(zhHome, /视频笔记/);
+  assert.match(enHome, /Video Notes/);
+  assert.match(zhHome, /href="privacy\/"/);
+  assert.match(enHome, /href="privacy\/"/);
 });
 
 test("隐私页覆盖本地存储、模型下载、权限和删除", async () => {
@@ -48,7 +66,6 @@ test("官网提供可切换的中英文主页与隐私页", async () => {
 
   assert.match(zhHome, /data-language="en"/);
   assert.match(enHome, /<html lang="en" data-language="en">/);
-  assert.match(enHome, /Turn video lessons into notes you can use/);
   assert.match(enHome, /screenshot-1-note-en\.png/);
   assert.match(enPrivacy, /Connection metadata/);
   assert.match(enPrivacy, /delete your data/i);

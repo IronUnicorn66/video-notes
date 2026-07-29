@@ -1,13 +1,13 @@
-# Edge 150 实机验收清单（1.0.3）
+# Edge 150 实机验收清单（1.0.4）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge 150 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
 - [x] 已自动验证：`npm test` 通过（232 个测试）。
-- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `1.0.3`。
-- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-1.0.3.zip`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.3.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `1.0.4`。
+- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-1.0.4.zip`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.4.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
 

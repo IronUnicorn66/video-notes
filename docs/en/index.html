@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Video Notes is a Microsoft Edge extension for capturing timestamps, screenshots, subtitles, and local voice transcriptions while watching YouTube and Bilibili lessons.">
+    <meta name="description" content="Video Notes is a Microsoft Edge extension that keeps key ideas, timestamps, and context together while you watch YouTube and Bilibili lessons, then exports everything as Markdown.">
     <meta name="theme-color" content="#f5f2ea">
-    <title>Video Notes · Turn video lessons into notes you can use</title>
+    <title>Video Notes · Keep the key idea and its context</title>
     <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../styles.css">
   </head>
@@ -20,7 +20,7 @@
         </a>
         <div class="nav-links">
           <a href="#how">How it works</a>
-          <a href="#features">Features</a>
+          <a href="#value">Benefits</a>
           <a href="#install">Install</a>
           <a href="privacy/">Privacy</a>
           <a href="../?language=zh_CN" data-language="zh_CN" lang="zh-CN">简体中文</a>
@@ -30,20 +30,20 @@
     </header>
 
     <main id="main-content">
-      <section class="hero shell">
+      <section id="problem" class="hero shell" aria-labelledby="problem-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span>Microsoft Edge · Local-first</p>
-          <h1>Turn video lessons into notes you can use.</h1>
-          <p class="lead">Keep your thoughts, player screenshots, lead-in subtitles, and voice recordings on one timeline. When the lesson ends, export everything as editable Markdown.</p>
+          <p class="eyebrow"><span></span>Microsoft Edge · Notes for video lessons</p>
+          <h1 id="problem-title">The key idea moves on before your notes catch up.</h1>
+          <p class="lead">Watching and taking useful notes pull your attention in different directions. Video Notes keeps your thoughts, timestamps, screenshots, lead-in subtitles, and voice beside the video, so the context stays with every idea.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.3/video-notes-edge-1.0.3.zip">Download the 1.0.3 preview</a>
-            <a class="button button-secondary" href="#install">Installation steps</a>
+            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.4/video-notes-edge-1.0.4.zip">Download the 1.0.4 preview</a>
+            <a class="button button-secondary" href="#how">See how it works</a>
           </div>
           <div class="trust-row" aria-label="Product principles">
+            <span>YouTube and Bilibili</span>
             <span>Data stays local</span>
             <span>Open source</span>
             <span>No account</span>
-            <span>No analytics</span>
           </div>
         </div>
 
@@ -54,123 +54,83 @@
         >
       </section>
 
-      <section class="numbers shell" aria-label="Product capability summary">
-        <div><strong>5–30 sec</strong><span>Lead-in subtitles</span></div>
-        <div><strong>3 models</strong><span>Local Whisper transcription</span></div>
-        <div><strong>1 ZIP</strong><span>Markdown, images, and audio</span></div>
-      </section>
-
-      <section id="how" class="section shell">
+      <section id="how" class="section shell how-section" aria-labelledby="how-title">
         <div class="section-heading">
           <p class="section-label">How it works</p>
-          <h2>From “this matters” to a complete note</h2>
-          <p>Capture the moment and its context without breaking your viewing rhythm.</p>
+          <h2 id="how-title">Four steps from a video moment to a useful note</h2>
+          <p>The side panel stays next to the lesson. Capture the moment, keep watching, and organize everything when you finish.</p>
         </div>
         <div class="steps">
           <article>
             <span class="step-number">01</span>
-            <h3>Open the side panel</h3>
-            <p>Open a YouTube or Bilibili video, then select Video Notes in the Edge toolbar.</p>
+            <h3>Install it in Edge</h3>
+            <p>Download the preview ZIP and load its extracted folder from the extensions page.</p>
           </article>
           <article>
             <span class="step-number">02</span>
-            <h3>Add your thought</h3>
-            <p>Selecting the editor pauses the video. Move focus away to save the note and resume playback.</p>
+            <h3>Open the side panel</h3>
+            <p>Start a YouTube or Bilibili lesson, then select Video Notes in the Edge toolbar.</p>
           </article>
           <article>
             <span class="step-number">03</span>
-            <h3>Keep the context</h3>
-            <p>Attach a player screenshot, recent subtitles, or a hold-to-talk voice recording.</p>
+            <h3>Capture the moment</h3>
+            <p>The video pauses while you type and resumes after saving. Add subtitles, a screenshot, or voice when useful.</p>
           </article>
           <article>
             <span class="step-number">04</span>
             <h3>Export and refine</h3>
-            <p>Export a Markdown ZIP and continue editing in the notes app you already use.</p>
+            <p>Export a Markdown ZIP and continue working in the notes app you already use.</p>
           </article>
         </div>
-      </section>
 
-      <section id="features" class="section feature-section">
-        <div class="shell">
-          <div class="section-heading section-heading-light">
-            <p class="section-label">Features</p>
-            <h2>Every note keeps the context around it</h2>
-          </div>
-          <div class="feature-grid">
-            <article class="feature-card feature-card-wide">
-              <span class="feature-icon">⌁</span>
-              <h3>Automatic lead-in subtitles</h3>
-              <p>Choose 5, 10, 20, or 30 seconds. Capture native subtitles or bilingual subtitles shown by Immersive Translate, then edit each subtitle block when needed.</p>
-              <div class="subtitle-demo">
-                <span>00:19:37 — 00:19:57</span>
-                <strong>We can now make this assumption explicit.</strong>
-                <strong>现在，我们可以明确写出这个假设。</strong>
-              </div>
-            </article>
-            <article class="feature-card">
-              <span class="feature-icon">▣</span>
-              <h3>Player screenshots</h3>
-              <p>Enable the optional permission to capture only the visible video player.</p>
-            </article>
-            <article class="feature-card">
-              <span class="feature-icon">◉</span>
-              <h3>Local voice transcription</h3>
-              <p>Recordings and Whisper transcription stay inside your browser.</p>
-            </article>
-            <article class="feature-card">
-              <span class="feature-icon">↶</span>
-              <h3>Undoable timeline</h3>
-              <p>Edit, delete, clear, undo, and redo without losing control of your notes.</p>
-            </article>
-            <article class="feature-card">
-              <span class="feature-icon">⇩</span>
-              <h3>Markdown ZIP</h3>
-              <p>Export text, screenshots, and original recordings in a stable folder structure.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section shell local-section">
-        <div class="local-copy">
-          <p class="section-label">Local-first</p>
-          <h2>Your study record stays on your device.</h2>
-          <p>Notes, subtitles, screenshots, recordings, and transcriptions live in extension storage. Model weights come from a pinned source and are checked for exact size and SHA-256 before being cached.</p>
-          <a class="text-link" href="privacy/">Read the full privacy policy <span>→</span></a>
-        </div>
-        <div class="local-stack" aria-label="Local data flow">
-          <div><span>1</span><p><strong>You choose what to capture</strong><small>Text, screenshot, subtitles, or audio</small></p></div>
-          <div><span>2</span><p><strong>Edge processes it locally</strong><small>IndexedDB, Cache Storage, Whisper</small></p></div>
-          <div><span>3</span><p><strong>You export and manage it</strong><small>Markdown, images, audio</small></p></div>
-        </div>
-      </section>
-
-      <section id="install" class="section install-section">
-        <div class="shell install-grid">
-          <div>
+        <div id="install" class="install-bar">
+          <div class="install-copy">
             <p class="section-label">Install the preview</p>
-            <h2>Download the ZIP and load it in Edge</h2>
-            <p>While the first Microsoft Edge Add-ons review is in progress, you can install the same 1.0.3 release package manually.</p>
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.3/video-notes-edge-1.0.3.zip">Download Video Notes 1.0.3</a>
+            <h3>Download the ZIP and load it in Edge</h3>
+            <p>While the Microsoft Edge Add-ons review is in progress, you can install the same 1.0.4 release package manually.</p>
+            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.4/video-notes-edge-1.0.4.zip">Download Video Notes 1.0.4</a>
           </div>
           <ol class="install-steps">
-            <li><strong>Download and extract the ZIP</strong><span>Keep it in a permanent folder</span></li>
-            <li><strong>Open edge://extensions/</strong><span>Turn on Developer mode</span></li>
-            <li><strong>Select Load unpacked</strong><span>Choose the folder containing manifest.json</span></li>
-            <li><strong>Open a lesson video</strong><span>Select the Video Notes toolbar icon</span></li>
+            <li><span>1</span><p><strong>Download and extract the ZIP</strong><small>Keep it in a permanent folder</small></p></li>
+            <li><span>2</span><p><strong>Open edge://extensions/</strong><small>Turn on Developer mode</small></p></li>
+            <li><span>3</span><p><strong>Select Load unpacked</strong><small>Choose the folder containing manifest.json</small></p></li>
           </ol>
         </div>
       </section>
 
-      <section class="section shell support-section">
-        <div>
-          <p class="section-label">Supported sites</p>
-          <h2>YouTube and Bilibili lesson videos</h2>
-          <p>Supports standard YouTube videos and Bilibili BV videos, including multi-part videos. Subtitles must already be visible in the player.</p>
-        </div>
-        <div class="support-actions">
-          <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes">View source</a>
-          <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes/issues">Report an issue</a>
+      <section id="value" class="section value-section" aria-labelledby="value-title">
+        <div class="shell">
+          <div class="section-heading section-heading-light">
+            <p class="section-label">Benefits</p>
+            <h2 id="value-title">Finish the lesson with material you can keep using</h2>
+          </div>
+          <div class="value-grid">
+            <article class="value-card">
+              <span class="value-icon">▶</span>
+              <h3>Stay with the lesson</h3>
+              <p>Playback pauses while you type and resumes after saving. Capture the idea in place without losing your viewing rhythm.</p>
+            </article>
+            <article class="value-card">
+              <span class="value-icon">⌁</span>
+              <h3>Keep the context</h3>
+              <p>Each note can carry its timestamp, recent subtitles, a player screenshot, and voice, making the original moment easy to recover.</p>
+            </article>
+            <article class="value-card">
+              <span class="value-icon">⇩</span>
+              <h3>Continue in your own tools</h3>
+              <p>Export Markdown, images, and original recordings for apps such as Obsidian. Your content and transcription stay in the browser.</p>
+            </article>
+          </div>
+          <div class="value-cta">
+            <div>
+              <h3>Built for YouTube and Bilibili lessons</h3>
+              <p>Supports standard YouTube videos and Bilibili BV videos, including multi-part lessons. Subtitles come from text already shown in the player.</p>
+            </div>
+            <div class="value-actions">
+              <a class="button button-light" href="privacy/">Read the privacy policy</a>
+              <a class="button button-ghost" href="https://github.com/IronUnicorn66/video-notes/issues">Report an issue</a>
+            </div>
+          </div>
         </div>
       </section>
     </main>
