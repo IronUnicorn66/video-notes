@@ -31,18 +31,25 @@ const zhCnMessages = JSON.parse(
     "utf8",
   ).catch(() => "{}"),
 );
+const enMessages = JSON.parse(
+  await readFile(
+    new URL("../_locales/en/messages.json", import.meta.url),
+    "utf8",
+  ).catch(() => "{}"),
+);
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.2");
+  assert.equal(manifest.version, "1.0.3");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
 });
 
-test("Edge 发布包声明简体中文和公开主页", async () => {
+test("Edge 发布包声明中英文和公开主页", async () => {
   assert.equal(manifest.default_locale, "zh_CN");
   assert.equal(manifest.name, "__MSG_extensionName__");
   assert.equal(manifest.description, "__MSG_extensionDescription__");
+  assert.equal(manifest.action.default_title, "__MSG_actionTitle__");
   assert.equal(
     manifest.homepage_url,
     "https://ironunicorn66.github.io/video-notes/",
@@ -52,6 +59,10 @@ test("Edge 发布包声明简体中文和公开主页", async () => {
     zhCnMessages.extensionDescription?.message,
     "在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。",
   );
+  assert.equal(zhCnMessages.actionTitle?.message, "打开视频笔记");
+  assert.equal(enMessages.extensionName?.message, "Video Notes");
+  assert.match(enMessages.extensionDescription?.message ?? "", /YouTube and Bilibili/);
+  assert.equal(enMessages.actionTitle?.message, "Open Video Notes");
   const builtMessages = JSON.parse(
     await readFile(
       new URL("../dist/_locales/zh_CN/messages.json", import.meta.url),
@@ -59,6 +70,13 @@ test("Edge 发布包声明简体中文和公开主页", async () => {
     ).catch(() => "{}"),
   );
   assert.deepEqual(builtMessages, zhCnMessages);
+  const builtEnMessages = JSON.parse(
+    await readFile(
+      new URL("../dist/_locales/en/messages.json", import.meta.url),
+      "utf8",
+    ).catch(() => "{}"),
+  );
+  assert.deepEqual(builtEnMessages, enMessages);
 });
 
 test("公开文档提供一致的主页、隐私和支持入口", async () => {
@@ -72,11 +90,12 @@ test("公开文档提供一致的主页、隐私和支持入口", async () => {
   const privacyUrl = `${homepage}privacy/`;
   const supportUrl = "https://github.com/IronUnicorn66/video-notes/issues";
 
-  for (const content of [readme, listing]) {
-    assert.ok(content.includes(homepage));
-    assert.ok(content.includes(privacyUrl));
-    assert.ok(content.includes(supportUrl));
-  }
+  assert.ok(readme.includes(`${homepage}en/`));
+  assert.ok(readme.includes(`${homepage}en/privacy/`));
+  assert.ok(readme.includes(supportUrl));
+  assert.ok(listing.includes(homepage));
+  assert.ok(listing.includes(privacyUrl));
+  assert.ok(listing.includes(supportUrl));
   assert.ok(privacy.includes(supportUrl));
   assert.match(license, /MIT License/);
   for (const permission of manifest.permissions) {

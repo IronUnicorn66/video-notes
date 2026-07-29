@@ -46,6 +46,41 @@ select:focus-visible {
   padding: 4px 2px 16px;
 }
 
+.video-header-top,
+.language-switch {
+  display: flex;
+  align-items: center;
+}
+
+.video-header-top {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.language-switch {
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid #d5d1c7;
+  border-radius: 8px;
+  background: #f1efe8;
+}
+
+.language-switch button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 7px;
+  color: #625e55;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.language-switch button[aria-pressed="true"] {
+  color: #34463e;
+  background: #fffdf8;
+  box-shadow: 0 1px 4px rgba(44, 40, 32, 0.12);
+}
+
 .eyebrow {
   color: #737065;
   font-size: 12px;

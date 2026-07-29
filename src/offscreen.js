@@ -3,7 +3,8 @@ import { FileTranscriber } from "@transcribe/transcriber";
 
 import { WHISPER_MODEL, WHISPER_MODELS, getWhisperModel } from "./core/model-config.js";
 import { createModelDownloader } from "./core/model-download.js";
-import { buildMarkdown, makeAssetFilename, sanitizeFilename } from "./core/note-format.js";
+import { buildMarkdown, makeAssetFilename, makeExportFilenames } from "./core/note-format.js";
+import { translate } from "./core/i18n.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { persistRecordedNote } from "./core/note-history-commands.js";
 import { createTranscriberManager } from "./core/transcriber-manager.js";
@@ -407,7 +408,7 @@ function enqueueTranscription(noteId, modelId, source) {
   return tracked;
 }
 
-async function exportSession(sessionId) {
+async function exportSession(sessionId, language = "zh_CN") {
   const session = await repository.getSession(sessionId);
   if (!session) throw new Error("没有找到要导出的会话");
   const notes = (await repository.listNotes(sessionId)).filter((note) => note.status === "saved");
@@ -423,7 +424,10 @@ async function exportSession(sessionId) {
         exportNote.imageFilename = `images/${makeAssetFilename(index + 1, note.seconds, "webp")}`;
         files.push({ name: exportNote.imageFilename, data: new Uint8Array(await image.arrayBuffer()) });
       } else {
-        exportNote.warnings = [...(exportNote.warnings ?? []), "截图资产缺失"];
+        exportNote.warnings = [
+          ...(exportNote.warnings ?? []),
+          translate(language, "missingScreenshotAsset"),
+        ];
       }
     }
     if (note.audioKey) {
@@ -432,20 +436,26 @@ async function exportSession(sessionId) {
         exportNote.audioFilename = `audio/${makeAssetFilename(index + 1, note.seconds, "webm")}`;
         files.push({ name: exportNote.audioFilename, data: new Uint8Array(await audio.arrayBuffer()) });
       } else {
-        exportNote.warnings = [...(exportNote.warnings ?? []), "录音资产缺失"];
+        exportNote.warnings = [
+          ...(exportNote.warnings ?? []),
+          translate(language, "missingAudioAsset"),
+        ];
       }
     }
     exportNotes.push(exportNote);
   }
 
-  const safeTitle = sanitizeFilename(session.title);
-  files.unshift({ name: `${safeTitle}.md`, data: buildMarkdown(session, exportNotes) });
+  const filenames = makeExportFilenames(session.title, language);
+  files.unshift({
+    name: filenames.markdown,
+    data: buildMarkdown(session, exportNotes, { language }),
+  });
   const zip = createZip(files);
   const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
   try {
     const { downloadId } = await backgroundRequest("OFFSCREEN_DOWNLOAD", {
       url,
-      filename: `${safeTitle}-视频笔记.zip`,
+      filename: filenames.archive,
     });
     return { downloadId, noteCount: notes.length };
   } finally {
@@ -496,7 +506,7 @@ async function handleMessage(message) {
     case "TRANSCRIBE_NOTE":
       return enqueueTranscription(message.noteId, message.modelId, message.source);
     case "EXPORT_SESSION":
-      return exportSession(message.sessionId);
+      return exportSession(message.sessionId, message.language);
     default:
       return undefined;
   }

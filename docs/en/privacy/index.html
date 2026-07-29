@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Privacy policy for the Video Notes Microsoft Edge extension.">
+    <meta name="theme-color" content="#f5f2ea">
+    <title>Privacy policy · Video Notes</title>
+    <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#policy">Skip to the privacy policy</a>
+    <header class="site-header shell">
+      <nav class="nav" aria-label="Main navigation">
+        <a class="brand" href="../">
+          <img src="../../assets/icon.svg" alt="">
+          <span>Video Notes</span>
+        </a>
+        <div class="nav-links">
+          <a href="../">Back to home</a>
+          <a aria-current="page" href="./">Privacy policy</a>
+          <a href="../../privacy/?language=zh_CN" data-language="zh_CN" lang="zh-CN">简体中文</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="policy" class="policy shell">
+      <header class="policy-header">
+        <p class="eyebrow"><span></span>Privacy Policy</p>
+        <h1>Video Notes privacy policy</h1>
+        <p>Effective date: July 28, 2026</p>
+      </header>
+
+      <article class="policy-body">
+        <section>
+          <h2>Overview</h2>
+          <p>Video Notes creates timestamped personal notes while you watch YouTube and Bilibili lessons. At your request, a note can include a player screenshot, subtitles already rendered on the page, an original voice recording, and a local voice transcription. This policy explains what the extension processes, why it processes it, the permissions it uses, where information is stored, and how you can delete it.</p>
+        </section>
+
+        <section>
+          <h2>Information the extension processes</h2>
+          <ul>
+            <li>The current video URL, title, site, video identifier, part number, and playback time.</li>
+            <li>Your note text, subtitle edits, and undo or redo history.</li>
+            <li>Native subtitles or bilingual Immersive Translate subtitles already rendered on the current page.</li>
+            <li>The visible player image when you explicitly enable player screenshots.</li>
+            <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
+            <li>Shortcut, subtitle window, timeline order, permission, language, and model settings.</li>
+          </ul>
+          <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
+        </section>
+
+        <section>
+          <h2>Storage and processing location</h2>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Settings are stored in extension storage. Model weights are stored in Cache Storage. Personal content is processed on your device.</p>
+          <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
+        </section>
+
+        <section>
+          <h2>Whisper model downloads and connection metadata</h2>
+          <p>When you choose a local voice model, the extension downloads pinned Base, Small, or Medium weights from the <code>ggerganov/whisper.cpp</code> repository on Hugging Face. It verifies the exact file size and SHA-256 before saving the model to local cache, then removes the model-host permission after the download completes.</p>
+          <p>Remote responses contain static model data only. JavaScript, Worker, and WASM code ship inside the extension package, and transcription runs locally.</p>
+          <p><strong>Connection metadata:</strong> model downloads connect directly to Hugging Face, its CDN, or XetHub. Like any standard HTTPS request, these services receive the connection information needed to deliver the file, such as your IP address, User-Agent, request time, and model file URL. The request contains no note, subtitle, screenshot, recording, or transcription content. The extension and its developer do not read or retain this connection metadata. See the <a href="https://huggingface.co/privacy">Hugging Face privacy policy</a> for the third party’s practices.</p>
+        </section>
+
+        <section>
+          <h2>Why each permission is used</h2>
+          <ul>
+            <li><strong>Storage:</strong> saves settings, permission state, model state, and your records locally.</li>
+            <li><strong>Active tab and scripting:</strong> reads video time and already-rendered subtitles on supported lesson pages, and restores the packaged content script when the connection is interrupted.</li>
+            <li><strong>Side panel:</strong> provides note input, settings, and the timeline beside the video.</li>
+            <li><strong>Offscreen document:</strong> maintains authorized recording, local transcription, and export generation.</li>
+            <li><strong>Downloads:</strong> saves the ZIP you explicitly export.</li>
+            <li><strong>Optional screenshot permission:</strong> is requested only when you enable player screenshots and accept the Edge prompt.</li>
+            <li><strong>Optional model-host permission:</strong> is requested only for a model download you start.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Microphone and player screenshots</h2>
+          <p>The microphone records only while you hold Right Option/Alt or the Hold to talk button. Recording stops if the window loses focus, the page becomes hidden, the side panel closes, or the 60-second limit is reached.</p>
+          <p>Player screenshots are disabled by default. You must enable them in the side panel and accept Edge’s optional permission prompt. After the permission is removed, new notes stop capturing screenshots.</p>
+        </section>
+
+        <section>
+          <h2>Retention and how to delete your data</h2>
+          <p>Video Notes retains video sessions and downloaded models so you can continue when you return to the same lesson. You can delete one note, clear every note for the current video, or clear the extension’s data from the Edge extension management page. Uninstalling the extension causes the browser to clear extension storage.</p>
+          <p>Exporting a ZIP does not delete the browser session. You control ZIP files after they are saved to your Downloads folder.</p>
+        </section>
+
+        <section>
+          <h2>Policy updates</h2>
+          <p>If the extension’s data processing, permissions, or network access changes, this page will be updated before the new version is released and the effective date above will change.</p>
+        </section>
+
+        <section>
+          <h2>Contact</h2>
+          <p>For general questions, use <a href="https://github.com/IronUnicorn66/video-notes/issues">GitHub Issues</a>. The repository and existing issues are public; a GitHub login is required to create a new issue. Report security concerns privately through a <a href="https://github.com/IronUnicorn66/video-notes/security/advisories/new">GitHub Security Advisory</a>.</p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer-inner">
+        <p>© 2026 IronUnicorn66 · Video Notes</p>
+        <a href="../">Back to home</a>
+      </div>
+    </footer>
+    <script type="module" src="../../language.js"></script>
+  </body>
+</html>

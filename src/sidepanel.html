@@ -3,53 +3,62 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>视频笔记</title>
+    <title data-i18n="productName">视频笔记</title>
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="video-header">
-        <div class="eyebrow">当前视频</div>
-        <h1 id="video-title">等待打开视频…</h1>
-        <a id="video-url" class="video-url" href="#" target="_blank" hidden>打开原视频</a>
+        <div class="video-header-top">
+          <div class="eyebrow" data-i18n="currentVideo">当前视频</div>
+          <div class="language-switch" role="group" data-i18n-aria-label="languageSelector" aria-label="界面语言">
+            <button type="button" data-interface-language="zh_CN">中文</button>
+            <button type="button" data-interface-language="en">EN</button>
+          </div>
+        </div>
+        <h1 id="video-title" data-i18n="waitingForVideo">等待打开视频…</h1>
+        <a id="video-url" class="video-url" href="#" target="_blank" hidden data-i18n="openOriginalVideo">打开原视频</a>
       </header>
 
       <section class="composer" aria-labelledby="composer-title">
         <div class="section-row">
-          <h2 id="composer-title">快速标记</h2>
+          <h2 id="composer-title" data-i18n="quickNote">快速标记</h2>
           <span id="marker-time" class="time-chip" hidden></span>
         </div>
         <textarea
           id="note-input"
           rows="3"
           placeholder="点这里即暂停视频。输入后移开光标自动保存…"
+          data-i18n-placeholder="notePlaceholder"
           disabled
         ></textarea>
         <div class="composer-hint">
-          <span>⌘/Ctrl + Enter 保存 · Esc 取消</span>
+          <span data-i18n="composerHint">⌘/Ctrl + Enter 保存 · Esc 取消</span>
           <button id="voice-button" class="voice-button" type="button" disabled>
             <span class="voice-dot"></span>
-            <span id="voice-button-label">按住说话</span>
+            <span id="voice-button-label" data-i18n="holdToTalk">按住说话</span>
           </button>
         </div>
         <div id="recording-status" class="recording-status" hidden>
           <span class="recording-pulse"></span>
-          <span>录音中</span>
+          <span data-i18n="recording">录音中</span>
           <span id="recording-timer">00:00</span>
         </div>
       </section>
 
       <section class="timeline" aria-labelledby="timeline-title">
         <div class="section-row">
-          <h2 id="timeline-title">标记时间线</h2>
+          <h2 id="timeline-title" data-i18n="timeline">标记时间线</h2>
           <div class="timeline-actions">
-            <div class="note-sort-toggle" role="group" aria-label="笔记显示顺序">
+            <div class="note-sort-toggle" role="group" aria-label="笔记显示顺序" data-i18n-aria-label="noteSortOrder">
               <button
                 class="note-sort-button"
                 type="button"
                 data-note-sort-order="oldest"
                 aria-pressed="false"
                 title="最早笔记在前"
+                data-i18n-title="oldestFirst"
+                data-i18n="oldest"
               >正序</button>
               <button
                 class="note-sort-button is-active"
@@ -57,85 +66,87 @@
                 data-note-sort-order="newest"
                 aria-pressed="true"
                 title="最新笔记在前"
+                data-i18n-title="newestFirst"
+                data-i18n="newest"
               >倒序</button>
             </div>
-            <button id="undo-button" class="secondary-button" type="button" disabled>撤销</button>
-            <button id="redo-button" class="secondary-button" type="button" disabled>反撤销</button>
-            <button id="clear-button" class="danger-button" type="button" disabled>清空</button>
-            <button id="export-button" class="secondary-button" type="button" disabled>导出 ZIP</button>
+            <button id="undo-button" class="secondary-button" type="button" disabled data-i18n="undo">撤销</button>
+            <button id="redo-button" class="secondary-button" type="button" disabled data-i18n="redo">反撤销</button>
+            <button id="clear-button" class="danger-button" type="button" disabled data-i18n="clear">清空</button>
+            <button id="export-button" class="secondary-button" type="button" disabled data-i18n="exportZip">导出 ZIP</button>
           </div>
         </div>
         <ol id="note-list" class="note-list"></ol>
-        <p id="empty-notes" class="empty-state">这个视频还没有标记。</p>
+        <p id="empty-notes" class="empty-state" data-i18n="emptyNotes">这个视频还没有标记。</p>
       </section>
 
       <details id="permission-settings" class="settings">
-        <summary>权限、语音与快捷键</summary>
+        <summary data-i18n="settingsSummary">权限、语音与快捷键</summary>
         <div class="settings-content">
           <div class="setting-row">
             <div>
-              <strong>播放器截图</strong>
-              <p id="screenshot-permission-detail">正在检查权限…</p>
+              <strong data-i18n="playerScreenshot">播放器截图</strong>
+              <p id="screenshot-permission-detail" data-i18n="permissionChecking">正在检查权限…</p>
             </div>
-            <button id="screenshot-permission-button" class="secondary-button" type="button">启用</button>
+            <button id="screenshot-permission-button" class="secondary-button" type="button" data-i18n="enable">启用</button>
           </div>
           <div class="setting-row">
             <div>
-              <strong>麦克风</strong>
-              <p id="microphone-permission-detail">正在检查权限…</p>
+              <strong data-i18n="microphone">麦克风</strong>
+              <p id="microphone-permission-detail" data-i18n="permissionChecking">正在检查权限…</p>
             </div>
-            <button id="microphone-permission-button" class="secondary-button" type="button">授权</button>
+            <button id="microphone-permission-button" class="secondary-button" type="button" data-i18n="authorize">授权</button>
           </div>
           <div class="setting-row">
             <div class="subtitle-setting">
               <label for="subtitle-enabled">
                 <input id="subtitle-enabled" type="checkbox" checked />
-                <strong>前置字幕</strong>
+                <strong data-i18n="leadInSubtitles">前置字幕</strong>
               </label>
-              <p>读取播放器已经显示的字幕，并附在新标记中。</p>
-              <label for="subtitle-window-seconds">读取标记前</label>
+              <p data-i18n="subtitleDescription">读取播放器已经显示的字幕，并附在新标记中。</p>
+              <label for="subtitle-window-seconds" data-i18n="readBefore">读取标记前</label>
               <select id="subtitle-window-seconds">
-                <option value="5">5 秒</option>
-                <option value="10">10 秒</option>
-                <option value="20" selected>20 秒</option>
-                <option value="30">30 秒</option>
+                <option value="5" data-i18n="seconds" data-i18n-count="5">5 秒</option>
+                <option value="10" data-i18n="seconds" data-i18n-count="10">10 秒</option>
+                <option value="20" selected data-i18n="seconds" data-i18n-count="20">20 秒</option>
+                <option value="30" data-i18n="seconds" data-i18n-count="30">30 秒</option>
               </select>
             </div>
           </div>
           <div class="setting-row">
             <div class="whisper-setting">
-              <strong>本地 Whisper</strong>
-              <p id="whisper-detail">尚未启用。首次下载约 57 MiB。</p>
-              <label for="whisper-model-select">转写模型</label>
+              <strong data-i18n="localWhisper">本地 Whisper</strong>
+              <p id="whisper-detail" data-i18n="whisperInitial">尚未启用。首次下载约 57 MiB。</p>
+              <label for="whisper-model-select" data-i18n="transcriptionModel">转写模型</label>
               <select id="whisper-model-select"></select>
               <p id="whisper-model-warning" hidden></p>
             </div>
-            <button id="whisper-model-action" class="secondary-button" type="button">下载并使用</button>
+            <button id="whisper-model-action" class="secondary-button" type="button" data-i18n="downloadAndUse">下载并使用</button>
           </div>
           <div class="setting-row">
             <div>
-              <strong>按住说话键</strong>
-              <p>仅在视频页面且光标不在输入控件中生效。</p>
+              <strong data-i18n="holdToTalkKey">按住说话键</strong>
+              <p data-i18n="shortcutDescription">仅在视频页面且光标不在输入控件中生效。</p>
             </div>
             <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
           </div>
-          <p class="privacy-note">录音、截图、笔记和转写都保存在本机。截图权限只用于 YouTube 和哔哩哔哩播放器；启用语音后只联网下载模型。</p>
+          <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记和转写都保存在本机。截图权限只用于 YouTube 和哔哩哔哩播放器；启用语音后只联网下载模型。</p>
         </div>
       </details>
 
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
-    <dialog id="screenshot-dialog" aria-label="标记截图预览">
-      <button id="screenshot-dialog-close" type="button" aria-label="关闭截图">关闭</button>
-      <img id="screenshot-dialog-image" alt="标记时的播放器截图大图" />
+    <dialog id="screenshot-dialog" aria-label="标记截图预览" data-i18n-aria-label="screenshotPreview">
+      <button id="screenshot-dialog-close" type="button" aria-label="关闭截图" data-i18n="close" data-i18n-aria-label="closeScreenshot">关闭</button>
+      <img id="screenshot-dialog-image" alt="标记时的播放器截图大图" data-i18n-alt="screenshotImageAlt" />
     </dialog>
     <dialog id="history-confirm-dialog" aria-labelledby="history-confirm-title" aria-describedby="history-confirm-description">
       <form method="dialog" class="confirm-dialog-card">
         <h2 id="history-confirm-title"></h2>
         <p id="history-confirm-description"></p>
         <div class="confirm-dialog-actions">
-          <button value="cancel" class="secondary-button">取消</button>
-          <button id="history-confirm-button" value="confirm" class="danger-button">确认</button>
+          <button value="cancel" class="secondary-button" data-i18n="cancel">取消</button>
+          <button id="history-confirm-button" value="confirm" class="danger-button" data-i18n="confirm">确认</button>
         </div>
       </form>
     </dialog>

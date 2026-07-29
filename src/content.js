@@ -8,6 +8,7 @@ import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
+import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 let currentMedia = null;
@@ -19,6 +20,8 @@ let recordingOverlay = null;
 let shortcutError = null;
 let shortcutErrorTimer = null;
 let shortcutCode = "AltRight";
+let interfaceLanguage = resolveLanguage(undefined, chrome.i18n.getUILanguage());
+const t = (key, variables) => translate(interfaceLanguage, key, variables);
 
 function videoTitle(platform) {
   if (platform === "youtube") {
@@ -177,7 +180,7 @@ function markerSnapshot(markerId, { deferPause = false } = {}) {
 function showRecordingOverlay() {
   if (!document.fullscreenElement || recordingOverlay) return;
   recordingOverlay = document.createElement("div");
-  recordingOverlay.textContent = "● 录音中";
+  recordingOverlay.textContent = t("contentRecording");
   Object.assign(recordingOverlay.style, {
     position: "fixed",
     top: "18px",
@@ -209,7 +212,9 @@ function showShortcutError(message) {
   hideShortcutError();
   shortcutError = document.createElement("div");
   shortcutError.setAttribute("role", "status");
-  shortcutError.textContent = `视频笔记：${message}`;
+  shortcutError.textContent = t("contentErrorPrefix", {
+    message: localizeRuntimeMessage(interfaceLanguage, message),
+  });
   Object.assign(shortcutError.style, {
     position: "fixed",
     right: "18px",
@@ -233,8 +238,8 @@ const pushToTalk = new PushToTalkController({
   onStart: async () => {
     hideShortcutError();
     const response = await chrome.runtime.sendMessage({ type: "VOICE_START_REQUEST" });
-    if (!response?.ok) throw new Error(response?.error ?? "录音启动失败");
-    if (response.canceled) throw new Error("录音已取消");
+    if (!response?.ok) throw new Error(response?.error ?? t("recordingStartFailed"));
+    if (response.canceled) throw new Error(t("recordingCanceled"));
     showRecordingOverlay();
   },
   onStop: async (reason) => {
@@ -272,14 +277,17 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("pointerdown", onPlayerPointerDown, true);
 
 chrome.storage.local.get({
+  interfaceLanguage: undefined,
   shortcutCode: "AltRight",
   subtitleEnabled: true,
   subtitleWindowSeconds: 20,
 }).then(({
   shortcutCode: saved,
+  interfaceLanguage: savedLanguage,
   subtitleEnabled,
   subtitleWindowSeconds,
 }) => {
+  interfaceLanguage = resolveLanguage(savedLanguage, chrome.i18n.getUILanguage());
   shortcutCode = saved;
   pushToTalk.keyCode = saved;
   subtitleCapture.updateSettings({ subtitleEnabled, subtitleWindowSeconds });
@@ -287,6 +295,12 @@ chrome.storage.local.get({
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
+  if (changes.interfaceLanguage) {
+    interfaceLanguage = resolveLanguage(
+      changes.interfaceLanguage.newValue,
+      chrome.i18n.getUILanguage(),
+    );
+  }
   if (changes.shortcutCode?.newValue) {
     shortcutCode = changes.shortcutCode.newValue;
     pushToTalk.keyCode = shortcutCode;

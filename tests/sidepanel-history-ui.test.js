@@ -29,10 +29,13 @@ test("删除和清空共用一个标题及描述均有关联的确认框", () =>
   assert.match(html, /<form method="dialog" class="confirm-dialog-card">/);
   assert.match(html, /<h2 id="history-confirm-title"><\/h2>/);
   assert.match(html, /<p id="history-confirm-description"><\/p>/);
-  assert.match(html, /<button value="cancel" class="secondary-button">取消<\/button>/);
   assert.match(
     html,
-    /<button id="history-confirm-button" value="confirm" class="danger-button">确认<\/button>/,
+    /<button value="cancel" class="secondary-button"[^>]*data-i18n="cancel"[^>]*>取消<\/button>/,
+  );
+  assert.match(
+    html,
+    /<button id="history-confirm-button" value="confirm" class="danger-button"[^>]*data-i18n="confirm"[^>]*>确认<\/button>/,
   );
 });
 
@@ -42,13 +45,13 @@ test("笔记卡片把删除放在编辑旁并先通过统一确认框", () => {
   const renderSource = source.slice(renderStart, renderEnd);
   const confirmation = renderSource.indexOf("confirmHistoryAction(");
 
-  assert.match(renderSource, /deleteButton\.textContent = "删除"/);
+  assert.match(renderSource, /deleteButton\.textContent = t\("delete"\)/);
   assert.match(renderSource, /actions\.append\(kind, edit, deleteButton\)/);
   assert.ok(confirmation >= 0, "笔记删除应调用统一确认框");
   assert.match(renderSource.slice(confirmation), /formatTimestamp\(note\.seconds\)/);
   assert.match(
     renderSource.slice(confirmation),
-    /description: `将删除 \$\{formatTimestamp\(note\.seconds\)\} 的标记。可通过撤销恢复。`/,
+    /description: t\("deleteNoteDescription", \{\s*timestamp: formatTimestamp\(note\.seconds\),\s*\}\)/,
   );
   assert.match(renderSource.slice(confirmation), /operation: "delete", noteId: note\.id/);
   assert.match(
@@ -99,7 +102,7 @@ test("活动状态驱动历史控件且所有会话历史请求携带侧栏标�
   assert.match(source, /pending: historyOperationController\.pending/);
   assert.match(
     source,
-    /description: `将清空 \$\{savedNoteCount\(\)\} 条已保存标记。可通过撤销恢复。`/,
+    /description: t\("clearNotesDescription", \{ count: savedNoteCount\(\) \}\)/,
   );
 
   for (const type of [

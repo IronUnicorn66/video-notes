@@ -913,7 +913,11 @@ async function handleMessage(message, sender) {
       await chrome.storage.local.set({ shortcutCode: message.code });
       return { code: message.code };
     case "EXPORT_SESSION":
-      return sendToOffscreen({ type: "EXPORT_SESSION", sessionId: message.sessionId });
+      return sendToOffscreen({
+        type: "EXPORT_SESSION",
+        sessionId: message.sessionId,
+        language: message.language,
+      });
     case "CONTEXT_CHANGED": {
       const tab = contextChangedSenderTab(sender);
       if (!tab) {

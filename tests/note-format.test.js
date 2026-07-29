@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildMarkdown,
   formatTimestamp,
+  makeExportFilenames,
   makeAssetFilename,
   sanitizeFilename,
 } from "../src/core/note-format.js";
@@ -97,4 +98,43 @@ test("缺失资产时省略对应块并保留告警", () => {
   assert.doesNotMatch(markdown, /截图\]\(/);
   assert.doesNotMatch(markdown, /原始录音/);
   assert.match(markdown, /> ⚠ 截图失败/);
+});
+
+test("英文导出翻译固定标签并保留用户内容", () => {
+  const markdown = buildMarkdown(
+    { title: "课程标题", canonicalUrl: "https://example.com", platform: "youtube" },
+    [{
+      seconds: 1,
+      jumpUrl: "https://example.com?t=1",
+      body: "用户笔记",
+      subtitleContext: "字幕原文",
+      audioFilename: "audio/001.webm",
+      warnings: ["背景音未联动静音", "转写失败：原始录音已丢失"],
+    }],
+    { language: "en" },
+  );
+
+  assert.match(markdown, /- Platform: youtube/);
+  assert.match(markdown, /- Original URL: \[Open video\]/);
+  assert.match(markdown, /\[Original recording\]/);
+  assert.match(markdown, /### Lead-in subtitles/);
+  assert.match(markdown, /> ⚠ Background audio could not be muted automatically/);
+  assert.match(markdown, /> ⚠ Transcription failed: The original recording is missing/);
+  assert.match(markdown, /用户笔记/);
+  assert.match(markdown, /字幕原文/);
+});
+
+test("导出文件名使用当前界面语言并提供空标题回退", () => {
+  assert.deepEqual(makeExportFilenames("课程", "zh_CN"), {
+    markdown: "课程.md",
+    archive: "课程-视频笔记.zip",
+  });
+  assert.deepEqual(makeExportFilenames("Course", "en"), {
+    markdown: "Course.md",
+    archive: "Course-video-notes.zip",
+  });
+  assert.deepEqual(makeExportFilenames("", "en"), {
+    markdown: "Video Notes.md",
+    archive: "Video Notes-video-notes.zip",
+  });
 });

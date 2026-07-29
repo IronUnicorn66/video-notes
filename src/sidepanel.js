@@ -27,11 +27,24 @@ import {
   createHistoryConfirmationController,
   createHistoryOperationController,
   historyControlState,
-  historyOperationSuccessMessage,
   historyShortcut,
 } from "./core/note-history-controls.js";
+import { localizeRuntimeMessage, translate } from "./core/i18n.js";
+import {
+  localizeDocument,
+  readInterfaceLanguage,
+  writeInterfaceLanguage,
+} from "./core/extension-language.js";
+
+const interfaceLanguage = await readInterfaceLanguage(
+  chrome.storage.local,
+  chrome.i18n.getUILanguage(),
+);
+const t = (key, variables) => translate(interfaceLanguage, key, variables);
+localizeDocument(document, interfaceLanguage);
 
 const elements = {
+  languageButtons: document.querySelectorAll("[data-interface-language]"),
   videoTitle: document.querySelector("#video-title"),
   videoUrl: document.querySelector("#video-url"),
   input: document.querySelector("#note-input"),
@@ -139,7 +152,7 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
 });
 
 function showToast(message) {
-  elements.toast.textContent = message;
+  elements.toast.textContent = localizeRuntimeMessage(interfaceLanguage, message);
   elements.toast.hidden = false;
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => {
@@ -182,7 +195,12 @@ historyOperationController = createHistoryOperationController({
     showToast(error.message);
   },
   showSuccess(operation) {
-    const message = historyOperationSuccessMessage(operation.type);
+    const message = {
+      DELETE_NOTE: t("deleteSuccess"),
+      CLEAR_SESSION_NOTES: t("clearSuccess"),
+      UNDO_NOTE_ACTION: t("undoSuccess"),
+      REDO_NOTE_ACTION: t("redoSuccess"),
+    }[operation.type];
     if (message) showToast(message);
   },
 });
@@ -291,22 +309,22 @@ function confirmHistoryAction({ title, description }, action) {
 }
 
 function whisperModelLabel(modelId) {
-  return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? "当前模型";
+  return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? t("currentModel");
 }
 
 function retranscriptionUnavailableReason(note) {
-  if (!note.audioKey) return "原始录音不可用";
-  if (!whisperStatus) return "正在读取模型状态";
+  if (!note.audioKey) return t("originalAudioUnavailable");
+  if (!whisperStatus) return t("readingModelStatus");
   const selectedModelId = whisperStatus.selectedModelId;
-  if (!whisperStatus.cachedModelIds.includes(selectedModelId)) return "当前模型尚未缓存";
+  if (!whisperStatus.cachedModelIds.includes(selectedModelId)) return t("currentModelNotCached");
   if (["downloading", "recording", "transcribing"].includes(whisperStatus.whisperState)) {
-    return "当前语音任务进行中";
+    return t("voiceTaskInProgress");
   }
   return "";
 }
 
 function formatTranscriptionTime(createdAt) {
-  return new Date(createdAt).toLocaleString("zh-CN", {
+  return new Date(createdAt).toLocaleString(interfaceLanguage === "en" ? "en" : "zh-CN", {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -319,7 +337,7 @@ async function request(message) {
     ? { ...message, tabId: sidePanelRefresh.tabId }
     : message;
   const response = await chrome.runtime.sendMessage(payload);
-  if (!response?.ok) throw new Error(response?.error ?? "操作失败");
+  if (!response?.ok) throw new Error(response?.error ?? t("operationFailed"));
   return response;
 }
 
@@ -355,17 +373,17 @@ async function renderPermissionStatus({ expandIfNeeded = false } = {}) {
   microphoneReady = microphone.ready;
 
   elements.screenshotPermissionDetail.textContent = screenshotGranted
-    ? "已授权。只在 YouTube 和哔哩哔哩标记时截取可见播放器。"
-    : "Edge 截图接口需要一次额外授权；插件仍只在支持的视频页运行。";
-  elements.screenshotPermissionButton.textContent = screenshotGranted ? "已启用" : "启用";
+    ? t("screenshotPermissionGranted")
+    : t("screenshotPermissionNeeded");
+  elements.screenshotPermissionButton.textContent = screenshotGranted ? t("enabled") : t("enable");
   elements.screenshotPermissionButton.disabled = screenshotGranted;
 
   elements.microphonePermissionDetail.textContent = microphone.ready
-    ? "已授权。只在按住说话期间录音。"
+    ? t("microphonePermissionGranted")
     : microphone.state === "denied"
-      ? "权限已被拒绝，请打开授权页，在 Edge 地址栏权限设置中允许后重试。"
-      : "点击授权会打开独立页面，请在那里确认 Edge 的麦克风权限。";
-  elements.microphonePermissionButton.textContent = microphone.ready ? "已授权" : "授权";
+      ? t("microphonePermissionDenied")
+      : t("microphonePermissionNeeded");
+  elements.microphonePermissionButton.textContent = microphone.ready ? t("authorized") : t("authorize");
   elements.microphonePermissionButton.disabled = microphone.ready;
 
   if (expandIfNeeded && (!screenshotGranted || !microphone.ready)) {
@@ -406,16 +424,16 @@ async function renderNoteAssets(note, container, generation) {
 
     if (note.screenshotKey) {
       if (!assets.screenshotUrl) {
-        appendAssetWarning(container, "截图文件缺失");
+        appendAssetWarning(container, t("screenshotFileMissing"));
       } else {
         const button = document.createElement("button");
         button.className = "note-screenshot-button";
         button.type = "button";
-        button.setAttribute("aria-label", "放大标记截图");
+        button.setAttribute("aria-label", t("enlargeScreenshot"));
         const image = document.createElement("img");
         image.className = "note-screenshot";
         image.loading = "lazy";
-        image.alt = "标记时的播放器截图";
+        image.alt = t("screenshotAlt");
         image.src = assets.screenshotUrl;
         button.append(image);
         button.addEventListener("click", () => {
@@ -428,7 +446,7 @@ async function renderNoteAssets(note, container, generation) {
 
     if (note.audioKey) {
       if (!assets.audioUrl) {
-        appendAssetWarning(container, "录音文件缺失");
+        appendAssetWarning(container, t("audioFileMissing"));
       } else {
         const player = document.createElement("audio");
         player.className = "note-audio";
@@ -441,10 +459,10 @@ async function renderNoteAssets(note, container, generation) {
   } catch {
     if (generation !== renderGeneration) return;
     if (note.screenshotKey) {
-      appendAssetWarning(container, "截图文件缺失");
+      appendAssetWarning(container, t("screenshotFileMissing"));
     }
     if (note.audioKey) {
-      appendAssetWarning(container, "录音文件缺失");
+      appendAssetWarning(container, t("audioFileMissing"));
     }
   }
 }
@@ -475,20 +493,22 @@ function renderNotes(notes, order = noteSortBinding.order) {
     time.textContent = formatTimestamp(note.seconds);
     const kind = document.createElement("span");
     kind.className = "note-kind";
-    kind.textContent = note.inputType === "voice" ? "语音" : "文字";
+    kind.textContent = note.inputType === "voice" ? t("voiceNote") : t("textNote");
     const edit = document.createElement("button");
     edit.className = "note-edit-button";
     edit.type = "button";
-    edit.textContent = "编辑";
+    edit.textContent = t("edit");
     const deleteButton = document.createElement("button");
     deleteButton.className = "note-delete-button";
     deleteButton.type = "button";
-    deleteButton.textContent = "删除";
+    deleteButton.textContent = t("delete");
     deleteButton.addEventListener("click", () => {
       if (!canRunHistoryAction("delete")) return;
       confirmHistoryAction({
-        title: "删除这条标记？",
-        description: `将删除 ${formatTimestamp(note.seconds)} 的标记。可通过撤销恢复。`,
+        title: t("deleteNoteTitle"),
+        description: t("deleteNoteDescription", {
+          timestamp: formatTimestamp(note.seconds),
+        }),
       }, { operation: "delete", noteId: note.id });
     });
     const actions = document.createElement("span");
@@ -499,7 +519,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
 
     const body = document.createElement("p");
     body.className = "note-body";
-    body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+    body.textContent = note.body || (note.inputType === "voice" ? t("originalAudioSaved") : t("emptyNote"));
     item.append(body);
     const assets = document.createElement("div");
     assets.className = "note-assets";
@@ -511,7 +531,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
       content: body,
       getInitialText: () => note.body ?? "",
       restore() {
-        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+        body.textContent = note.body || (note.inputType === "voice" ? t("originalAudioSaved") : t("emptyNote"));
       },
       save(text) {
         return request({
@@ -522,7 +542,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
       },
       applySaved(response) {
         note.body = response.note.body;
-        body.textContent = note.body || (note.inputType === "voice" ? "已保留原始录音" : "空标记");
+        body.textContent = note.body || (note.inputType === "voice" ? t("originalAudioSaved") : t("emptyNote"));
       },
     });
     const subtitleState = subtitleBlockState(note, subtitleSettings.enabled);
@@ -532,18 +552,18 @@ function renderNotes(notes, order = noteSortBinding.order) {
       const subtitleHeader = document.createElement("div");
       subtitleHeader.className = "note-subtitle-header";
       const subtitleTitle = document.createElement("strong");
-      subtitleTitle.textContent = "前置字幕";
+      subtitleTitle.textContent = t("leadInSubtitles");
       const subtitleEdit = document.createElement("button");
       subtitleEdit.className = "note-edit-button";
       subtitleEdit.type = "button";
-      subtitleEdit.textContent = "编辑字幕";
+      subtitleEdit.textContent = t("editSubtitles");
       const subtitle = document.createElement("p");
       subtitle.className = "note-subtitle-text";
 
       const renderSubtitle = () => {
         const state = subtitleBlockState(note, true);
         subtitle.textContent = state.empty
-          ? "未读取到字幕，请确认播放器已开启字幕"
+          ? t("subtitlesUnavailable")
           : state.text;
         subtitle.classList.toggle("is-empty", state.empty);
       };
@@ -576,15 +596,17 @@ function renderNotes(notes, order = noteSortBinding.order) {
       const pending = document.createElement("span");
       pending.className = "note-pending";
       pending.textContent = note.pendingTranscription
-        ? `使用 ${whisperModelLabel(note.pendingTranscription.modelId)} 转写中…`
-        : "本地转写中…";
+        ? t("transcribingWithModel", {
+          model: whisperModelLabel(note.pendingTranscription.modelId),
+        })
+        : t("localTranscribing");
       item.append(pending);
     }
     if (note.inputType === "voice") {
       const retranscribe = document.createElement("button");
       retranscribe.className = "note-retranscribe-button";
       retranscribe.type = "button";
-      retranscribe.textContent = "用当前模型重新转写";
+      retranscribe.textContent = t("retranscribe");
       const unavailableReason = retranscriptionUnavailableReason(note);
       retranscribe.disabled = Boolean(unavailableReason);
       retranscribe.title = unavailableReason;
@@ -610,7 +632,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
       const results = document.createElement("details");
       results.className = "note-transcription-results";
       const summary = document.createElement("summary");
-      summary.textContent = `查看 ${note.transcriptionRuns.length} 个转写结果`;
+      summary.textContent = t("viewTranscriptions", { count: note.transcriptionRuns.length });
       results.append(summary);
       for (const run of note.transcriptionRuns) {
         const result = document.createElement("div");
@@ -619,7 +641,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
         metadata.className = "note-transcription-meta";
         metadata.textContent = `${whisperModelLabel(run.modelId)} · ${formatTranscriptionTime(run.createdAt)}`;
         const text = document.createElement("p");
-        text.textContent = run.text || "（无识别文本）";
+        text.textContent = run.text || t("noRecognizedText");
         result.append(metadata, text);
         results.append(result);
       }
@@ -628,7 +650,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
     for (const warning of note.warnings ?? []) {
       const warningLine = document.createElement("span");
       warningLine.className = "note-pending";
-      warningLine.textContent = warning;
+      warningLine.textContent = localizeRuntimeMessage(interfaceLanguage, warning);
       item.append(warningLine);
     }
     elements.noteList.append(item);
@@ -667,7 +689,7 @@ refreshRunner = createSidePanelRefreshRunner({
     activeContextTabId = sidePanelRefresh.tabId;
     canUndo = response.history.canUndo;
     canRedo = response.history.canRedo;
-    if (!activeContext) throw new Error("请打开 YouTube 或哔哩哔哩普通视频页");
+    if (!activeContext) throw new Error(t("openSupportedVideo"));
     elements.videoTitle.textContent = activeContext.title;
     elements.videoUrl.href = activeContext.canonicalUrl;
     elements.videoUrl.hidden = false;
@@ -681,7 +703,7 @@ refreshRunner = createSidePanelRefreshRunner({
     activeContextTabId = null;
     canUndo = false;
     canRedo = false;
-    elements.videoTitle.textContent = error.message;
+    elements.videoTitle.textContent = localizeRuntimeMessage(interfaceLanguage, error.message);
     elements.videoUrl.hidden = true;
     elements.input.disabled = true;
     elements.voiceButton.disabled = true;
@@ -758,7 +780,7 @@ function setRecordingUi(active) {
   syncHistoryControls();
   elements.recordingStatus.hidden = !active;
   elements.voiceButton.classList.toggle("is-recording", active);
-  elements.voiceLabel.textContent = active ? "松开结束" : "按住说话";
+  elements.voiceLabel.textContent = active ? t("releaseToStop") : t("holdToTalk");
   clearInterval(recordingInterval);
   clearTimeout(recordingTimeout);
   if (!active) return;
@@ -780,7 +802,7 @@ async function startVoice() {
     if (!microphoneReady) {
       await openMicrophonePermissionPage();
       pendingVoiceStopReason = null;
-      showToast("请在新页面完成麦克风授权");
+      showToast(t("completeMicrophonePermission"));
       return;
     }
     await request({ type: "VOICE_START_REQUEST" });
@@ -820,7 +842,11 @@ async function stopVoice(reason = "button-release") {
 }
 
 function shortcutLabel(code) {
-  const labels = { AltRight: "右 Option / Alt", AltLeft: "左 Option / Alt", Space: "空格" };
+  const labels = {
+    AltRight: t("shortcutRightAlt"),
+    AltLeft: t("shortcutLeftAlt"),
+    Space: t("shortcutSpace"),
+  };
   return labels[code] ?? code;
 }
 
@@ -828,19 +854,24 @@ async function renderWhisperStatus() {
   const status = await request({ type: "GET_WHISPER_STATUS" });
   whisperStatus = status;
   const labels = {
-    disabled: "尚未启用。请选择模型后下载。",
-    downloading: "正在下载并校验模型，可在中断后续传。",
-    ready: "已启用，可在本机转写。",
-    recording: "正在录音，松开后会在本机转写。",
-    transcribing: "正在本机转写，视频可继续播放。",
-    error: `本地语音异常：${status.whisperError || "未知错误"}`,
+    disabled: t("whisperDisabled"),
+    downloading: t("whisperDownloading"),
+    ready: t("whisperReady"),
+    recording: t("whisperRecording"),
+    transcribing: t("whisperTranscribing"),
+    error: t("whisperError", {
+      error: localizeRuntimeMessage(
+        interfaceLanguage,
+        status.whisperError || t("unknownError"),
+      ),
+    }),
   };
   const selectedModelId = pendingWhisperModelId ?? status.selectedModelId;
   if (elements.whisperModelSelect.options.length !== status.models.length) {
     elements.whisperModelSelect.replaceChildren(...status.models.map((model) => {
       const option = document.createElement("option");
       option.value = model.id;
-      option.textContent = `${model.label}${model.recommended ? "（推荐）" : ""}`;
+      option.textContent = `${model.label}${model.recommended ? t("recommended") : ""}`;
       return option;
     }));
   }
@@ -851,17 +882,30 @@ async function renderWhisperStatus() {
     || Boolean(status.download);
   const cached = status.cachedModelIds.includes(selectedModelId);
   elements.whisperDetail.textContent = downloadingModel
-    ? `正在下载并校验 ${downloadingModel.label}（已下载 ${Math.round(
-      (status.download.downloadedBytes ?? 0) / 1024 / 1024,
-    )} / ${Math.round(downloadingModel.size / 1024 / 1024)} MiB）。`
+    ? t("modelDownloading", {
+      model: downloadingModel.label,
+      progress: `${Math.round((status.download.downloadedBytes ?? 0) / 1024 / 1024)} / ${Math.round(
+        downloadingModel.size / 1024 / 1024,
+      )} MiB`,
+    })
     : labels[status.whisperState] ?? labels.disabled;
-  elements.whisperModelAction.textContent = cached ? "使用此模型" : "下载并使用";
+  elements.whisperModelAction.textContent = cached ? t("useThisModel") : t("downloadAndUse");
   elements.whisperModelSelect.disabled = busy;
   elements.whisperModelAction.disabled = busy;
   elements.whisperModelWarning.hidden = selectedModel?.experimental !== true;
   elements.whisperModelWarning.textContent = selectedModel?.experimental
-    ? "约 514 MiB，当前设备可能转写较慢"
+    ? t("experimentalModelWarning")
     : "";
+}
+
+for (const button of elements.languageButtons) {
+  const selected = button.dataset.interfaceLanguage === interfaceLanguage;
+  button.setAttribute("aria-pressed", String(selected));
+  button.addEventListener("click", async () => {
+    if (selected) return;
+    await writeInterfaceLanguage(chrome.storage.local, button.dataset.interfaceLanguage);
+    location.reload();
+  });
 }
 
 elements.input.addEventListener("focus", () => void beginTypedDraft());
@@ -915,8 +959,8 @@ elements.screenshotPermissionButton.addEventListener("click", async () => {
   elements.screenshotPermissionButton.disabled = true;
   try {
     const granted = await chrome.permissions.request({ origins: SCREENSHOT_ORIGINS });
-    if (!granted) throw new Error("截图授权已取消");
-    showToast("播放器截图已启用");
+    if (!granted) throw new Error(t("screenshotPermissionCanceled"));
+    showToast(t("screenshotEnabled"));
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -928,7 +972,7 @@ elements.microphonePermissionButton.addEventListener("click", async () => {
   elements.microphonePermissionButton.disabled = true;
   try {
     await openMicrophonePermissionPage();
-    showToast("请在新页面完成麦克风授权");
+    showToast(t("completeMicrophonePermission"));
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -1008,8 +1052,8 @@ elements.redoButton.addEventListener("click", () => {
 elements.clearButton.addEventListener("click", () => {
   if (!canRunHistoryAction("clear")) return;
   confirmHistoryAction({
-    title: "清空全部标记？",
-    description: `将清空 ${savedNoteCount()} 条已保存标记。可通过撤销恢复。`,
+    title: t("clearNotesTitle"),
+    description: t("clearNotesDescription", { count: savedNoteCount() }),
   }, { operation: "clear" });
 });
 
@@ -1017,8 +1061,12 @@ elements.exportButton.addEventListener("click", async () => {
   if (!activeContext) return;
   elements.exportButton.disabled = true;
   try {
-    const result = await request({ type: "EXPORT_SESSION", sessionId: activeContext.sessionId });
-    showToast(`已生成 ${result.noteCount} 条标记的 ZIP`);
+    const result = await request({
+      type: "EXPORT_SESSION",
+      sessionId: activeContext.sessionId,
+      language: interfaceLanguage,
+    });
+    showToast(t("exportComplete", { count: result.noteCount }));
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -1038,17 +1086,17 @@ elements.whisperModelAction.addEventListener("click", async () => {
     const modelId = elements.whisperModelSelect.value;
     if (status.cachedModelIds.includes(modelId)) {
       await request({ type: "SELECT_WHISPER_MODEL", modelId });
-      showToast("已切换本地 Whisper 模型");
+      showToast(t("whisperModelChanged"));
     } else {
       const source = modelId === "base-q5_1"
         ? await request({ type: "CHECK_BUNDLED_MODEL" })
         : { bundled: false };
       if (!source.bundled) {
         const granted = await chrome.permissions.request({ origins: WHISPER_ORIGINS });
-        if (!granted) throw new Error("未授权下载本地语音模型");
+        if (!granted) throw new Error(t("modelDownloadPermissionDenied"));
       }
       await request({ type: "ENABLE_WHISPER", modelId });
-      showToast("本地 Whisper 已启用");
+      showToast(t("whisperEnabled"));
     }
     pendingWhisperModelId = null;
   } catch (error) {
@@ -1060,7 +1108,7 @@ elements.whisperModelAction.addEventListener("click", async () => {
 
 elements.keyButton.addEventListener("click", () => {
   elements.keyButton.classList.add("is-listening");
-  elements.keyButton.textContent = "请按一个键…";
+  elements.keyButton.textContent = t("pressAKey");
   elements.keyButton.focus();
 });
 elements.keyButton.addEventListener("keydown", async (event) => {
@@ -1075,7 +1123,7 @@ elements.keyButton.addEventListener("keydown", async (event) => {
   try {
     await request({ type: "SET_SHORTCUT", code: event.code });
     elements.keyButton.textContent = shortcutLabel(event.code);
-    showToast(`按住说话键已改为 ${shortcutLabel(event.code)}`);
+    showToast(t("shortcutChanged", { shortcut: shortcutLabel(event.code) }));
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -1113,6 +1161,14 @@ document.addEventListener("visibilitychange", () => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (
+    area === "local"
+    && changes.interfaceLanguage?.newValue
+    && changes.interfaceLanguage.newValue !== interfaceLanguage
+  ) {
+    location.reload();
+    return;
+  }
   if (area === "local" && (
     changes.whisperState
     || changes.whisperSelectedModel

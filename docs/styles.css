@@ -242,6 +242,15 @@ h3 {
   transform: rotate(1.3deg);
 }
 
+.product-screenshot {
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(56, 88, 75, 0.17);
+  border-radius: 26px;
+  box-shadow: var(--shadow);
+  transform: rotate(1.3deg);
+}
+
 .video-canvas {
   position: relative;
   min-width: 0;
@@ -728,7 +737,7 @@ h3 {
     padding-block: 16px;
   }
 
-  .nav-links a:not([aria-current="page"]):not(:last-child) {
+  .nav-links a:not([aria-current="page"]):not([data-language]):not(:last-child) {
     display: none;
   }
 

@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "Video Notes"
+  },
+  "extensionDescription": {
+    "message": "Take timestamped notes on YouTube and Bilibili with text or hold-to-talk, then export Markdown with screenshots, subtitles, and recordings."
+  },
+  "actionTitle": {
+    "message": "Open Video Notes"
+  }
+}

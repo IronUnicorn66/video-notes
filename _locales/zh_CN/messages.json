@@ -4,5 +4,8 @@
   },
   "extensionDescription": {
     "message": "在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。"
+  },
+  "actionTitle": {
+    "message": "打开视频笔记"
   }
 }

@@ -12,7 +12,7 @@ test("主页提供产品流程、下载、隐私与支持入口", async () => {
   assert.match(html, /id="features"/);
   assert.match(
     html,
-    /https:\/\/github\.com\/IronUnicorn66\/video-notes\/releases\/download\/v1\.0\.2\/video-notes-edge-1\.0\.2\.zip/,
+    /https:\/\/github\.com\/IronUnicorn66\/video-notes\/releases\/download\/v1\.0\.3\/video-notes-edge-1\.0\.3\.zip/,
   );
   assert.match(html, /href="privacy\/"/);
   assert.match(html, /https:\/\/github\.com\/IronUnicorn66\/video-notes\/issues/);
@@ -38,8 +38,33 @@ test("隐私页覆盖本地存储、模型下载、权限和删除", async () =>
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
 });
 
+test("官网提供可切换的中英文主页与隐私页", async () => {
+  const [zhHome, enHome, zhPrivacy, enPrivacy] = await Promise.all([
+    read("docs/index.html"),
+    read("docs/en/index.html"),
+    read("docs/privacy/index.html"),
+    read("docs/en/privacy/index.html"),
+  ]);
+
+  assert.match(zhHome, /data-language="en"/);
+  assert.match(enHome, /<html lang="en" data-language="en">/);
+  assert.match(enHome, /Turn video lessons into notes you can use/);
+  assert.match(enHome, /screenshot-1-note-en\.png/);
+  assert.match(enPrivacy, /Connection metadata/);
+  assert.match(enPrivacy, /delete your data/i);
+  assert.match(zhPrivacy, /data-language="en"/);
+  for (const html of [zhHome, enHome, zhPrivacy, enPrivacy]) {
+    assert.match(html, /language\.js/);
+  }
+});
+
 test("站点不加载第三方脚本、字体或分析服务", async () => {
-  for (const file of ["docs/index.html", "docs/privacy/index.html"]) {
+  for (const file of [
+    "docs/index.html",
+    "docs/privacy/index.html",
+    "docs/en/index.html",
+    "docs/en/privacy/index.html",
+  ]) {
     const html = await read(file);
     assert.doesNotMatch(html, /<script[^>]+src=["']https?:/i);
     assert.doesNotMatch(html, /fonts\.(googleapis|gstatic)\.com/i);
@@ -51,6 +76,7 @@ test("站点提供窄屏和减少动态效果样式", async () => {
   const css = await read("docs/styles.css");
 
   assert.match(css, /@media\s*\(max-width:\s*720px\)/);
+  assert.match(css, /:not\(\[data-language\]\)/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
 });

@@ -42,7 +42,7 @@
 - Changes: `buildMarkdown(session, entries, { language = "zh_CN" } = {}) -> string`。
 - Changes: `EXPORT_SESSION` 消息携带 `language`，后台透传给隐藏页。
 
-- [ ] **Step 1: Write the failing language-core tests**
+- [x] **Step 1: Write the failing language-core tests**
 
 在 `tests/i18n.test.js` 写入独立期望值，验证自动选择、显式偏好、变量替换和缺失消息键。
 
@@ -60,7 +60,7 @@ test("英文消息替换变量并暴露缺失键", () => {
 });
 ```
 
-- [ ] **Step 2: Run the language-core test and verify RED**
+- [x] **Step 2: Run the language-core test and verify RED**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/i18n.test.js
@@ -68,13 +68,13 @@ node --test --test-concurrency=1 tests/i18n.test.js
 
 预期：因 `src/core/i18n.js` 尚不存在而失败。
 
-- [ ] **Step 3: Implement the bilingual message catalog and storage adapter**
+- [x] **Step 3: Implement the bilingual message catalog and storage adapter**
 
 `src/core/i18n.js` 提供固定语言集合、语言规范化、自动语言选择和 `{variable}` 替换。消息目录覆盖侧栏静态标签、笔记卡片、权限状态、录音、Whisper、历史确认、内容页浮层、授权页、导出 Markdown 和可见失败提示。
 
 `src/core/extension-language.js` 只负责 `interfaceLanguage` 的读取与写入；无效值交给 `resolveLanguage` 回退。
 
-- [ ] **Step 4: Add a failing English Markdown export test**
+- [x] **Step 4: Add a failing English Markdown export test**
 
 ```javascript {.line-numbers}
 test("英文导出翻译固定标签并保留用户内容", () => {
@@ -99,7 +99,7 @@ test("英文导出翻译固定标签并保留用户内容", () => {
 });
 ```
 
-- [ ] **Step 5: Run the Markdown test and verify RED**
+- [x] **Step 5: Run the Markdown test and verify RED**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/note-format.test.js
@@ -107,11 +107,11 @@ node --test --test-concurrency=1 tests/note-format.test.js
 
 预期：英文调用仍生成中文固定标签，新增测试失败。
 
-- [ ] **Step 6: Localize Markdown and carry language through export**
+- [x] **Step 6: Localize Markdown and carry language through export**
 
 修改 `buildMarkdown` 使用消息键生成平台、原始网址、截图、录音、转写摘要与前置字幕标题。侧栏发送 `EXPORT_SESSION` 时携带当前语言；后台和隐藏页透传该值，隐藏页同时用语言对应的 ZIP 后缀和缺失资产告警。
 
-- [ ] **Step 7: Run focused tests and verify GREEN**
+- [x] **Step 7: Run focused tests and verify GREEN**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/i18n.test.js tests/note-format.test.js
@@ -142,7 +142,7 @@ node --test --test-concurrency=1 tests/i18n.test.js tests/note-format.test.js
 - Produces: `_locales/en/messages.json` 中的 `extensionName`、`extensionDescription` 和 `actionTitle`。
 - Changes: Manifest `action.default_title` 使用 `__MSG_actionTitle__`。
 
-- [ ] **Step 1: Write failing extension localization tests**
+- [x] **Step 1: Write failing extension localization tests**
 
 测试读取英文 Manifest 语言包并验证构建产物包含它；测试语言存储适配层读写真实 fake storage；测试侧栏和麦克风页构建后保留语言切换标记与本地脚本引用。
 
@@ -159,7 +159,7 @@ test("发布构建包含两种 Manifest 语言包", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the extension localization tests and verify RED**
+- [x] **Step 2: Run the extension localization tests and verify RED**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/extension-localization.test.js tests/manifest.test.js tests/release-package.test.js
@@ -167,19 +167,19 @@ node --test --test-concurrency=1 tests/extension-localization.test.js tests/mani
 
 预期：英文语言包和语言切换入口缺失，测试失败。
 
-- [ ] **Step 3: Add Manifest English metadata and language controls**
+- [x] **Step 3: Add Manifest English metadata and language controls**
 
 新增英文语言包，为中文语言包补充 `actionTitle`，将 Manifest 工具栏标题改为消息引用。侧栏标题区域增加 `中文 / EN` 按钮组，CSS 保证 320px 宽度下仍可使用。
 
-- [ ] **Step 4: Apply translations before sidepanel initialization**
+- [x] **Step 4: Apply translations before sidepanel initialization**
 
 侧栏启动时先读取 `interfaceLanguage`，创建当前翻译函数，设置 `<html lang>`，再更新所有带本地化标记的静态节点。切换按钮写入偏好后重新加载页面。动态笔记卡片、权限说明、Whisper 状态、确认框、Toast、快捷键、日期格式和导出成功提示全部改用消息键。
 
-- [ ] **Step 5: Localize the microphone permission page and content overlay**
+- [x] **Step 5: Localize the microphone permission page and content overlay**
 
 授权页启动时读取相同偏好并翻译静态与动态状态。内容脚本读取相同偏好并监听变更，翻译全屏录音浮层、快捷键错误前缀与录音失败提示。
 
-- [ ] **Step 6: Build and run focused tests to verify GREEN**
+- [x] **Step 6: Build and run focused tests to verify GREEN**
 
 ```bash {.line-numbers}
 npm run build
@@ -197,6 +197,7 @@ node --test --test-concurrency=1 tests/extension-localization.test.js tests/mani
 - Create: `README.zh-CN.md`
 - Create: `store-assets/edge/screenshot-1-note-en.svg`
 - Create: `store-assets/edge/screenshot-1-note-en.png`
+- Create: `docs/assets/screenshot-1-note-en.png`
 - Modify: `docs/index.html`
 - Modify: `docs/privacy/index.html`
 - Modify: `docs/styles.css`
@@ -209,7 +210,7 @@ node --test --test-concurrency=1 tests/extension-localization.test.js tests/mani
 - Produces: 英文主页 `/en/` 与英文隐私页 `/en/privacy/`。
 - Produces: 英文产品截图 `store-assets/edge/screenshot-1-note-en.png`，尺寸 `1280 × 800`。
 
-- [ ] **Step 1: Write failing site and asset tests**
+- [x] **Step 1: Write failing site and asset tests**
 
 ```javascript {.line-numbers}
 test("官网提供可切换的中英文主页与隐私页", async () => {
@@ -230,7 +231,7 @@ test("官网提供可切换的中英文主页与隐私页", async () => {
 
 在 `tests/store-assets.test.js` 将 `screenshot-1-note-en.png` 的预期尺寸设为 `1280 × 800`，并验证对应 SVG 不包含外部资源。
 
-- [ ] **Step 2: Run site and asset tests and verify RED**
+- [x] **Step 2: Run site and asset tests and verify RED**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/site.test.js tests/store-assets.test.js
@@ -238,27 +239,27 @@ node --test --test-concurrency=1 tests/site.test.js tests/store-assets.test.js
 
 预期：英文页面、语言脚本与英文截图缺失，测试失败。
 
-- [ ] **Step 3: Implement static language routing**
+- [x] **Step 3: Implement static language routing**
 
 四个页面声明当前语言、对应语言路径和 `language.js`。脚本在没有偏好时按 `navigator.languages` 选择，在语言链接点击时保存偏好；存储失败时吞掉存储异常并继续普通导航。中文页面保留现有中文正文，英文页面使用独立英文正文。
 
-- [ ] **Step 4: Create English homepage and privacy policy**
+- [x] **Step 4: Create English homepage and privacy policy**
 
 英文主页覆盖使用流程、功能、本地优先、安装、支持范围和联系入口。英文隐私页逐项覆盖处理信息、IndexedDB、Cache Storage、Hugging Face 连接元数据、权限、麦克风、截图、保留、删除、更新和联系渠道。两页所有相对链接按 `/en/` 层级校正。
 
-- [ ] **Step 5: Create bilingual README files**
+- [x] **Step 5: Create bilingual README files**
 
 复制当前中文 README 到 `README.zh-CN.md` 并增加语言链接；将 `README.md` 重写为英文，保持安装、使用、联网范围、本地开发、支持、安全和许可事实一致。英文 README 引用英文截图，中文 README 引用中文截图。
 
-- [ ] **Step 6: Create and render the English screenshot**
+- [x] **Step 6: Create and render the English screenshot**
 
-复制 `screenshot-1-note.svg` 为英文源文件，只替换产品界面和示例课程文案，维持尺寸、颜色和布局。运行素材脚本生成 PNG。
+复制 `screenshot-1-note.svg` 为英文源文件，只替换产品界面和示例课程文案，维持尺寸、颜色和布局。运行素材脚本生成 PNG，并把同一 PNG 放入 `docs/assets/` 供 GitHub Pages 使用。
 
 ```bash {.line-numbers}
 npm run build:store-assets
 ```
 
-- [ ] **Step 7: Run site and asset tests and verify GREEN**
+- [x] **Step 7: Run site and asset tests and verify GREEN**
 
 ```bash {.line-numbers}
 node --test --test-concurrency=1 tests/site.test.js tests/store-assets.test.js
@@ -286,7 +287,7 @@ node --test --test-concurrency=1 tests/site.test.js tests/store-assets.test.js
 - Consumes: Tasks 1–3 的双语扩展、官网、README 和截图。
 - Produces: 版本一致的 `1.0.3` 构建目录和 `video-notes-edge-1.0.3.zip` 发布包。
 
-- [ ] **Step 1: Update version expectations and verify RED**
+- [x] **Step 1: Update version expectations and verify RED**
 
 把版本测试、发布包名和官网下载地址预期先改为 `1.0.3`。
 
@@ -296,11 +297,11 @@ node --test --test-concurrency=1 tests/manifest.test.js tests/release-package.te
 
 预期：旧版元数据和下载链接导致失败。
 
-- [ ] **Step 2: Synchronize release metadata and current documentation**
+- [x] **Step 2: Synchronize release metadata and current documentation**
 
 把 Manifest、package 元数据、锁文件根包版本、双语 README、双语官网、验收清单和商店说明中的当前版本统一改为 `1.0.3`。验收清单自动验证项更新为本轮实际测试数量与新发布包名；历史人工烟测版本保持原记录。
 
-- [ ] **Step 3: Run complete automated verification**
+- [x] **Step 3: Run complete automated verification**
 
 ```bash {.line-numbers}
 npm test
@@ -313,7 +314,7 @@ git diff --check
 
 预期：测试零失败；构建、打包、ZIP 完整性、摘要校验与空白检查退出码均为 0。
 
-- [ ] **Step 4: Inspect scope and commit the implementation**
+- [x] **Step 4: Inspect scope and commit the implementation**
 
 确认所有改动均可追溯到英文本地化、英文内容、英文截图、测试或 `1.0.3` 版本同步后提交。
 

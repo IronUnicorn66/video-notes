@@ -1,96 +1,98 @@
+<p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
+
 <p align="center">
-  <img src="assets/icon.svg" width="96" alt="视频笔记图标">
+  <img src="assets/icon.svg" width="96" alt="Video Notes icon">
 </p>
 
-<h1 align="center">视频笔记</h1>
+<h1 align="center">Video Notes</h1>
 
-<p align="center">看课程时快速留下时点、截图、字幕和自己的想法。</p>
+<p align="center">Capture timestamps, screenshots, subtitles, and your own thoughts while watching a lesson.</p>
 
-视频笔记是一款面向 Microsoft Edge 的开源扩展。它在 YouTube 和哔哩哔哩视频旁提供持续可见的笔记侧栏，让文字记录、播放器截图、标记前字幕、本地语音转写和 Markdown 导出保持在同一条时间线上。
+Video Notes is an open-source Microsoft Edge extension. It keeps a note panel visible beside YouTube and Bilibili videos, placing typed notes, player screenshots, lead-in subtitles, local voice transcription, and Markdown export on one timeline.
 
-![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
+![Video Notes side panel](store-assets/edge/screenshot-1-note-en.png)
 
-## 核心能力
+## What it does
 
-- 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
-- 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
-- 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
-- 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
-- Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
-- 正序或倒序查看时间线，支持编辑、删除、清空、撤销和反撤销。
-- 导出 ZIP，包含 Markdown、截图和原始录音。
+- Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
+- Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note.
+- Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
+- Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
+- Runs Base, Small, or Medium Whisper models locally in the browser.
+- Shows notes oldest-first or newest-first, with edit, delete, clear, undo, and redo controls.
+- Exports a ZIP containing Markdown, screenshots, and original recordings.
 
-## 安装
+## Install
 
-### Edge 商店
+### Microsoft Edge Add-ons
 
-1.0.2 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+Version 1.0.3 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
-### GitHub Release 测试版
+### GitHub Release preview
 
-[下载视频笔记 1.0.2 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.2/video-notes-edge-1.0.2.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.2/video-notes-edge-1.0.2.zip.sha256)
+[Download Video Notes 1.0.3 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.3/video-notes-edge-1.0.3.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.3/video-notes-edge-1.0.3.zip.sha256)
 
-1. 下载 ZIP 并解压到固定目录。
-2. 在 Edge 地址栏打开 `edge://extensions/`。
-3. 开启“开发人员模式”。
-4. 点击“加载解压缩的扩展”。
-5. 选择解压后的目录；该目录内应直接包含 `manifest.json`。
+1. Download the ZIP and extract it to a permanent folder.
+2. Open `edge://extensions/` in Edge.
+3. Turn on **Developer mode**.
+4. Select **Load unpacked**.
+5. Choose the extracted folder that directly contains `manifest.json`.
 
-测试版需要手动更新。新版本发布后，请重新下载并覆盖原目录，再在扩展管理页点击“重新加载”。
+Preview builds require manual updates. Download the new release into the same folder, then select **Reload** on the extension management page.
 
-## 使用方法
+## Use
 
-1. 打开 YouTube 普通视频页或哔哩哔哩 BV 视频页，点击工具栏中的“视频笔记”。
-2. 点击快速标记输入框，输入想法后移开焦点；也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
-3. 在“权限、语音与快捷键”中按需启用播放器截图、麦克风和前置字幕。
-4. 需要语音记录时，按住右 Option/Alt 或“按住说话”按钮。
-5. 需要本地转写时，选择并下载固定的 Whisper 模型；下载完成后可离线转写。
-6. 看完后点击“导出 ZIP”。导出不会删除浏览器中的笔记。
+1. Open a standard YouTube video or a Bilibili BV video, then select Video Notes in the Edge toolbar.
+2. Select the quick-note editor, type your thought, and move focus away. You can also press `Cmd/Ctrl + Enter` to save or `Esc` to cancel.
+3. Open **Permissions, voice, and shortcuts** to enable player screenshots, microphone access, or lead-in subtitles.
+4. Hold Right Option/Alt or **Hold to talk** when you want to add a voice note.
+5. Select and download a pinned Whisper model for local transcription. After the download, transcription can run offline.
+6. Select **Export ZIP** when you finish. Exporting does not delete notes from the browser.
 
-## 本地数据与联网范围
+## Local data and network access
 
-笔记、字幕、截图、录音和转写结果保存在扩展自己的浏览器存储中，不会上传给开发者。扩展不包含账户、广告或分析统计。
+Notes, subtitles, screenshots, recordings, and transcription results stay in extension storage on your device. Video Notes has no account system, advertising, or analytics, and it does not upload this content to the developer.
 
-首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。下载服务会收到普通 HTTPS 请求的 IP、User-Agent、请求时间和模型文件地址等连接元数据；请求不包含用户笔记或媒体内容。
+When you first download a Whisper model, the extension retrieves static weights from a pinned `ggerganov/whisper.cpp` revision on Hugging Face, verifies the exact size and SHA-256, and caches the model locally. All JavaScript, Worker, and WASM code ships inside the extension package. The download service receives normal HTTPS connection metadata such as IP address, User-Agent, request time, and model file URL; the request contains no notes or media content.
 
-- [产品主页](https://ironunicorn66.github.io/video-notes/)
-- [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
-- [问题反馈](https://github.com/IronUnicorn66/video-notes/issues)
+- [Product website](https://ironunicorn66.github.io/video-notes/en/)
+- [Privacy policy](https://ironunicorn66.github.io/video-notes/en/privacy/)
+- [Support](https://github.com/IronUnicorn66/video-notes/issues)
 
-仓库和现有问题可公开读取；提交新问题需要登录 GitHub。仓库已启用公开 Issues。
+The repository and existing issues are public. Creating a new issue requires a GitHub login.
 
-## 本地开发
+## Local development
 
-要求 Node.js 22 或更高版本。
+Requires Node.js 22 or later.
 
 ```bash {.line-numbers}
 npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.2.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.2.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.3.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.3.zip.sha256
 ```
 
-构建完成后，在 `edge://extensions/` 中加载本项目的 `dist` 目录。
+After building, load the project’s `dist` directory from `edge://extensions/`.
 
-## 支持范围
+## Supported environments
 
-- YouTube 普通视频页。
-- 哔哩哔哩普通 BV 视频页与分 P。
-- 桌面版 Microsoft Edge 150 或更高版本。
+- Standard YouTube video pages.
+- Standard Bilibili BV video pages, including multi-part videos.
+- Microsoft Edge 150 or later on desktop.
 
-扩展只读取播放器已经渲染的字幕，不主动开启字幕，也不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
+The extension reads subtitles already rendered by the player. It does not enable subtitles for you or call private subtitle APIs. Whisper performance depends on model size, device memory, and recording quality.
 
-## 贡献与安全
+## Contributing and security
 
-- 一般问题与功能建议：[GitHub Issues](https://github.com/IronUnicorn66/video-notes/issues)
-- 安全问题：请按 [安全政策](SECURITY.md) 私下报告。
-- 详细权限与数据说明：[本地数据与权限](docs/PRIVACY.md)
-- Edge 上架资料：[商店发布文案](docs/STORE_LISTING.md)
-- 第三方组件：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- Questions and feature requests: [GitHub Issues](https://github.com/IronUnicorn66/video-notes/issues)
+- Security reports: follow the [security policy](SECURITY.md) for private reporting.
+- Detailed permission and data notes: [local data and permissions](docs/PRIVACY.md)
+- Microsoft Edge listing material: [store listing copy](docs/STORE_LISTING.md)
+- Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-## 许可证
+## License
 
-本项目使用 [MIT License](LICENSE)。第三方组件继续遵循各自许可证。
+Video Notes is available under the [MIT License](LICENSE). Third-party components remain subject to their own licenses.

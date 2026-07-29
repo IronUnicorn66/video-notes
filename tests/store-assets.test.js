@@ -11,6 +11,7 @@ const expectedPngs = new Map([
   ['logo-300.png', [300, 300]],
   ['promo-440x280.png', [440, 280]],
   ['screenshot-1-note.png', [1280, 800]],
+  ['screenshot-1-note-en.png', [1280, 800]],
   ['screenshot-2-context.png', [1280, 800]],
   ['screenshot-3-export.png', [1280, 800]],
 ]);

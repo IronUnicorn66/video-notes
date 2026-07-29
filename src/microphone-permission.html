@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>授权麦克风 · 视频笔记</title>
+    <title data-i18n="microphonePermissionPageTitle">授权麦克风 · 视频笔记</title>
     <link rel="stylesheet" href="microphone-permission.css">
   </head>
   <body>
     <main class="permission-card">
-      <span class="eyebrow">视频笔记</span>
-      <h1>允许使用麦克风</h1>
-      <p>点击下方按钮后，请在 Edge 弹出的权限提示中选择“允许”。插件只在你按住说话期间录音。</p>
-      <p id="permission-status" class="status" role="status">尚未授权</p>
-      <button id="grant-microphone-button" type="button">允许麦克风</button>
-      <p class="privacy">授权测试会短暂打开麦克风并立即关闭，不会保存或上传音频。</p>
+      <span class="eyebrow" data-i18n="microphonePermissionEyebrow">视频笔记</span>
+      <h1 data-i18n="microphonePermissionTitle">允许使用麦克风</h1>
+      <p data-i18n="microphonePermissionDescription">点击下方按钮后，请在 Edge 弹出的权限提示中选择“允许”。插件只在你按住说话期间录音。</p>
+      <p id="permission-status" class="status" role="status" data-i18n="microphoneNotAuthorized">尚未授权</p>
+      <button id="grant-microphone-button" type="button" data-i18n="allowMicrophone">允许麦克风</button>
+      <p class="privacy" data-i18n="microphonePermissionPrivacy">授权测试会短暂打开麦克风并立即关闭，不会保存或上传音频。</p>
     </main>
     <script type="module" src="microphone-permission.js"></script>
   </body>
