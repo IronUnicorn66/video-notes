@@ -65,18 +65,21 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
   assert.equal(localizeRuntimeMessage("en", "unmapped browser error"), "unmapped browser error");
 });
 
-test("扩展语言偏好通过本地存储读写", async () => {
-  const values = {};
+test("扩展语言偏好按键读取并写回本地存储", async () => {
+  const values = { interfaceLanguage: "en" };
   const storage = {
-    async get(defaults) {
-      return { ...defaults, ...values };
+    async get(keys) {
+      if (typeof keys === "string") {
+        return Object.hasOwn(values, keys) ? { [keys]: values[keys] } : {};
+      }
+      return {};
     },
     async set(changes) {
       Object.assign(values, changes);
     },
   };
 
-  assert.equal(await readInterfaceLanguage(storage, "en-GB"), "en");
+  assert.equal(await readInterfaceLanguage(storage, "zh-CN"), "en");
   await writeInterfaceLanguage(storage, "zh_CN");
   assert.equal(values.interfaceLanguage, "zh_CN");
   assert.equal(await readInterfaceLanguage(storage, "en-GB"), "zh_CN");

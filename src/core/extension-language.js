@@ -3,7 +3,7 @@ import { normalizeLanguage, resolveLanguage, translate } from "./i18n.js";
 export const INTERFACE_LANGUAGE_KEY = "interfaceLanguage";
 
 export async function readInterfaceLanguage(storageLocal, uiLanguage) {
-  const values = await storageLocal.get({ [INTERFACE_LANGUAGE_KEY]: undefined });
+  const values = await storageLocal.get(INTERFACE_LANGUAGE_KEY);
   return resolveLanguage(values[INTERFACE_LANGUAGE_KEY], uiLanguage);
 }
 
