@@ -1,13 +1,13 @@
-# Edge 150 实机验收清单（1.0.8）
+# Edge 150 实机验收清单（1.0.9）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge 150 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（232 个测试）。
-- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `1.0.8`。
-- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-1.0.8.zip`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.8.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm test` 通过（252 个测试）。
+- [x] 已自动验证：`npm run build` 成功，`dist/manifest.json` 的版本为 `1.0.9`。
+- [x] 已自动验证：`npm run package` 成功，生成 `artifacts/video-notes-edge-1.0.9.zip`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.9.zip` 通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
 
@@ -38,6 +38,7 @@
 - [ ] 按 `Esc` 取消一次字幕编辑，确认原内容保持不变。
 - [ ] 关闭前置字幕后创建标记，确认停止采集且所有字幕块隐藏；重新开启后历史字幕重新出现。
 - [ ] 播放器未开启字幕时创建标记，确认显示空字幕提示，并可手工输入字幕。
+- [ ] 在有原生字幕的 YouTube 视频中打开“完整字幕”，确认状态显示段数、覆盖起止时间和字幕语言；默认每 5 条合并，切换后可逐条展示，搜索时仅显示逐条命中，点击时间范围可跳到该组第一条字幕。
 - [ ] 在侧栏点击“启用播放器截图”并完成 Edge 可选权限授权，确认文字笔记和语音笔记都能保存当前可见播放器截图。
 - [ ] 在独立扩展授权页完成麦克风授权后，按住右 Option/Alt 录制一条语音笔记；确认松开后保存原始录音并恢复视频播放。
 - [ ] 创建一条文字笔记和一条语音笔记，确认侧栏均显示截图。

@@ -24,7 +24,9 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
-  filterTranscriptCues,
+  formatTranscriptTimeRange,
+  transcriptCoverage,
+  transcriptDisplayCues,
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
 import {
@@ -60,6 +62,7 @@ const elements = {
   fullTranscriptPanel: document.querySelector("#full-transcript-panel"),
   fullTranscriptStatus: document.querySelector("#full-transcript-status"),
   fullTranscriptSearch: document.querySelector("#full-transcript-search"),
+  fullTranscriptDisplayToggle: document.querySelector("#full-transcript-display-toggle"),
   fullTranscriptRetry: document.querySelector("#full-transcript-retry"),
   fullTranscriptList: document.querySelector("#full-transcript-list"),
   fullTranscriptEmpty: document.querySelector("#full-transcript-empty"),
@@ -128,6 +131,7 @@ let fullTranscript = null;
 let fullTranscriptContextKey = "";
 let fullTranscriptGeneration = 0;
 let fullTranscriptLoading = false;
+let fullTranscriptGrouped = true;
 
 const noteSortBinding = createSidepanelNoteSortBinding({
   buttons: elements.noteSortButtons,
@@ -366,20 +370,42 @@ function resetFullTranscript({ hide = false } = {}) {
   elements.fullTranscriptStatus.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptSearch.value = "";
   elements.fullTranscriptSearch.disabled = true;
+  syncFullTranscriptDisplayToggle();
   elements.fullTranscriptRetry.disabled = true;
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptEmpty.hidden = false;
 }
 
+function syncFullTranscriptDisplayToggle() {
+  const mode = fullTranscriptGrouped
+    ? t("fullTranscriptGroupedMode")
+    : t("fullTranscriptIndividualMode");
+  elements.fullTranscriptDisplayToggle.disabled = !fullTranscript;
+  elements.fullTranscriptDisplayToggle.textContent = fullTranscriptGrouped
+    ? t("fullTranscriptShowIndividual")
+    : t("fullTranscriptGroupByFive");
+  elements.fullTranscriptDisplayToggle.setAttribute("aria-pressed", String(fullTranscriptGrouped));
+  elements.fullTranscriptDisplayToggle.setAttribute(
+    "aria-label",
+    t("fullTranscriptDisplayMode", { mode }),
+  );
+  elements.fullTranscriptDisplayToggle.title = t("fullTranscriptDisplayMode", { mode });
+}
+
 function renderFullTranscript() {
   const cues = fullTranscript?.cues ?? [];
-  const visibleCues = filterTranscriptCues(cues, elements.fullTranscriptSearch.value);
+  const visibleTranscript = transcriptDisplayCues(
+    cues,
+    elements.fullTranscriptSearch.value,
+    { grouped: fullTranscriptGrouped },
+  );
+  const visibleCues = visibleTranscript.cues;
   elements.fullTranscriptList.replaceChildren();
   for (const cue of visibleCues) {
     const item = document.createElement("li");
     item.className = "full-transcript-cue";
-    const timestamp = formatTimestamp(cue.startMs / 1000);
+    const timestamp = formatTranscriptTimeRange(cue);
     const time = document.createElement("button");
     time.className = "full-transcript-time";
     time.type = "button";
@@ -410,6 +436,7 @@ async function loadFullTranscript() {
   elements.fullTranscriptStatus.textContent = t("fullTranscriptLoading");
   elements.fullTranscriptSearch.value = "";
   elements.fullTranscriptSearch.disabled = true;
+  syncFullTranscriptDisplayToggle();
   elements.fullTranscriptRetry.disabled = true;
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptLoadingDetail");
@@ -418,7 +445,7 @@ async function loadFullTranscript() {
   try {
     const response = await request({ type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
     if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
-    if (!response.transcript?.ok) {
+    if (!response.transcript?.ok || response.transcript.cues.length === 0) {
       const messageKey = transcriptFailureMessageKey(response.transcript);
       elements.fullTranscriptStatus.textContent = t("fullTranscriptUnavailable");
       elements.fullTranscriptEmpty.textContent = t(messageKey);
@@ -426,11 +453,14 @@ async function loadFullTranscript() {
       return;
     }
     fullTranscript = response.transcript;
+    const coverage = transcriptCoverage(fullTranscript.cues);
     elements.fullTranscriptStatus.textContent = t("fullTranscriptLoaded", {
       count: fullTranscript.cues.length,
+      coverage: formatTranscriptTimeRange(coverage),
       language: fullTranscript.label || fullTranscript.languageCode || t("unknownLanguage"),
     });
     elements.fullTranscriptSearch.disabled = false;
+    syncFullTranscriptDisplayToggle();
     elements.fullTranscriptRetry.disabled = false;
     renderFullTranscript();
   } catch (error) {
@@ -1061,6 +1091,11 @@ elements.input.addEventListener("keydown", (event) => {
 });
 
 elements.fullTranscriptSearch.addEventListener("input", renderFullTranscript);
+elements.fullTranscriptDisplayToggle.addEventListener("click", () => {
+  fullTranscriptGrouped = !fullTranscriptGrouped;
+  syncFullTranscriptDisplayToggle();
+  renderFullTranscript();
+});
 elements.fullTranscriptRetry.addEventListener("click", () => {
   void loadFullTranscript();
 });

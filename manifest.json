@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA01Ixrd7V62YRHdphM+lTLfIic66oEdvB2IePl6jVFpo0JQ41Klsbf1uQQa+SsM9UunM5r6Iu3Zkm54zLMNHkJ3IVU2U0INIF+xOUgM+nLT2T3fyjVR0dC+ZbIZl+4HWSu7aSecT3t8VXDW9rnmtqNBtEqV2ohIkRqRpofTRl3ArbZVOqzr+oxKYeczWVnGOxG24RDDGYrMh+2hQC2gY7dfnshIrACBh+XKtaNVBiyAfY/s00dqnVtsGI4ojSTB9V/1cfQj3QLn/ihQCmrQpO2rYPLI5+0mvQoyN10YAYG36yiBgXL0iWAPhv2sodmFG8ERh1eeWPJ6YGyUWJRc5y5wIDAQAB",
   "name": "__MSG_extensionName__",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_CN",
   "homepage_url": "https://ironunicorn66.github.io/video-notes/",
