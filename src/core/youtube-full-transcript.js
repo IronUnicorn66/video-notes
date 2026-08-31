@@ -152,11 +152,41 @@ function transcriptRequests(baseUrl) {
   ];
 }
 
-function parseTranscriptBody(body, format) {
+export function parseYoutubeTranscriptBody(body, format) {
   if (format === "json3" || body.trimStart().startsWith("{")) {
     return parseYoutubeJson3Transcript(body);
   }
   return parseYoutubeXmlTranscript(body);
+}
+
+export function transcriptFromYoutubeCapture(capture) {
+  if (!capture?.ok || !capture.body || !capture.url) return null;
+  let url;
+  try {
+    url = new URL(capture.url);
+  } catch {
+    return null;
+  }
+  const cues = parseYoutubeTranscriptBody(capture.body, url.searchParams.get("fmt") ?? "");
+  if (cues.length === 0) return null;
+  const languageCode = url.searchParams.get("lang") ?? "";
+  return {
+    ok: true,
+    source: "youtube-player-caption-response",
+    languageCode,
+    label: url.searchParams.get("name") ?? languageCode,
+    automatic: url.searchParams.get("kind") === "asr",
+    cues,
+  };
+}
+
+export function transcriptResultAfterPlayerCapture(nativeResult, capture) {
+  const transcript = transcriptFromYoutubeCapture(capture);
+  if (transcript) return transcript;
+  return {
+    ...nativeResult,
+    playerCaptureCode: capture?.code ?? "YOUTUBE_PLAYER_CAPTURE_INVALID",
+  };
 }
 
 export async function readYoutubeFullTranscript(root, {
@@ -179,7 +209,7 @@ export async function readYoutubeFullTranscript(root, {
       try {
         const response = await fetchImpl(request.url, { credentials: "include" });
         const body = await response.text();
-        const cues = response.ok ? parseTranscriptBody(body, request.format) : [];
+        const cues = response.ok ? parseYoutubeTranscriptBody(body, request.format) : [];
         attempts.push({
           languageCode: track.languageCode,
           format: request.format,

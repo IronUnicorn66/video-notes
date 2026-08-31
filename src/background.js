@@ -1,5 +1,7 @@
 import { computeScreenshotCrop } from "./core/screenshot.js";
 import { VideoNotesRepository } from "./core/storage.js";
+import { captureYoutubePlayerTranscript } from "./core/youtube-transcript-capture.js";
+import { transcriptResultAfterPlayerCapture } from "./core/youtube-full-transcript.js";
 import {
   createNoteHistoryCommandRouter,
   isNoteHistoryCommand,
@@ -800,7 +802,24 @@ async function handleMessage(message, sender) {
     case "GET_FULL_YOUTUBE_TRANSCRIPT": {
       const tab = await targetTab(sender, message.tabId);
       const response = await sendToTab(tab.id, { type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
-      return { transcript: response.transcript };
+      if (response.transcript?.code !== "YOUTUBE_NATIVE_CAPTION_BLOCKED") {
+        return { transcript: response.transcript };
+      }
+      let capture;
+      try {
+        const injection = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: captureYoutubePlayerTranscript,
+          args: [8000],
+        });
+        capture = injection[0]?.result;
+      } catch {
+        capture = { ok: false, code: "YOUTUBE_PLAYER_CAPTURE_FAILED" };
+      }
+      return {
+        transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
+      };
     }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
