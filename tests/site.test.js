@@ -26,7 +26,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.7\/video-notes-edge-1\.0\.7\.zip/,
+      /releases\/download\/v1\.0\.8\/video-notes-edge-1\.0\.8\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);

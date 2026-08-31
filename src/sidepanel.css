@@ -16,7 +16,8 @@ body {
 
 button,
 textarea,
-select {
+select,
+input {
   font: inherit;
 }
 
@@ -26,13 +27,15 @@ button {
 
 button:disabled,
 textarea:disabled,
-select:disabled {
+select:disabled,
+input:disabled {
   cursor: default;
   opacity: 0.52;
 }
 
 button:focus-visible,
-select:focus-visible {
+select:focus-visible,
+input:focus-visible {
   outline: 3px solid rgba(96, 124, 111, 0.4);
   outline-offset: 2px;
 }
@@ -108,6 +111,7 @@ h2 {
 
 .composer,
 .timeline,
+.full-transcript-panel,
 .settings {
   border: 1px solid #dedbd2;
   border-radius: 14px;
@@ -121,8 +125,88 @@ h2 {
 }
 
 .timeline,
+.full-transcript-panel,
 .settings {
   margin-top: 12px;
+}
+
+.full-transcript-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.full-transcript-panel > summary small {
+  overflow: hidden;
+  color: #858174;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.full-transcript-content {
+  padding: 0 14px 14px;
+}
+
+.full-transcript-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 11px;
+  border-top: 1px solid #ebe7de;
+}
+
+.full-transcript-search {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d5d1c7;
+  border-radius: 9px;
+  padding: 7px 9px;
+  color: #20262f;
+  background: #fff;
+}
+
+.full-transcript-list {
+  max-height: min(58vh, 620px);
+  margin: 11px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-gutter: stable;
+}
+
+.full-transcript-cue {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  padding: 8px 0;
+  border-top: 1px solid #ebe7de;
+}
+
+.full-transcript-cue:first-child {
+  border-top: 0;
+}
+
+.full-transcript-time {
+  align-self: start;
+  border: 0;
+  padding: 1px 0;
+  color: #476357;
+  background: transparent;
+  font: 650 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.full-transcript-text {
+  margin: 0;
+  color: #353a42;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .section-row,

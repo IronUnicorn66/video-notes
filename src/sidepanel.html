@@ -46,6 +46,34 @@
         </div>
       </section>
 
+      <details id="full-transcript-panel" class="full-transcript-panel" hidden>
+        <summary>
+          <span data-i18n="fullTranscript">完整字幕</span>
+          <small id="full-transcript-status" data-i18n="fullTranscriptWaiting">等待读取</small>
+        </summary>
+        <div class="full-transcript-content">
+          <div class="full-transcript-toolbar">
+            <input
+              id="full-transcript-search"
+              class="full-transcript-search"
+              type="search"
+              placeholder="搜索完整字幕"
+              data-i18n-placeholder="fullTranscriptSearch"
+              disabled
+            />
+            <button
+              id="full-transcript-retry"
+              class="secondary-button"
+              type="button"
+              data-i18n="retry"
+              disabled
+            >重试</button>
+          </div>
+          <ol id="full-transcript-list" class="full-transcript-list"></ol>
+          <p id="full-transcript-empty" class="empty-state" data-i18n="fullTranscriptWaiting">等待读取</p>
+        </div>
+      </details>
+
       <section class="timeline" aria-labelledby="timeline-title">
         <div class="section-row">
           <h2 id="timeline-title" data-i18n="timeline">标记时间线</h2>

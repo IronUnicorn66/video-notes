@@ -24,6 +24,10 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  filterTranscriptCues,
+  transcriptFailureMessageKey,
+} from "./core/full-transcript-view.js";
+import {
   createHistoryConfirmationController,
   createHistoryOperationController,
   historyControlState,
@@ -53,6 +57,12 @@ const elements = {
   voiceLabel: document.querySelector("#voice-button-label"),
   recordingStatus: document.querySelector("#recording-status"),
   recordingTimer: document.querySelector("#recording-timer"),
+  fullTranscriptPanel: document.querySelector("#full-transcript-panel"),
+  fullTranscriptStatus: document.querySelector("#full-transcript-status"),
+  fullTranscriptSearch: document.querySelector("#full-transcript-search"),
+  fullTranscriptRetry: document.querySelector("#full-transcript-retry"),
+  fullTranscriptList: document.querySelector("#full-transcript-list"),
+  fullTranscriptEmpty: document.querySelector("#full-transcript-empty"),
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
   noteSortButtons: document.querySelectorAll("[data-note-sort-order]"),
@@ -114,6 +124,10 @@ let activeContextTabId = null;
 let historyConfirmationController = null;
 let historyOperationController = null;
 let subtitleSettings = normalizeSubtitleSettings();
+let fullTranscript = null;
+let fullTranscriptContextKey = "";
+let fullTranscriptGeneration = 0;
+let fullTranscriptLoading = false;
 
 const noteSortBinding = createSidepanelNoteSortBinding({
   buttons: elements.noteSortButtons,
@@ -333,12 +347,112 @@ function formatTranscriptionTime(createdAt) {
 }
 
 async function request(message) {
-  const payload = message.type === "GET_ACTIVE_STATE" && Number.isInteger(sidePanelRefresh.tabId)
+  const payload = ["GET_ACTIVE_STATE", "GET_FULL_YOUTUBE_TRANSCRIPT", "SEEK_VIDEO"].includes(message.type)
+    && Number.isInteger(sidePanelRefresh.tabId)
     ? { ...message, tabId: sidePanelRefresh.tabId }
     : message;
   const response = await chrome.runtime.sendMessage(payload);
   if (!response?.ok) throw new Error(response?.error ?? t("operationFailed"));
   return response;
+}
+
+function resetFullTranscript({ hide = false } = {}) {
+  fullTranscriptGeneration += 1;
+  fullTranscript = null;
+  fullTranscriptLoading = false;
+  fullTranscriptContextKey = "";
+  elements.fullTranscriptPanel.hidden = hide;
+  elements.fullTranscriptPanel.open = !hide;
+  elements.fullTranscriptStatus.textContent = t("fullTranscriptWaiting");
+  elements.fullTranscriptSearch.value = "";
+  elements.fullTranscriptSearch.disabled = true;
+  elements.fullTranscriptRetry.disabled = true;
+  elements.fullTranscriptList.replaceChildren();
+  elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
+  elements.fullTranscriptEmpty.hidden = false;
+}
+
+function renderFullTranscript() {
+  const cues = fullTranscript?.cues ?? [];
+  const visibleCues = filterTranscriptCues(cues, elements.fullTranscriptSearch.value);
+  elements.fullTranscriptList.replaceChildren();
+  for (const cue of visibleCues) {
+    const item = document.createElement("li");
+    item.className = "full-transcript-cue";
+    const timestamp = formatTimestamp(cue.startMs / 1000);
+    const time = document.createElement("button");
+    time.className = "full-transcript-time";
+    time.type = "button";
+    time.dataset.seconds = String(cue.startMs / 1000);
+    time.textContent = timestamp;
+    time.setAttribute("aria-label", t("jumpToTimestamp", { timestamp }));
+    const text = document.createElement("p");
+    text.className = "full-transcript-text";
+    text.textContent = cue.text;
+    item.append(time, text);
+    elements.fullTranscriptList.append(item);
+  }
+  elements.fullTranscriptEmpty.textContent = cues.length > 0
+    ? t("fullTranscriptNoMatches")
+    : t("fullTranscriptWaiting");
+  elements.fullTranscriptEmpty.hidden = visibleCues.length > 0;
+}
+
+async function loadFullTranscript() {
+  if (fullTranscriptLoading || !activeContext || activeContext.platform !== "youtube") return;
+  const contextKey = `${sidePanelRefresh.tabId}:${activeContext.sessionId}`;
+  const generation = ++fullTranscriptGeneration;
+  fullTranscriptContextKey = contextKey;
+  fullTranscriptLoading = true;
+  fullTranscript = null;
+  elements.fullTranscriptPanel.hidden = false;
+  elements.fullTranscriptPanel.open = true;
+  elements.fullTranscriptStatus.textContent = t("fullTranscriptLoading");
+  elements.fullTranscriptSearch.value = "";
+  elements.fullTranscriptSearch.disabled = true;
+  elements.fullTranscriptRetry.disabled = true;
+  elements.fullTranscriptList.replaceChildren();
+  elements.fullTranscriptEmpty.textContent = t("fullTranscriptLoadingDetail");
+  elements.fullTranscriptEmpty.hidden = false;
+
+  try {
+    const response = await request({ type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
+    if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
+    if (!response.transcript?.ok) {
+      const messageKey = transcriptFailureMessageKey(response.transcript);
+      elements.fullTranscriptStatus.textContent = t("fullTranscriptUnavailable");
+      elements.fullTranscriptEmpty.textContent = t(messageKey);
+      elements.fullTranscriptRetry.disabled = false;
+      return;
+    }
+    fullTranscript = response.transcript;
+    elements.fullTranscriptStatus.textContent = t("fullTranscriptLoaded", {
+      count: fullTranscript.cues.length,
+      language: fullTranscript.label || fullTranscript.languageCode || t("unknownLanguage"),
+    });
+    elements.fullTranscriptSearch.disabled = false;
+    elements.fullTranscriptRetry.disabled = false;
+    renderFullTranscript();
+  } catch (error) {
+    if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
+    elements.fullTranscriptStatus.textContent = t("fullTranscriptUnavailable");
+    elements.fullTranscriptEmpty.textContent = localizeRuntimeMessage(interfaceLanguage, error.message);
+    elements.fullTranscriptRetry.disabled = false;
+  } finally {
+    if (generation === fullTranscriptGeneration) fullTranscriptLoading = false;
+  }
+}
+
+function syncFullTranscriptContext() {
+  if (!activeContext || activeContext.platform !== "youtube") {
+    resetFullTranscript({ hide: true });
+    return;
+  }
+  const contextKey = `${sidePanelRefresh.tabId}:${activeContext.sessionId}`;
+  if (contextKey === fullTranscriptContextKey) return;
+  resetFullTranscript();
+  fullTranscriptContextKey = contextKey;
+  void loadFullTranscript();
 }
 
 async function readMicrophonePermission() {
@@ -696,6 +810,7 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.input.disabled = false;
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
+    syncFullTranscriptContext();
   },
   applyError(error) {
     if (activeContext || activeContextTabId !== null) historyContextToken += 1;
@@ -709,6 +824,7 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.voiceButton.disabled = true;
     elements.exportButton.disabled = true;
     renderNotes([]);
+    resetFullTranscript({ hide: true });
   },
   isBlocked: () => inlineEditController.blocked,
   defer() {
@@ -942,6 +1058,20 @@ elements.input.addEventListener("keydown", (event) => {
     event.preventDefault();
     void commitTypedDraft().then(() => elements.input.blur());
   }
+});
+
+elements.fullTranscriptSearch.addEventListener("input", renderFullTranscript);
+elements.fullTranscriptRetry.addEventListener("click", () => {
+  void loadFullTranscript();
+});
+elements.fullTranscriptList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-seconds]");
+  if (!button) return;
+  const seconds = Number(button.dataset.seconds);
+  if (!Number.isFinite(seconds)) return;
+  void request({ type: "SEEK_VIDEO", seconds }).catch((error) => {
+    showToast(error.message);
+  });
 });
 
 elements.voiceButton.addEventListener("pointerdown", (event) => {
@@ -1206,6 +1336,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 window.addEventListener("pagehide", () => {
   ++renderGeneration;
+  ++fullTranscriptGeneration;
   closeScreenshotDialog();
   stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();

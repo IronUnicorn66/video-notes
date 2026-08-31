@@ -322,6 +322,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (![
     "GET_PAGE_CONTEXT",
     "GET_FULL_YOUTUBE_TRANSCRIPT",
+    "SEEK_VIDEO",
     "PREPARE_MARKER",
     "ACTIVATE_MARKER",
     "GET_MARKER_RESUME_ELIGIBILITY",
@@ -350,6 +351,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             preferredLanguages: navigator.languages ?? [navigator.language],
           }),
         };
+      }
+      case "SEEK_VIDEO": {
+        const media = findMedia();
+        const seconds = Number(message.seconds);
+        if (!media) throw new Error("没有找到可用的视频播放器");
+        if (!Number.isFinite(seconds) || seconds < 0) throw new Error("无效的视频时间点");
+        media.currentTime = Math.min(seconds, Number.isFinite(media.duration) ? media.duration : seconds);
+        return { seconds: media.currentTime };
       }
       case "PREPARE_MARKER":
         return markerSnapshot(message.markerId, { deferPause: message.deferPause === true });

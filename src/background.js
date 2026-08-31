@@ -821,6 +821,14 @@ async function handleMessage(message, sender) {
         transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
       };
     }
+    case "SEEK_VIDEO": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "SEEK_VIDEO",
+        seconds: message.seconds,
+      });
+      return { seconds: response.seconds };
+    }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
       return beginMarker(tab, "typed");

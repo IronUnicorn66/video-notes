@@ -1,7 +1,7 @@
 # 视频笔记 Edge 商店上架资料
 
 更新日期：2026-07-30
-版本：1.0.7
+版本：1.0.8
 
 本文件保存 Microsoft Partner Center 首次上架时可直接填写的内容。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
 
@@ -153,7 +153,7 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 ## 8. 发布包检查
 
 - ZIP 根目录直接包含 `manifest.json`。
-- Manifest V3 版本为 1.0.7，默认语言为 `zh_CN`。
+- Manifest V3 版本为 1.0.8，默认语言为 `zh_CN`。
 - ZIP 包含 `_locales/zh_CN/messages.json` 和 `_locales/en/messages.json`。
 - ZIP 不包含测试、开发文档、商店素材、Git 元数据或模型权重。
 - 包内没有远程 JavaScript 或动态代码加载器。
