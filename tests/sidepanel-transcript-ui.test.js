@@ -39,3 +39,14 @@ test("完整字幕列表适合长课程滚动和窄侧栏", () => {
   );
   assert.match(css, /\.full-transcript-time/);
 });
+
+test("完整字幕将时间范围置于正文上方以避免两列留白", () => {
+  assert.match(
+    css,
+    /\.full-transcript-cue\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
+  );
+  assert.match(
+    css,
+    /\.full-transcript-time\s*\{[^}]*justify-self:\s*start/s,
+  );
+});

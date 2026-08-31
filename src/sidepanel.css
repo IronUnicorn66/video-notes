@@ -189,8 +189,8 @@ h2 {
 
 .full-transcript-cue {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
   padding: 8px 0;
   border-top: 1px solid #ebe7de;
 }
@@ -201,6 +201,7 @@ h2 {
 
 .full-transcript-time {
   align-self: start;
+  justify-self: start;
   border: 0;
   padding: 1px 0;
   color: #476357;
