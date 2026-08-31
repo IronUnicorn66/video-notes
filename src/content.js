@@ -8,6 +8,7 @@ import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
+import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
 import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
@@ -320,6 +321,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (![
     "GET_PAGE_CONTEXT",
+    "GET_FULL_YOUTUBE_TRANSCRIPT",
     "PREPARE_MARKER",
     "ACTIVATE_MARKER",
     "GET_MARKER_RESUME_ELIGIBILITY",
@@ -332,6 +334,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     switch (message.type) {
       case "GET_PAGE_CONTEXT":
         return { context: getContext() };
+      case "GET_FULL_YOUTUBE_TRANSCRIPT": {
+        const context = getContext();
+        if (context?.platform !== "youtube") {
+          return {
+            transcript: {
+              ok: false,
+              code: "PLATFORM_UNSUPPORTED",
+              trackCount: 0,
+            },
+          };
+        }
+        return {
+          transcript: await readYoutubeFullTranscript(document, {
+            preferredLanguages: navigator.languages ?? [navigator.language],
+          }),
+        };
+      }
       case "PREPARE_MARKER":
         return markerSnapshot(message.markerId, { deferPause: message.deferPause === true });
       case "ACTIVATE_MARKER":

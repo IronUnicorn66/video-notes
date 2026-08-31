@@ -797,6 +797,11 @@ async function handleMessage(message, sender) {
       const { context } = await resolveSidePanelContext(sender);
       return context;
     }
+    case "GET_FULL_YOUTUBE_TRANSCRIPT": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, { type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
+      return { transcript: response.transcript };
+    }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
       return beginMarker(tab, "typed");

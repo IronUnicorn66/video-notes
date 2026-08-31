@@ -39,7 +39,7 @@ const enMessages = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.5");
+  assert.equal(manifest.version, "1.0.6");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);

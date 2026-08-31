@@ -26,12 +26,12 @@ Video Notes is an open-source Microsoft Edge extension. It keeps a note panel vi
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.5 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.6 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.5 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip.sha256)
+[Download Video Notes 1.0.6 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.6/video-notes-edge-1.0.6.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.6/video-notes-edge-1.0.6.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge.
@@ -71,8 +71,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.5.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.5.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.6.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.6.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/`.
