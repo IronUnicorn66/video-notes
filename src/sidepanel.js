@@ -40,6 +40,12 @@ import {
   untranslatedTranscriptCues,
 } from "./core/full-transcript-translation.js";
 import {
+  BROWSER_TRANSLATION_ERROR,
+  browserTranscriptTranslationAvailability,
+  createBrowserTranscriptTranslator,
+  translateBrowserTranscriptCues,
+} from "./core/browser-transcript-translation.js";
+import {
   clearTranslationSettings,
   FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY,
   saveTranslationSettings,
@@ -98,6 +104,9 @@ const elements = {
   microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
   subtitleEnabled: document.querySelector("#subtitle-enabled"),
   subtitleWindowSeconds: document.querySelector("#subtitle-window-seconds"),
+  fullTranscriptTranslationProvider: document.querySelector("#full-transcript-translation-provider"),
+  fullTranscriptLocalTranslationDetail: document.querySelector("#full-transcript-local-translation-detail"),
+  fullTranscriptApiTranslationSettings: document.querySelector("#full-transcript-api-translation-settings"),
   fullTranscriptTranslationBaseUrl: document.querySelector("#full-transcript-translation-base-url"),
   fullTranscriptTranslationApiKey: document.querySelector("#full-transcript-translation-api-key"),
   fullTranscriptTranslationModel: document.querySelector("#full-transcript-translation-model"),
@@ -153,6 +162,12 @@ let fullTranscriptLoading = false;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
 let fullTranscriptTranslationRunning = false;
 let fullTranscriptTranslationController = null;
+let fullTranscriptTranslationProvider = "browser";
+let browserTranscriptTranslationSession = null;
+let browserTranscriptTranslationState = globalThis.Translator
+  ? { status: "waiting" }
+  : { status: "unsupported" };
+const browserTranscriptTranslationPairs = new Map();
 
 const noteSortBinding = createSidepanelNoteSortBinding({
   buttons: elements.noteSortButtons,
@@ -388,6 +403,7 @@ function resetFullTranscript({ hide = false } = {}) {
   fullTranscript = null;
   fullTranscriptLoading = false;
   fullTranscriptContextKey = "";
+  setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
   elements.fullTranscriptPanel.hidden = hide;
   elements.fullTranscriptPanel.open = !hide;
   elements.fullTranscriptStatus.textContent = t("fullTranscriptWaiting");
@@ -411,6 +427,14 @@ function fullTranscriptLoadedStatus() {
     language: fullTranscript.label || fullTranscript.languageCode || t("unknownLanguage"),
   });
   if (!fullTranscriptTranslationRunning) return loaded;
+  if (
+    fullTranscriptTranslationProvider === "browser"
+    && browserTranscriptTranslationState.status === "downloading"
+  ) {
+    return `${loaded} · ${t("fullTranscriptLocalTranslationDownloading", {
+      progress: Math.round(browserTranscriptTranslationState.progress * 100),
+    })}`;
+  }
   return `${loaded} · ${t("fullTranscriptTranslating", {
     completed: translatedFullTranscriptCueCount(),
     total: fullTranscript.cues.length,
@@ -427,6 +451,7 @@ function syncFullTranscriptTranslateButton() {
   const total = fullTranscript?.cues.length ?? 0;
   const translated = translatedFullTranscriptCueCount();
   elements.fullTranscriptTranslate.disabled = total === 0 || fullTranscriptLoading || fullTranscriptTranslationRunning;
+  elements.fullTranscriptTranslationProvider.disabled = fullTranscriptTranslationRunning;
   if (fullTranscriptTranslationRunning) {
     elements.fullTranscriptTranslate.textContent = t("fullTranscriptTranslate");
   } else if (translated === total && total > 0) {
@@ -473,14 +498,151 @@ function renderFullTranscript() {
   elements.fullTranscriptEmpty.hidden = visibleCues.length > 0;
 }
 
+const disposedBrowserTranslationSessions = new WeakSet();
+
+function normalizeFullTranscriptTranslationProvider(value) {
+  return value === "api" ? "api" : "browser";
+}
+
+function browserTranslationSourceKey(transcript = fullTranscript) {
+  return String(transcript?.languageCode ?? "").trim().toLowerCase();
+}
+
+function browserTranslationPairForTranscript(transcript = fullTranscript) {
+  return browserTranscriptTranslationPairs.get(browserTranslationSourceKey(transcript));
+}
+
+function cacheBrowserTranslationPair(transcript, pair) {
+  const key = browserTranslationSourceKey(transcript);
+  if (!key || !pair) return;
+  const current = browserTranscriptTranslationPairs.get(key);
+  if (
+    current?.sourceLanguage === pair.sourceLanguage
+    && current?.targetLanguage === pair.targetLanguage
+  ) return;
+  browserTranscriptTranslationPairs.set(key, pair);
+  void chrome.storage.local.set({
+    fullTranscriptBrowserTranslationPairs: Object.fromEntries(browserTranscriptTranslationPairs),
+  }).catch(() => {});
+}
+
+function destroyBrowserTranslationSession(session = browserTranscriptTranslationSession) {
+  if (!session || disposedBrowserTranslationSessions.has(session)) return;
+  disposedBrowserTranslationSessions.add(session);
+  if (browserTranscriptTranslationSession === session) browserTranscriptTranslationSession = null;
+  try {
+    session.destroy();
+  } catch {
+    // The session is already unusable; cleanup must not mask translation or shutdown results.
+  }
+}
+
+function localTranslationStatusMessage() {
+  if (browserTranscriptTranslationState.status === "downloading") {
+    return t("fullTranscriptLocalTranslationDownloading", {
+      progress: Math.round(browserTranscriptTranslationState.progress * 100),
+    });
+  }
+  const keys = {
+    waiting: "fullTranscriptLocalTranslationWaiting",
+    checking: "fullTranscriptLocalTranslationChecking",
+    ready: "fullTranscriptLocalTranslationReady",
+    downloadable: "fullTranscriptLocalTranslationDownloadable",
+    unsupported: "fullTranscriptLocalTranslationUnsupported",
+    unavailable: "fullTranscriptLocalTranslationUnavailable",
+    downloadFailed: "fullTranscriptLocalTranslationDownloadFailed",
+    alreadyTarget: "fullTranscriptLocalTranslationAlreadyTarget",
+  };
+  return t(keys[browserTranscriptTranslationState.status] ?? keys.waiting);
+}
+
+function renderFullTranscriptTranslationSettings() {
+  const usingApi = fullTranscriptTranslationProvider === "api";
+  elements.fullTranscriptTranslationProvider.value = fullTranscriptTranslationProvider;
+  elements.fullTranscriptApiTranslationSettings.hidden = !usingApi;
+  elements.fullTranscriptLocalTranslationDetail.hidden = usingApi;
+  elements.fullTranscriptLocalTranslationDetail.textContent = localTranslationStatusMessage();
+}
+
+function setBrowserTranscriptTranslationState(status, progress = 0) {
+  browserTranscriptTranslationState = { status, progress };
+  renderFullTranscriptTranslationSettings();
+  if (fullTranscript && fullTranscriptTranslationRunning) {
+    elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+  }
+}
+
+function setBrowserTranslationErrorState(error) {
+  const statuses = {
+    [BROWSER_TRANSLATION_ERROR.ALREADY_TARGET]: "alreadyTarget",
+    [BROWSER_TRANSLATION_ERROR.DOWNLOAD_FAILED]: "downloadFailed",
+    [BROWSER_TRANSLATION_ERROR.UNAVAILABLE]: "unavailable",
+    [BROWSER_TRANSLATION_ERROR.UNSUPPORTED]: "unsupported",
+  };
+  const status = statuses[error?.code];
+  if (status) setBrowserTranscriptTranslationState(status);
+  return Boolean(status);
+}
+
+async function refreshBrowserTranscriptTranslationAvailability() {
+  if (!globalThis.Translator) {
+    setBrowserTranscriptTranslationState("unsupported");
+    return;
+  }
+  if (!fullTranscript) {
+    setBrowserTranscriptTranslationState("waiting");
+    return;
+  }
+  const transcript = fullTranscript;
+  const generation = fullTranscriptGeneration;
+  const contextKey = fullTranscriptContextKey;
+  setBrowserTranscriptTranslationState("checking");
+  try {
+    const result = await browserTranscriptTranslationAvailability({
+      sourceLanguage: transcript.languageCode,
+      preferredPair: browserTranslationPairForTranscript(transcript),
+    });
+    if (
+      transcript !== fullTranscript
+      || generation !== fullTranscriptGeneration
+      || contextKey !== fullTranscriptContextKey
+    ) return;
+    cacheBrowserTranslationPair(transcript, result.pair);
+    setBrowserTranscriptTranslationState(
+      result.availability === "available" ? "ready" : "downloadable",
+    );
+  } catch (error) {
+    if (
+      transcript === fullTranscript
+      && generation === fullTranscriptGeneration
+      && contextKey === fullTranscriptContextKey
+    ) {
+      if (!setBrowserTranslationErrorState(error)) {
+        setBrowserTranscriptTranslationState("unavailable");
+      }
+    }
+  }
+}
+
 function cancelFullTranscriptTranslation() {
   fullTranscriptTranslationController?.abort();
   fullTranscriptTranslationController = null;
   fullTranscriptTranslationRunning = false;
+  destroyBrowserTranslationSession();
+  if (browserTranscriptTranslationState.status === "downloading") {
+    setBrowserTranscriptTranslationState("downloadable");
+  }
 }
 
-function focusFullTranscriptTranslationSettings() {
+function focusBrowserTranslationSettings() {
   elements.settings.open = true;
+  elements.fullTranscriptTranslationProvider.focus();
+  elements.fullTranscriptTranslationProvider.scrollIntoView({ block: "center" });
+}
+
+function focusFullTranscriptTranslationApiSettings() {
+  elements.settings.open = true;
+  renderFullTranscriptTranslationSettings();
   elements.fullTranscriptTranslationBaseUrl.focus();
   elements.fullTranscriptTranslationBaseUrl.scrollIntoView({ block: "center" });
 }
@@ -498,13 +660,12 @@ async function ensureFullTranscriptTranslationPermission(config) {
   if (!granted) throw new Error(t("fullTranscriptTranslationPermissionDenied"));
 }
 
-async function translateFullTranscript() {
-  if (!fullTranscript || fullTranscriptTranslationRunning) return;
+async function translateFullTranscriptWithApi() {
   let config;
   try {
     config = translationConfigFromControls();
   } catch (error) {
-    focusFullTranscriptTranslationSettings();
+    focusFullTranscriptTranslationApiSettings();
     showToast(error.message);
     return;
   }
@@ -579,6 +740,106 @@ async function translateFullTranscript() {
   }
 }
 
+async function translateFullTranscriptInBrowser() {
+  const transcript = fullTranscript;
+  const generation = fullTranscriptGeneration;
+  const contextKey = fullTranscriptContextKey;
+  const controller = new AbortController();
+  let session = null;
+  fullTranscriptTranslationController = controller;
+  fullTranscriptTranslationRunning = true;
+  elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+  syncFullTranscriptTranslateButton();
+
+  try {
+    const created = await createBrowserTranscriptTranslator({
+      sourceLanguage: transcript.languageCode,
+      preferredPair: browserTranslationPairForTranscript(transcript),
+      signal: controller.signal,
+      onDownloadProgress: (progress) => {
+        if (
+          fullTranscriptTranslationController === controller
+          && transcript === fullTranscript
+          && generation === fullTranscriptGeneration
+          && contextKey === fullTranscriptContextKey
+        ) {
+          setBrowserTranscriptTranslationState("downloading", progress);
+        }
+      },
+    });
+    session = created.session;
+    if (
+      controller.signal.aborted
+      || transcript !== fullTranscript
+      || generation !== fullTranscriptGeneration
+      || contextKey !== fullTranscriptContextKey
+    ) return;
+    browserTranscriptTranslationSession = session;
+    cacheBrowserTranslationPair(transcript, created.pair);
+    setBrowserTranscriptTranslationState("ready");
+
+    const allTranslated = transcript.cues.length > 0
+      && transcript.cues.every((cue) => String(cue.translation ?? "").trim());
+    if (allTranslated) {
+      for (const cue of transcript.cues) delete cue.translation;
+    }
+    const cues = untranslatedTranscriptCues(transcript.cues);
+    if (cues.length === 0) return;
+    elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+    renderFullTranscript();
+
+    await translateBrowserTranscriptCues({
+      session,
+      cues,
+      signal: controller.signal,
+      onTranslated: ({ id, translation }) => {
+        if (
+          transcript !== fullTranscript
+          || generation !== fullTranscriptGeneration
+          || contextKey !== fullTranscriptContextKey
+        ) {
+          controller.abort();
+          return;
+        }
+        transcript.cues[id].translation = translation;
+        elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+        renderFullTranscript();
+      },
+    });
+    showToast(t("fullTranscriptTranslationComplete"));
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      const providerError = setBrowserTranslationErrorState(error);
+      if (providerError) focusBrowserTranslationSettings();
+      const message = localizeRuntimeMessage(interfaceLanguage, error.message);
+      showToast(providerError ? message : `${t("fullTranscriptTranslationInterrupted")}：${message}`);
+    }
+  } finally {
+    destroyBrowserTranslationSession(session);
+    if (fullTranscriptTranslationController === controller) {
+      fullTranscriptTranslationController = null;
+      fullTranscriptTranslationRunning = false;
+      if (
+        transcript === fullTranscript
+        && generation === fullTranscriptGeneration
+        && contextKey === fullTranscriptContextKey
+      ) {
+        elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+        syncFullTranscriptTranslateButton();
+      }
+    }
+  }
+}
+
+async function translateFullTranscript() {
+  if (!fullTranscript || fullTranscriptTranslationRunning) return;
+  if (fullTranscriptTranslationProvider === "api") {
+    await translateFullTranscriptWithApi();
+  } else {
+    await translateFullTranscriptInBrowser();
+  }
+}
+
 const FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS = [
   "fullTranscriptTranslationBaseUrl",
   "fullTranscriptTranslationApiKey",
@@ -647,6 +908,7 @@ async function loadFullTranscript() {
   fullTranscriptContextKey = contextKey;
   fullTranscriptLoading = true;
   fullTranscript = null;
+  setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
   elements.fullTranscriptPanel.hidden = false;
   elements.fullTranscriptPanel.open = true;
   elements.fullTranscriptStatus.textContent = t("fullTranscriptLoading");
@@ -671,6 +933,7 @@ async function loadFullTranscript() {
     syncFullTranscriptTranslateButton();
     elements.fullTranscriptRetry.disabled = false;
     renderFullTranscript();
+    void refreshBrowserTranscriptTranslationAvailability();
   } catch (error) {
     if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
     elements.fullTranscriptStatus.textContent = t("fullTranscriptUnavailable");
@@ -1384,6 +1647,24 @@ elements.subtitleWindowSeconds.addEventListener("change", async () => {
   }
 });
 
+elements.fullTranscriptTranslationProvider.addEventListener("change", async () => {
+  const previous = fullTranscriptTranslationProvider;
+  fullTranscriptTranslationProvider = normalizeFullTranscriptTranslationProvider(
+    elements.fullTranscriptTranslationProvider.value,
+  );
+  renderFullTranscriptTranslationSettings();
+  try {
+    await chrome.storage.local.set({ fullTranscriptTranslationProvider });
+    if (fullTranscriptTranslationProvider === "browser") {
+      void refreshBrowserTranscriptTranslationAvailability();
+    }
+  } catch (error) {
+    fullTranscriptTranslationProvider = previous;
+    renderFullTranscriptTranslationSettings();
+    showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
+  }
+});
+
 elements.fullTranscriptTranslationSave.addEventListener("click", () => {
   void saveFullTranscriptTranslationSettings();
 });
@@ -1607,6 +1888,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
   }
+  if (area === "local" && changes.fullTranscriptTranslationProvider) {
+    const nextProvider = normalizeFullTranscriptTranslationProvider(
+      changes.fullTranscriptTranslationProvider.newValue,
+    );
+    if (
+      nextProvider !== fullTranscriptTranslationProvider
+      && fullTranscriptTranslationRunning
+    ) {
+      cancelFullTranscriptTranslation();
+      syncFullTranscriptTranslateButton();
+    }
+    fullTranscriptTranslationProvider = nextProvider;
+    renderFullTranscriptTranslationSettings();
+    if (nextProvider === "browser" && fullTranscript) {
+      void refreshBrowserTranscriptTranslationAvailability();
+    }
+  }
 });
 
 window.addEventListener("pagehide", () => {
@@ -1639,15 +1937,32 @@ syncSubtitleSettingsControls();
 
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
+  fullTranscriptTranslationProvider: "browser",
+  fullTranscriptBrowserTranslationPairs: {},
   fullTranscriptTranslationBaseUrl: "",
   fullTranscriptTranslationApiKey: "",
   fullTranscriptTranslationModel: "",
 });
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
+fullTranscriptTranslationProvider = normalizeFullTranscriptTranslationProvider(
+  fullTranscriptSettings.fullTranscriptTranslationProvider,
+);
+for (const [sourceLanguage, pair] of Object.entries(
+  fullTranscriptSettings.fullTranscriptBrowserTranslationPairs ?? {},
+)) {
+  if (
+    sourceLanguage
+    && typeof pair?.sourceLanguage === "string"
+    && typeof pair?.targetLanguage === "string"
+  ) {
+    browserTranscriptTranslationPairs.set(sourceLanguage, pair);
+  }
+}
 elements.fullTranscriptTranslationBaseUrl.value = fullTranscriptSettings.fullTranscriptTranslationBaseUrl;
 elements.fullTranscriptTranslationApiKey.value = fullTranscriptSettings.fullTranscriptTranslationApiKey;
 elements.fullTranscriptTranslationModel.value = fullTranscriptSettings.fullTranscriptTranslationModel;
+renderFullTranscriptTranslationSettings();
 syncFullTranscriptTranslateButton();
 
 await initializeSidepanel({

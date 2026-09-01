@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Privacy policy for the Video Notes Microsoft Edge extension.">
+    <meta name="description" content="Privacy policy for the Video Notes Microsoft Edge and Google Chrome extension.">
     <meta name="theme-color" content="#f5f2ea">
     <title>Privacy policy · Video Notes</title>
     <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
@@ -29,7 +29,7 @@
       <header class="policy-header">
         <p class="eyebrow"><span></span>Privacy Policy</p>
         <h1>Video Notes privacy policy</h1>
-        <p>Effective date: July 28, 2026</p>
+        <p>Effective date: September 1, 2026</p>
       </header>
 
       <article class="policy-body">
@@ -47,7 +47,8 @@
             <li>The visible player image when you explicitly enable player screenshots.</li>
             <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
             <li>Shortcut, subtitle window, full-transcript group size, timeline order, permission, language, and model settings.</li>
-            <li>Your optional full-transcript translation API Base URL, API Key, and model name; the current complete YouTube transcript only when you select Translate.</li>
+            <li>The transcript language, Simplified Chinese target code, and browser language-pack status used for local browser translation.</li>
+            <li>Your optional backup translation API Base URL, API Key, and model name; the complete YouTube transcript only when you select the API method and then select Translate.</li>
           </ul>
           <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
           <p>When complete YouTube transcript retrieval is restricted, the extension may briefly toggle the player captions control to capture the native caption response requested by the player, then immediately restore its prior state.</p>
@@ -55,13 +56,14 @@
 
         <section>
           <h2>Storage and processing location</h2>
-          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Settings, including the full-transcript translation API configuration, are stored in local extension storage. Model weights are stored in Cache Storage. Translations stay only in the current side-panel session and are not retained. Personal content is processed on your device.</p>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. The translation method, usable browser language codes, and backup API configuration are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs. Translations stay only in the current side-panel session and are not retained.</p>
           <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
         </section>
 
         <section>
-          <h2>Optional full transcript translation</h2>
-          <p>Full transcript translation is disabled by default. After you save an HTTPS OpenAI-compatible API Base URL, API Key, and model name, the extension requests optional access to that one API host. Only after you select Translate for the current YouTube video does the extension send the complete transcript directly to that API in batches for Simplified Chinese translation. It does not send notes, screenshots, recordings, transcriptions, or browsing history.</p>
+          <h2>Local full-transcript translation and optional cloud backup</h2>
+          <p>Full transcripts use the built-in desktop Edge or Chrome Translator API by default. The translation session runs in the side-panel document, so transcript content and translations are processed locally and are not sent to the developer or a subtitle translation service. The browser may connect to download a language pack the first time a language pair is used. Translation works offline afterward. Edge and Chrome manage these packs separately; the extension does not download, bundle, or sync a translation model.</p>
+          <p>The OpenAI-compatible API is an explicit backup method. The extension sends the complete transcript to your configured HTTPS API only after you select the API method and then select Translate. It never falls back to the cloud automatically and does not send notes, screenshots, recordings, transcriptions, or browsing history.</p>
           <p>The API Key is saved only in local extension storage and is never synced to the developer or an included service. Your chosen API receives subtitle content plus the normal metadata needed for an HTTPS connection; its privacy practices govern that data. Clearing and saving all three translation fields removes the local configuration and revokes that API-host permission. If the browser cannot revoke the permission, the API Key, Base URL, and model name are still deleted immediately; only a key-free host identifier is retained for a later retry, and the extension shows an explicit warning.</p>
         </section>
 
@@ -80,7 +82,7 @@
             <li><strong>Side panel:</strong> provides note input, settings, and the timeline beside the video.</li>
             <li><strong>Offscreen document:</strong> maintains authorized recording, local transcription, and export generation.</li>
             <li><strong>Downloads:</strong> saves the ZIP you explicitly export.</li>
-            <li><strong>Optional screenshot and translation-host permissions:</strong> screenshot access is requested only when you enable player screenshots and accept the Edge prompt; translation access is requested only for the single HTTPS API host you enter when saving configuration or selecting Translate.</li>
+            <li><strong>Optional screenshot and translation-host permissions:</strong> screenshot access is requested only when you enable it and accept the browser prompt. Backup cloud translation requests access only to the single HTTPS API host you enter when saving configuration or selecting the API method and Translate. Local browser translation does not use this permission.</li>
             <li><strong>Optional model-host permission:</strong> is requested only for a model download you start.</li>
           </ul>
         </section>
@@ -88,12 +90,12 @@
         <section>
           <h2>Microphone and player screenshots</h2>
           <p>The microphone records only while you hold Right Option/Alt or the Hold to talk button. Recording stops if the window loses focus, the page becomes hidden, the side panel closes, or the 60-second limit is reached.</p>
-          <p>Player screenshots are disabled by default. You must enable them in the side panel and accept Edge’s optional permission prompt. After the permission is removed, new notes stop capturing screenshots.</p>
+          <p>Player screenshots are disabled by default. You must enable them in the side panel and accept the browser’s optional permission prompt. After the permission is removed, new notes stop capturing screenshots.</p>
         </section>
 
         <section>
           <h2>Retention and how to delete your data</h2>
-          <p>Video Notes retains video sessions and downloaded models so you can continue when you return to the same lesson. You can delete one note, clear every note for the current video, or clear the extension’s data from the Edge extension management page. Uninstalling the extension causes the browser to clear extension storage.</p>
+          <p>Video Notes retains video sessions and downloaded Whisper models so you can continue when you return to the same lesson. You can delete one note, clear every note for the current video, or clear extension data from the Edge or Chrome extension management page. Browser translation language packs are managed by the browser itself. Uninstalling the extension causes the browser to clear extension storage.</p>
           <p>Exporting a ZIP does not delete the browser session. You control ZIP files after they are saved to your Downloads folder.</p>
         </section>
 

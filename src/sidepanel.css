@@ -690,7 +690,8 @@ textarea:focus {
   font-weight: 650;
 }
 
-.full-transcript-translation-setting input {
+.full-transcript-translation-setting input,
+.full-transcript-translation-setting select {
   box-sizing: border-box;
   width: 100%;
   margin-top: 5px;
@@ -700,6 +701,19 @@ textarea:focus {
   color: #34463e;
   background: #fff;
   font-size: 12px;
+}
+
+.full-transcript-local-translation-detail {
+  margin-top: 7px;
+  color: #5f5b51;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.full-transcript-api-translation-settings {
+  margin-top: 9px;
+  border-top: 1px solid #dedbd2;
+  padding-top: 1px;
 }
 
 .full-transcript-translation-setting button {

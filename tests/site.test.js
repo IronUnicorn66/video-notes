@@ -26,7 +26,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.16\/video-notes-edge-1\.0\.16\.zip/,
+      /releases\/download\/v1\.0\.17\/video-notes-edge-1\.0\.17\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -59,7 +59,10 @@ test("隐私页覆盖本地存储、模型下载、可选翻译权限和删除",
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
   assert.match(html, /全文翻译/);
   assert.match(html, /API Key/);
-  assert.match(englishHtml, /Full transcript translation/);
+  assert.match(html, /Translator API/);
+  assert.match(html, /不会自动回退到云端/);
+  assert.match(englishHtml, /Local full-transcript translation/);
+  assert.match(englishHtml, /never falls back to the cloud automatically/);
   assert.match(englishHtml, /API Key/);
 });
 

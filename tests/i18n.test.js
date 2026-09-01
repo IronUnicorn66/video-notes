@@ -69,6 +69,14 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
     localizeRuntimeMessage("en", "翻译服务请求失败（HTTP 429）"),
     "Translation service request failed (HTTP 429)",
   );
+  assert.equal(
+    localizeRuntimeMessage("en", "当前浏览器不支持本地翻译"),
+    "This browser does not support local translation",
+  );
+  assert.equal(
+    localizeRuntimeMessage("en", "本地翻译不可用：language pack failed"),
+    "Local translation is unavailable: language pack failed",
+  );
   assert.equal(localizeRuntimeMessage("zh_CN", "录音启动失败"), "录音启动失败");
   assert.equal(localizeRuntimeMessage("en", "unmapped browser error"), "unmapped browser error");
 });

@@ -175,18 +175,27 @@
           </div>
           <div class="setting-row">
             <div class="full-transcript-translation-setting">
-              <strong data-i18n="fullTranscriptTranslationSettings">全文翻译（OpenAI 兼容）</strong>
-              <p data-i18n="fullTranscriptTranslationDescription">仅在你点击翻译后，完整字幕会直接发送给下方配置的服务。</p>
-              <label for="full-transcript-translation-base-url" data-i18n="fullTranscriptTranslationBaseUrl">API Base URL</label>
-              <input id="full-transcript-translation-base-url" type="url" inputmode="url" autocomplete="url" placeholder="https://api.example.com/v1" />
-              <label for="full-transcript-translation-api-key" data-i18n="fullTranscriptTranslationApiKey">API Key</label>
-              <input id="full-transcript-translation-api-key" type="password" autocomplete="off" />
-              <label for="full-transcript-translation-model" data-i18n="fullTranscriptTranslationModel">模型名</label>
-              <input id="full-transcript-translation-model" type="text" autocomplete="off" />
-              <button id="full-transcript-translation-save" class="secondary-button" type="button" data-i18n="fullTranscriptTranslationSave">保存翻译配置</button>
+              <strong data-i18n="fullTranscriptTranslationSettings">全文翻译</strong>
+              <p data-i18n="fullTranscriptTranslationDescription">默认使用浏览器内置模型在本机翻译；云端 API 仅在你主动选择后使用。</p>
+              <label for="full-transcript-translation-provider" data-i18n="fullTranscriptTranslationProvider">翻译方式</label>
+              <select id="full-transcript-translation-provider">
+                <option value="browser" data-i18n="fullTranscriptTranslationProviderBrowser">浏览器本地翻译（推荐）</option>
+                <option value="api" data-i18n="fullTranscriptTranslationProviderApi">OpenAI 兼容 API（备用）</option>
+              </select>
+              <p id="full-transcript-local-translation-detail" class="full-transcript-local-translation-detail" role="status" aria-live="polite">读取字幕后检查本地语言包。</p>
+              <div id="full-transcript-api-translation-settings" class="full-transcript-api-translation-settings" hidden>
+                <p data-i18n="fullTranscriptTranslationApiDescription">仅在点击翻译后，将完整字幕直接发送给下方配置的服务。</p>
+                <label for="full-transcript-translation-base-url" data-i18n="fullTranscriptTranslationBaseUrl">API Base URL</label>
+                <input id="full-transcript-translation-base-url" type="url" inputmode="url" autocomplete="url" placeholder="https://api.example.com/v1" />
+                <label for="full-transcript-translation-api-key" data-i18n="fullTranscriptTranslationApiKey">API Key</label>
+                <input id="full-transcript-translation-api-key" type="password" autocomplete="off" />
+                <label for="full-transcript-translation-model" data-i18n="fullTranscriptTranslationModel">模型名</label>
+                <input id="full-transcript-translation-model" type="text" autocomplete="off" />
+                <button id="full-transcript-translation-save" class="secondary-button" type="button" data-i18n="fullTranscriptTranslationSave">保存云端备用配置</button>
+              </div>
             </div>
           </div>
-          <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记和转写都保存在本机。截图权限只用于 YouTube 和哔哩哔哩播放器；启用语音后只联网下载模型。</p>
+          <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记、转写和浏览器本地译文都保存在本机。截图权限只用于视频播放器；本地模型仅在首次使用相应功能时下载。</p>
         </div>
       </details>
 
