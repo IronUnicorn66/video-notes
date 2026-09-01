@@ -17,6 +17,8 @@
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
 - 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
+- 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、可配置的 5/10/20/30 条合并阅读和时间跳转。
+- 可选使用自己配置的 OpenAI 兼容 API 把完整字幕翻译为简体中文，原文与译文上下对照。
 - 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
 - Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
 - 正序或倒序查看时间线，支持编辑、删除、清空、撤销和反撤销。
@@ -26,12 +28,12 @@
 
 ### Edge 商店
 
-1.0.5 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.16 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.5 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip.sha256)
+[下载视频笔记 1.0.16 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`。
@@ -45,7 +47,7 @@
 
 1. 打开 YouTube 普通视频页或哔哩哔哩 BV 视频页，点击工具栏中的“视频笔记”。
 2. 点击快速标记输入框，输入想法后移开焦点；也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
-3. 在“权限、语音与快捷键”中按需启用播放器截图、麦克风和前置字幕。
+3. 在“权限、语音与快捷键”中按需启用播放器截图、麦克风、前置字幕或可选翻译。
 4. 需要语音记录时，按住右 Option/Alt 或“按住说话”按钮。
 5. 需要本地转写时，选择并下载固定的 Whisper 模型；下载完成后可离线转写。
 6. 看完后点击“导出 ZIP”。导出不会删除浏览器中的笔记。
@@ -55,6 +57,8 @@
 笔记、字幕、截图、录音和转写结果保存在扩展自己的浏览器存储中，不会上传给开发者。扩展不包含账户、广告或分析统计。
 
 首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。下载服务会收到普通 HTTPS 请求的 IP、User-Agent、请求时间和模型文件地址等连接元数据；请求不包含用户笔记或媒体内容。
+
+完整字幕翻译是可选功能。保存 HTTPS 的 OpenAI 兼容 API Base URL、API Key 和模型名后，点击“翻译”才会把当前 YouTube 完整字幕直接发送到该服务；API Key 保存在扩展本机存储，译文只保留在当前侧栏会话，二者都不会发送给扩展开发者。
 
 - [产品主页](https://ironunicorn66.github.io/video-notes/)
 - [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
@@ -71,8 +75,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.5.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.5.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.16.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.16.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 中加载本项目的 `dist` 目录。
@@ -83,7 +87,7 @@ cd artifacts && shasum -a 256 -c video-notes-edge-1.0.5.zip.sha256
 - 哔哩哔哩普通 BV 视频页与分 P。
 - 桌面版 Microsoft Edge 150 或更高版本。
 
-扩展只读取播放器已经渲染的字幕，不主动开启字幕，也不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
+笔记的前置字幕只读取播放器已经渲染的内容。完整字幕读取遇到平台限制时，扩展可能短暂切换 YouTube 的字幕开关以捕获播放器发起的原生字幕响应，随后恢复原先状态；不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
 
 ## 贡献与安全
 

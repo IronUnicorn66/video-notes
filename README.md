@@ -17,6 +17,8 @@ Video Notes is an open-source Microsoft Edge extension. It keeps a note panel vi
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note.
 - Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
+- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, configurable 5, 10, 20, or 30-segment reading groups, and timestamp jumps.
+- Optionally translates a complete YouTube transcript into Simplified Chinese through your own OpenAI-compatible API, with source and translation shown together.
 - Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
 - Runs Base, Small, or Medium Whisper models locally in the browser.
 - Shows notes oldest-first or newest-first, with edit, delete, clear, undo, and redo controls.
@@ -26,12 +28,12 @@ Video Notes is an open-source Microsoft Edge extension. It keeps a note panel vi
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.5 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.16 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.5 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.5/video-notes-edge-1.0.5.zip.sha256)
+[Download Video Notes 1.0.16 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge.
@@ -45,7 +47,7 @@ Preview builds require manual updates. Download the new release into the same fo
 
 1. Open a standard YouTube video or a Bilibili BV video, then select Video Notes in the Edge toolbar.
 2. Select the quick-note editor, type your thought, and move focus away. You can also press `Cmd/Ctrl + Enter` to save or `Esc` to cancel.
-3. Open **Permissions, voice, and shortcuts** to enable player screenshots, microphone access, or lead-in subtitles.
+3. Open **Permissions, voice, and shortcuts** to enable player screenshots, microphone access, lead-in subtitles, or optional translation.
 4. Hold Right Option/Alt or **Hold to talk** when you want to add a voice note.
 5. Select and download a pinned Whisper model for local transcription. After the download, transcription can run offline.
 6. Select **Export ZIP** when you finish. Exporting does not delete notes from the browser.
@@ -55,6 +57,8 @@ Preview builds require manual updates. Download the new release into the same fo
 Notes, subtitles, screenshots, recordings, and transcription results stay in extension storage on your device. Video Notes has no account system, advertising, or analytics, and it does not upload this content to the developer.
 
 When you first download a Whisper model, the extension retrieves static weights from a pinned `ggerganov/whisper.cpp` revision on Hugging Face, verifies the exact size and SHA-256, and caches the model locally. All JavaScript, Worker, and WASM code ships inside the extension package. The download service receives normal HTTPS connection metadata such as IP address, User-Agent, request time, and model file URL; the request contains no notes or media content.
+
+Full-transcript translation is optional. After you save an HTTPS OpenAI-compatible API Base URL, API key, and model name, selecting **Translate** sends only the current complete YouTube transcript directly to that endpoint. The API key stays in local extension storage, translations stay only in the current side-panel session, and neither is sent to the extension developer.
 
 - [Product website](https://ironunicorn66.github.io/video-notes/en/)
 - [Privacy policy](https://ironunicorn66.github.io/video-notes/en/privacy/)
@@ -71,8 +75,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.5.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.5.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.16.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.16.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/`.
@@ -83,7 +87,7 @@ After building, load the project’s `dist` directory from `edge://extensions/`.
 - Standard Bilibili BV video pages, including multi-part videos.
 - Microsoft Edge 150 or later on desktop.
 
-The extension reads subtitles already rendered by the player. It does not enable subtitles for you or call private subtitle APIs. Whisper performance depends on model size, device memory, and recording quality.
+Lead-in subtitles are read from content already rendered by the player. When complete YouTube transcript retrieval is blocked, the side panel may briefly toggle the YouTube captions control to capture the native caption response requested by the player, then restore its prior state. This stays local to the browser and does not use a private site API or a third-party subtitle service. Whisper performance depends on model size, device memory, and recording quality.
 
 ## Contributing and security
 

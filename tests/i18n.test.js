@@ -61,6 +61,14 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
     localizeRuntimeMessage("en", "内置模型模型 SHA-256 校验失败"),
     "Bundled model: Model SHA-256 verification failed",
   );
+  assert.equal(
+    localizeRuntimeMessage("en", "请填写 API Key"),
+    "Enter an API key",
+  );
+  assert.equal(
+    localizeRuntimeMessage("en", "翻译服务请求失败（HTTP 429）"),
+    "Translation service request failed (HTTP 429)",
+  );
   assert.equal(localizeRuntimeMessage("zh_CN", "录音启动失败"), "录音启动失败");
   assert.equal(localizeRuntimeMessage("en", "unmapped browser error"), "unmapped browser error");
 });

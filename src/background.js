@@ -1,5 +1,10 @@
 import { computeScreenshotCrop } from "./core/screenshot.js";
 import { VideoNotesRepository } from "./core/storage.js";
+import { captureYoutubePlayerTranscript } from "./core/youtube-transcript-capture.js";
+import {
+  shouldAttemptYoutubePlayerCapture,
+  transcriptResultAfterPlayerCapture,
+} from "./core/youtube-full-transcript.js";
 import {
   createNoteHistoryCommandRouter,
   isNoteHistoryCommand,
@@ -796,6 +801,38 @@ async function handleMessage(message, sender) {
     case "GET_SIDEPANEL_CONTEXT": {
       const { context } = await resolveSidePanelContext(sender);
       return context;
+    }
+    case "GET_FULL_YOUTUBE_TRANSCRIPT": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, { type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
+      if (!shouldAttemptYoutubePlayerCapture(response.transcript)) {
+        return { transcript: response.transcript };
+      }
+      let capture;
+      try {
+        const injection = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: captureYoutubePlayerTranscript,
+          args: [8000, { videoId: response.transcript.videoId }],
+        });
+        capture = injection[0]?.result;
+      } catch {
+        capture = { ok: false, code: "YOUTUBE_PLAYER_CAPTURE_FAILED" };
+      }
+      return {
+        transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
+      };
+    }
+    case "SEEK_VIDEO": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "SEEK_VIDEO",
+        seconds: message.seconds,
+        sessionId: message.sessionId,
+        videoId: message.videoId,
+      });
+      return { seconds: response.seconds };
     }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
