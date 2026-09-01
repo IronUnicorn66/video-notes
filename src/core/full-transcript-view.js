@@ -1,11 +1,28 @@
 export const TRANSCRIPT_CUE_GROUP_SIZE = 5;
 export const TRANSCRIPT_CUE_GROUP_SIZES = [5, 10, 20];
+export const TRANSCRIPT_FONT_SIZE = 12;
+export const TRANSCRIPT_FONT_SIZE_MIN = 10;
+export const TRANSCRIPT_FONT_SIZE_MAX = 24;
 
 export function normalizeTranscriptGroupSize(value) {
   const groupSize = Number(value);
   return TRANSCRIPT_CUE_GROUP_SIZES.includes(groupSize)
     ? groupSize
     : TRANSCRIPT_CUE_GROUP_SIZE;
+}
+
+export function normalizeTranscriptFontSize(value) {
+  const fontSize = Number(value);
+  if (!Number.isFinite(fontSize)) return TRANSCRIPT_FONT_SIZE;
+  return Math.min(
+    TRANSCRIPT_FONT_SIZE_MAX,
+    Math.max(TRANSCRIPT_FONT_SIZE_MIN, Math.round(fontSize)),
+  );
+}
+
+export function transcriptFontSizeAfterStep(currentFontSize, direction) {
+  const step = Math.sign(Number(direction));
+  return normalizeTranscriptFontSize(normalizeTranscriptFontSize(currentFontSize) + step);
 }
 
 export function transcriptCoverage(cues) {

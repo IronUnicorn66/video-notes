@@ -173,18 +173,39 @@ h2 {
 }
 
 .full-transcript-action {
-  min-width: 58px;
+  min-width: 50px;
   width: auto;
   height: 34px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   white-space: nowrap;
 }
 
 .full-transcript-actions {
   display: flex;
   flex: 0 0 auto;
+  align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.full-transcript-font-size-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.full-transcript-font-size-button {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .full-transcript-group-picker {
@@ -284,14 +305,14 @@ h2 {
 .full-transcript-text {
   margin: 0;
   color: #353a42;
-  font-size: 12px;
+  font-size: var(--full-transcript-font-size, 12px);
   line-height: 1.5;
 }
 
 .full-transcript-translation {
   margin: 0;
   color: #476357;
-  font-size: 12px;
+  font-size: var(--full-transcript-font-size, 12px);
   line-height: 1.5;
 }
 

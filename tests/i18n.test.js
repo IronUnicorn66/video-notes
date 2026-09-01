@@ -73,6 +73,8 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
     translate("en", "fullTranscriptLanguagePackReady", { size: 200 }),
     "Downloaded · about 200 MiB",
   );
+  assert.equal(translate("zh_CN", "decreaseFullTranscriptFontSize"), "减小字幕字号");
+  assert.equal(translate("en", "increaseFullTranscriptFontSize"), "Increase transcript font size");
   assert.equal(localizeRuntimeMessage("zh_CN", "录音启动失败"), "录音启动失败");
   assert.equal(localizeRuntimeMessage("en", "unmapped browser error"), "unmapped browser error");
 });
