@@ -57,7 +57,12 @@ test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
   assert.match(css, /\.full-transcript-time/);
 });
 
-test("侧栏在权限设置中提供翻译 API，并在完整字幕工具栏提供单选合并条数", () => {
+test("侧栏默认提供浏览器本地翻译，并将翻译 API 保留为手动备用", () => {
+  assert.match(html, /id="full-transcript-translation-provider"/);
+  assert.match(html, /<option value="browser"[^>]*>浏览器本地翻译（推荐）<\/option>/);
+  assert.match(html, /<option value="api"[^>]*>OpenAI 兼容 API（备用）<\/option>/);
+  assert.match(html, /id="full-transcript-local-translation-detail"[^>]*role="status"/);
+  assert.match(html, /id="full-transcript-api-translation-settings"[^>]*hidden/);
   assert.match(html, /id="full-transcript-translation-base-url"[^>]*type="url"/);
   assert.match(html, /id="full-transcript-translation-api-key"[^>]*type="password"/);
   assert.match(html, /id="full-transcript-translation-model"[^>]*type="text"/);
@@ -77,7 +82,11 @@ test("侧栏在权限设置中提供翻译 API，并在完整字幕工具栏提�
   assert.match(css, /label:has\(input:checked\)/);
 });
 
-test("侧栏翻译只在显式操作后按 API 主机授权并保留原文与译文", () => {
+test("侧栏翻译在文档中创建本地会话，API 仅在显式选择后授权", () => {
+  assert.match(source, /createBrowserTranscriptTranslator/);
+  assert.match(source, /translateBrowserTranscriptCues/);
+  assert.match(source, /browserTranscriptTranslationAvailability/);
+  assert.match(source, /fullTranscriptTranslationProvider === "api"/);
   assert.match(source, /normalizeFullTranscriptTranslationConfig/);
   assert.match(source, /translateTranscriptBatch/);
   assert.match(source, /requestTranslationHostPermission/);
@@ -90,6 +99,17 @@ test("完整字幕加载结束后会重新启用翻译按钮", () => {
     source,
     /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*\}/s,
   );
+});
+
+test("切换视频、重试和关闭侧栏会中断本地翻译并销毁文档会话", () => {
+  assert.match(
+    source,
+    /function cancelFullTranscriptTranslation\(\) \{[\s\S]*fullTranscriptTranslationController\?\.abort\(\);[\s\S]*destroyBrowserTranslationSession\(\);[\s\S]*\}/,
+  );
+  assert.match(source, /async function loadFullTranscript\(\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
+  assert.match(source, /session\.destroy\(\)/);
+  assert.match(source, /untranslatedTranscriptCues\(transcript\.cues\)/);
 });
 
 test("完整字幕将时间范围置于正文上方以避免两列留白", () => {

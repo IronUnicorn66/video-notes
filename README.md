@@ -8,7 +8,7 @@
 
 <p align="center">Capture timestamps, screenshots, subtitles, and your own thoughts while watching a lesson.</p>
 
-Video Notes is an open-source Microsoft Edge extension. It keeps a note panel visible beside YouTube and Bilibili videos, placing typed notes, player screenshots, lead-in subtitles, local voice transcription, and Markdown export on one timeline.
+Video Notes is an open-source extension for desktop Microsoft Edge and Google Chrome. It keeps a note panel visible beside YouTube and Bilibili videos, placing typed notes, player screenshots, lead-in subtitles, local voice transcription, and Markdown export on one timeline.
 
 ![Video Notes side panel](store-assets/edge/screenshot-1-note-en.png)
 
@@ -18,7 +18,7 @@ Video Notes is an open-source Microsoft Edge extension. It keeps a note panel vi
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note.
 - Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
 - For YouTube videos with available native captions, shows the full transcript locally with its coverage range, configurable 5, 10, 20, or 30-segment reading groups, and timestamp jumps.
-- Optionally translates a complete YouTube transcript into Simplified Chinese through your own OpenAI-compatible API, with source and translation shown together.
+- Translates a complete YouTube transcript into Simplified Chinese locally with the built-in Edge/Chrome Translator API by default. After the first language-pack download it works offline; your own OpenAI-compatible API remains an explicit backup choice.
 - Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
 - Runs Base, Small, or Medium Whisper models locally in the browser.
 - Shows notes oldest-first or newest-first, with edit, delete, clear, undo, and redo controls.
@@ -28,15 +28,15 @@ Video Notes is an open-source Microsoft Edge extension. It keeps a note panel vi
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.16 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.17 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.16 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.16/video-notes-edge-1.0.16.zip.sha256)
+[Download Video Notes 1.0.17 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.17/video-notes-edge-1.0.17.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.17/video-notes-edge-1.0.17.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
-2. Open `edge://extensions/` in Edge.
+2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
 3. Turn on **Developer mode**.
 4. Select **Load unpacked**.
 5. Choose the extracted folder that directly contains `manifest.json`.
@@ -58,7 +58,7 @@ Notes, subtitles, screenshots, recordings, and transcription results stay in ext
 
 When you first download a Whisper model, the extension retrieves static weights from a pinned `ggerganov/whisper.cpp` revision on Hugging Face, verifies the exact size and SHA-256, and caches the model locally. All JavaScript, Worker, and WASM code ships inside the extension package. The download service receives normal HTTPS connection metadata such as IP address, User-Agent, request time, and model file URL; the request contains no notes or media content.
 
-Full-transcript translation is optional. After you save an HTTPS OpenAI-compatible API Base URL, API key, and model name, selecting **Translate** sends only the current complete YouTube transcript directly to that endpoint. The API key stays in local extension storage, translations stay only in the current side-panel session, and neither is sent to the extension developer.
+Full transcripts are translated locally in the side-panel document with the browser’s built-in Translator API by default. The browser may download a language pack the first time a pair is used; after that, translation works offline and the extension sends no transcript to a translation service. Edge and Chrome manage their language packs separately, so support and output can differ. Only after you explicitly choose the OpenAI-compatible API method does the extension send the current complete transcript directly to your configured HTTPS endpoint. The API key stays in local extension storage and translations remain only in the current side-panel session.
 
 - [Product website](https://ironunicorn66.github.io/video-notes/en/)
 - [Privacy policy](https://ironunicorn66.github.io/video-notes/en/privacy/)
@@ -75,17 +75,18 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.16.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.16.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.17.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.17.zip.sha256
 ```
 
-After building, load the project’s `dist` directory from `edge://extensions/`.
+After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
 
 ## Supported environments
 
 - Standard YouTube video pages.
 - Standard Bilibili BV video pages, including multi-part videos.
 - Microsoft Edge 150 or later on desktop.
+- Google Chrome 138 or later on desktop.
 
 Lead-in subtitles are read from content already rendered by the player. When complete YouTube transcript retrieval is blocked, the side panel may briefly toggle the YouTube captions control to capture the native caption response requested by the player, then restore its prior state. This stays local to the browser and does not use a private site API or a third-party subtitle service. Whisper performance depends on model size, device memory, and recording quality.
 
