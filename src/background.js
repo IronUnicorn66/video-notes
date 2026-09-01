@@ -814,7 +814,7 @@ async function handleMessage(message, sender) {
           target: { tabId: tab.id },
           world: "MAIN",
           func: captureYoutubePlayerTranscript,
-          args: [8000],
+          args: [8000, { videoId: response.transcript.videoId }],
         });
         capture = injection[0]?.result;
       } catch {
