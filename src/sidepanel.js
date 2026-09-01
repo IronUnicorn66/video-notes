@@ -72,6 +72,8 @@ localizeDocument(document, interfaceLanguage);
 
 const elements = {
   languageButtons: document.querySelectorAll("[data-interface-language]"),
+  sidepanelZoomIncrease: document.querySelector("#sidepanel-zoom-increase"),
+  sidepanelZoomDecrease: document.querySelector("#sidepanel-zoom-decrease"),
   videoTitle: document.querySelector("#video-title"),
   videoUrl: document.querySelector("#video-url"),
   input: document.querySelector("#note-input"),
@@ -187,6 +189,8 @@ const noteSortBinding = createSidepanelNoteSortBinding({
 const sidepanelZoomBinding = createSidepanelZoomBinding({
   target: window,
   root: document.documentElement,
+  increaseButton: elements.sidepanelZoomIncrease,
+  decreaseButton: elements.sidepanelZoomDecrease,
   storage: chrome.storage,
   showToast,
 });

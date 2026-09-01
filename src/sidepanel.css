@@ -50,6 +50,8 @@ input:focus-visible {
 }
 
 .video-header-top,
+.video-header-controls,
+.sidepanel-zoom-controls,
 .language-switch {
   display: flex;
   align-items: center;
@@ -58,6 +60,28 @@ input:focus-visible {
 .video-header-top {
   justify-content: space-between;
   gap: 12px;
+}
+
+.video-header-controls {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.sidepanel-zoom-controls {
+  gap: 4px;
+}
+
+.sidepanel-zoom-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d5d1c7;
+  border-radius: 8px;
+  color: #34463e;
+  background: #fffdf8;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .language-switch {
