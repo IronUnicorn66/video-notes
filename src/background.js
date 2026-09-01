@@ -829,6 +829,8 @@ async function handleMessage(message, sender) {
       const response = await sendToTab(tab.id, {
         type: "SEEK_VIDEO",
         seconds: message.seconds,
+        sessionId: message.sessionId,
+        videoId: message.videoId,
       });
       return { seconds: response.seconds };
     }

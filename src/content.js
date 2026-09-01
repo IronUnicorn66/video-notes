@@ -10,6 +10,7 @@ import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
 import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
+import { seekMediaForVideoContext } from "./core/video-command-context.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 let currentMedia = null;
@@ -354,12 +355,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         };
       }
       case "SEEK_VIDEO": {
-        const media = findMedia();
-        const seconds = Number(message.seconds);
-        if (!media) throw new Error("没有找到可用的视频播放器");
-        if (!Number.isFinite(seconds) || seconds < 0) throw new Error("无效的视频时间点");
-        media.currentTime = Math.min(seconds, Number.isFinite(media.duration) ? media.duration : seconds);
-        return { seconds: media.currentTime };
+        const seconds = seekMediaForVideoContext({
+          media: findMedia(),
+          context: getContext(),
+          seconds: message.seconds,
+          expectedSessionId: message.sessionId,
+          expectedVideoId: message.videoId,
+        });
+        return { seconds };
       }
       case "PREPARE_MARKER":
         return markerSnapshot(message.markerId, { deferPause: message.deferPause === true });

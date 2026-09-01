@@ -27,6 +27,14 @@ test("完整字幕在 YouTube 上自动读取并按标签页发送跳转", () =>
   assert.match(source, /groupTranscriptCues/);
   assert.doesNotMatch(source, /fullTranscriptGrouped/);
   assert.match(source, /formatTranscriptTimeRange/);
+  assert.match(source, /time\.dataset\.sessionId/);
+  assert.match(source, /time\.dataset\.videoId/);
+  assert.match(source, /sessionId: button\.dataset\.sessionId/);
+  assert.match(source, /videoId: button\.dataset\.videoId/);
+  assert.match(
+    source,
+    /\["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"\][\s\S]*resetFullTranscript\(\)/,
+  );
 });
 
 test("完整字幕工具栏将分组和操作控件保持在同一行", () => {

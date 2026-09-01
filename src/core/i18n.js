@@ -420,6 +420,7 @@ const englishRuntimeMessages = new Map([
   ["未授权访问翻译 API", "Access to the translation API was not granted"],
   ["无法撤销旧的翻译 API 权限", "Could not revoke the previous translation API permission"],
   ["无法回收新的翻译 API 权限", "Could not revoke the newly granted translation API permission"],
+  ["当前页面会话不匹配", "The current page no longer matches this transcript"],
 ]);
 
 const englishRuntimePatterns = [

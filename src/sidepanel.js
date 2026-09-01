@@ -176,6 +176,7 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
     if (["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"].includes(message.type)) {
       historyContextToken += 1;
       closeStaleHistoryConfirmation();
+      resetFullTranscript();
     }
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
   },
@@ -448,6 +449,8 @@ function renderFullTranscript() {
     time.className = "full-transcript-time";
     time.type = "button";
     time.dataset.seconds = String(cue.startMs / 1000);
+    time.dataset.sessionId = activeContext?.sessionId ?? "";
+    time.dataset.videoId = fullTranscript?.videoId ?? "";
     time.textContent = timestamp;
     time.setAttribute("aria-label", t("jumpToTimestamp", { timestamp }));
     const text = document.createElement("p");
@@ -1305,7 +1308,12 @@ elements.fullTranscriptList.addEventListener("click", (event) => {
   if (!button) return;
   const seconds = Number(button.dataset.seconds);
   if (!Number.isFinite(seconds)) return;
-  void request({ type: "SEEK_VIDEO", seconds }).catch((error) => {
+  void request({
+    type: "SEEK_VIDEO",
+    seconds,
+    sessionId: button.dataset.sessionId,
+    videoId: button.dataset.videoId,
+  }).catch((error) => {
     showToast(error.message);
   });
 });
