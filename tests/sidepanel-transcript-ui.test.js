@@ -25,6 +25,7 @@ test("完整字幕在 YouTube 上自动读取并按标签页发送跳转", () =>
   assert.match(source, /activeContext\.platform !== "youtube"/);
   assert.match(source, /transcriptCoverage/);
   assert.match(source, /groupTranscriptCues/);
+  assert.match(source, /formatTranscriptProgress/);
   assert.doesNotMatch(source, /fullTranscriptGrouped/);
   assert.match(source, /formatTranscriptTimeRange/);
   assert.match(source, /time\.dataset\.sessionId/);
@@ -54,6 +55,18 @@ test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
     css,
     /\.full-transcript-panel > summary small\s*\{[^}]*white-space:\s*normal/s,
   );
+  assert.match(
+    css,
+    /\.full-transcript-panel > summary > span\s*\{[^}]*white-space:\s*nowrap/s,
+  );
+  assert.match(
+    css,
+    /\.full-transcript-panel > summary small\s*\{[^}]*flex:\s*1 1 0/s,
+  );
+  assert.match(
+    css,
+    /\.full-transcript-panel > summary small\s*\{[^}]*font-variant-numeric:\s*tabular-nums/s,
+  );
   assert.match(css, /\.full-transcript-time/);
 });
 
@@ -70,12 +83,11 @@ test("侧栏自动显示字幕语言并只提供五种翻译目标语言", () =>
   assert.match(html, /id="browser-translation-language-pack-action"[^>]*hidden/);
   assert.doesNotMatch(html, /OpenAI|API Base URL|API Key|full-transcript-translation-provider/);
   assert.match(html, /class="full-transcript-group-picker"/);
-  for (const value of [5, 10, 20, 30]) {
-    assert.match(
-      html,
-      new RegExp(`type="radio"[^>]*name="full-transcript-group-size"[^>]*data-full-transcript-group-size[^>]*value="${value}"`),
-    );
-  }
+  assert.deepEqual(
+    [...html.matchAll(/type="radio"[^>]*name="full-transcript-group-size"[^>]*data-full-transcript-group-size[^>]*value="(\d+)"/g)]
+      .map((match) => Number(match[1])),
+    [5, 10, 20],
+  );
   assert.match(html, /data-full-transcript-group-size value="5" checked/);
   assert.doesNotMatch(html, /id="full-transcript-group-size"/);
   assert.match(source, /fullTranscriptGroupButtons/);

@@ -46,13 +46,30 @@ test("完整字幕按五条合并，末组保留剩余字幕和完整时间范�
   ]);
 });
 
-test("完整字幕只接受四个合并档位并回退到默认五条", () => {
+test("完整字幕只接受三个合并档位并回退到默认五条", () => {
   assert.equal(transcriptView.normalizeTranscriptGroupSize(5), 5);
   assert.equal(transcriptView.normalizeTranscriptGroupSize("10"), 10);
   assert.equal(transcriptView.normalizeTranscriptGroupSize(20), 20);
-  assert.equal(transcriptView.normalizeTranscriptGroupSize(30), 30);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize(30), 5);
   assert.equal(transcriptView.normalizeTranscriptGroupSize(15), 5);
   assert.equal(transcriptView.normalizeTranscriptGroupSize("invalid"), 5);
+});
+
+test("完整字幕翻译进度按总数位数预留固定空间", () => {
+  const progressValues = [
+    transcriptView.formatTranscriptProgress(9, 1081),
+    transcriptView.formatTranscriptProgress(10, 1081),
+    transcriptView.formatTranscriptProgress(100, 1081),
+    transcriptView.formatTranscriptProgress(1081, 1081),
+  ];
+
+  assert.deepEqual(progressValues, [
+    "\u2007\u2007\u20079/1081",
+    "\u2007\u200710/1081",
+    "\u2007100/1081",
+    "1081/1081",
+  ]);
+  assert.deepEqual(progressValues.map((value) => [...value].length), [9, 9, 9, 9]);
 });
 
 test("完整字幕按自定义条数合并并拼接已有译文", () => {

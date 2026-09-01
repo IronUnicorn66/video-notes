@@ -17,7 +17,7 @@
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
 - 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
-- 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、可配置的 5/10/20/30 条合并阅读和时间跳转。
+- 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、可配置的 5/10/20 条合并阅读和时间跳转。
 - 使用 Edge/Chrome 内置 Translator API 在本机翻译完整字幕；自动识别字幕语言，首版可选择简体中文、英语、日语、韩语或西班牙语作为目标语言，并提前下载当前语言对。
 - 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
 - Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
@@ -28,12 +28,12 @@
 
 ### Edge 商店
 
-1.0.18 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.19 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.18 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.18/video-notes-edge-1.0.18.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.18/video-notes-edge-1.0.18.zip.sha256)
+[下载视频笔记 1.0.19 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.19/video-notes-edge-1.0.19.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.19/video-notes-edge-1.0.19.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -75,8 +75,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.18.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.18.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.19.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.19.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。
