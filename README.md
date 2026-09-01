@@ -17,9 +17,9 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note.
 - Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
-- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, configurable 5, 10, or 20-segment reading groups, independent font-size controls, and timestamp jumps.
+- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, and timestamp jumps.
 - Adjusts the whole side panel from 75% to 200% with the `+` and `−` buttons beside the language selector, in 10% steps.
-- Translates a complete YouTube transcript locally with the built-in Edge/Chrome Translator API. It detects the transcript language automatically and lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target, with advance download and visible progress for the current language pair.
+- Translates sentence-aware transcript paragraphs locally with the built-in Edge/Chrome Translator API. It detects the transcript language automatically and lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target, with advance download and visible progress for the current language pair.
 - Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
 - Runs Base, Small, or Medium Whisper models locally in the browser.
 - Shows notes oldest-first or newest-first, with edit, delete, clear, undo, and redo controls.
@@ -29,12 +29,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.21 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.22 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.21 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.21/video-notes-edge-1.0.21.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.21/video-notes-edge-1.0.21.zip.sha256)
+[Download Video Notes 1.0.22 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -76,8 +76,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.21.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.21.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.22.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.22.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.

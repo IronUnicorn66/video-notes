@@ -1,3 +1,8 @@
+import {
+  formatSubtitleFragments,
+  truncateSubtitleText,
+} from "./subtitle-segmentation.js";
+
 function normalizeText(text) {
   return String(text ?? "")
     .split(/\r\n?|\n/)
@@ -38,22 +43,9 @@ export class SubtitleBuffer {
     const eligible = this.items.filter(
       (item) => item.seconds <= end && item.seconds >= end - seconds,
     );
-    const selected = [];
-    let length = 0;
-
-    for (let index = eligible.length - 1; index >= 0; index -= 1) {
-      const text = eligible[index].text;
-      const separatorLength = selected.length === 0 ? 0 : 1;
-      const remaining = maxChars - length - separatorLength;
-      if (remaining <= 0) break;
-      if (text.length > remaining) {
-        if (selected.length === 0) selected.unshift(text.slice(-remaining));
-        break;
-      }
-      selected.unshift(text);
-      length += text.length + separatorLength;
-    }
-
-    return selected.join("\n");
+    return truncateSubtitleText(
+      formatSubtitleFragments(eligible.map((item) => item.text)),
+      maxChars,
+    );
   }
 }

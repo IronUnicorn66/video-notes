@@ -234,8 +234,8 @@ export async function translateBrowserTranscriptCues({
   return translations;
 }
 
-export function untranslatedTranscriptCues(cues) {
-  return cues
-    .map((cue, id) => ({ id, text: cue.text }))
-    .filter((cue) => !String(cues[cue.id].translation ?? "").trim());
+export function untranslatedTranscriptSegments(segments) {
+  return segments
+    .filter((segment) => !String(segment.translation ?? "").trim())
+    .map(({ id, text }) => ({ id, text }));
 }

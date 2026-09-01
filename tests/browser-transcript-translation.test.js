@@ -7,7 +7,7 @@ import {
   browserTranslationPairCandidates,
   createBrowserTranscriptTranslator,
   translateBrowserTranscriptCues,
-  untranslatedTranscriptCues,
+  untranslatedTranscriptSegments,
 } from "../src/core/browser-transcript-translation.js";
 import {
   BROWSER_TRANSLATION_TARGET_LANGUAGES,
@@ -255,7 +255,7 @@ test("语言包下载失败会返回独立错误状态", async () => {
   );
 });
 
-test("本地翻译逐条保留字幕序号、报告进度并拒绝空结果", async () => {
+test("本地翻译逐段保留稳定标识、报告进度并拒绝空结果", async () => {
   const completed = [];
   const translations = await translateBrowserTranscriptCues({
     session: {
@@ -308,13 +308,13 @@ test("中断信号会停止后续字幕翻译", async () => {
   assert.deepEqual(requested, ["One"]);
 });
 
-test("本地翻译只保留尚未翻译的字幕及原始序号", () => {
-  assert.deepEqual(untranslatedTranscriptCues([
-    { text: "One", translation: "一" },
-    { text: "Two" },
-    { text: "Three", translation: " " },
+test("本地翻译只保留尚未翻译的断句段落及稳定标识", () => {
+  assert.deepEqual(untranslatedTranscriptSegments([
+    { id: "0:6", text: "One", translation: "一" },
+    { id: "6:12", text: "Two" },
+    { id: "12:18", text: "Three", translation: " " },
   ]), [
-    { id: 1, text: "Two" },
-    { id: 2, text: "Three" },
+    { id: "6:12", text: "Two" },
+    { id: "12:18", text: "Three" },
   ]);
 });

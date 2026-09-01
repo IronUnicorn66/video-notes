@@ -152,7 +152,9 @@ test("切换视频、重试和关闭侧栏会中断本地翻译并销毁文档�
   assert.match(source, /async function loadFullTranscript\(\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /session\.destroy\(\)/);
-  assert.match(source, /untranslatedTranscriptCues\(transcript\.cues\)/);
+  assert.match(source, /untranslatedTranscriptSegments\(groups\)/);
+  assert.match(source, /fullTranscriptTranslations\.set\(id, translation\)/);
+  assert.match(source, /button\.disabled = fullTranscriptTranslationRunning/);
 });
 
 test("完整字幕将时间范围置于正文上方以避免两列留白", () => {
