@@ -690,7 +690,6 @@ textarea:focus {
   font-weight: 650;
 }
 
-.full-transcript-translation-setting input,
 .full-transcript-translation-setting select {
   box-sizing: border-box;
   width: 100%;
@@ -710,14 +709,37 @@ textarea:focus {
   line-height: 1.45;
 }
 
-.full-transcript-api-translation-settings {
-  margin-top: 9px;
-  border-top: 1px solid #dedbd2;
-  padding-top: 1px;
+.browser-translation-target,
+.browser-translation-language-pack-note {
+  margin-top: 7px;
+  color: #5f5b51;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.browser-translation-target strong {
+  color: #34463e;
+}
+
+#browser-translation-language-pack-progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 10px;
+  accent-color: #607c6f;
+}
+
+#browser-translation-language-pack-progress[hidden] {
+  display: none;
 }
 
 .full-transcript-translation-setting button {
+  width: 100%;
   margin-top: 10px;
+}
+
+.full-transcript-translation-setting button[hidden] {
+  display: none;
 }
 
 .note-subtitle {

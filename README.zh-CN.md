@@ -18,7 +18,7 @@
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
 - 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
 - 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、可配置的 5/10/20/30 条合并阅读和时间跳转。
-- 默认使用 Edge/Chrome 内置 Translator API 在本机把完整字幕翻译为简体中文；首次下载语言包后可离线使用，用户也可主动选择自己的 OpenAI 兼容 API 作为备用。
+- 使用 Edge/Chrome 内置 Translator API 在本机翻译完整字幕；自动识别字幕语言，首版可选择简体中文、英语、日语、韩语或西班牙语作为目标语言，并提前下载当前语言对。
 - 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
 - Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
 - 正序或倒序查看时间线，支持编辑、删除、清空、撤销和反撤销。
@@ -28,12 +28,12 @@
 
 ### Edge 商店
 
-1.0.17 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.18 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.17 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.17/video-notes-edge-1.0.17.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.17/video-notes-edge-1.0.17.zip.sha256)
+[下载视频笔记 1.0.18 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.18/video-notes-edge-1.0.18.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.18/video-notes-edge-1.0.18.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -47,7 +47,7 @@
 
 1. 打开 YouTube 普通视频页或哔哩哔哩 BV 视频页，点击工具栏中的“视频笔记”。
 2. 点击快速标记输入框，输入想法后移开焦点；也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
-3. 在“权限、语音与快捷键”中按需启用播放器截图、麦克风、前置字幕或可选翻译。
+3. 在“设置”中按需启用播放器截图、麦克风、前置字幕，或提前下载本地翻译语言包。
 4. 需要语音记录时，按住右 Option/Alt 或“按住说话”按钮。
 5. 需要本地转写时，选择并下载固定的 Whisper 模型；下载完成后可离线转写。
 6. 看完后点击“导出 ZIP”。导出不会删除浏览器中的笔记。
@@ -58,7 +58,7 @@
 
 首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。下载服务会收到普通 HTTPS 请求的 IP、User-Agent、请求时间和模型文件地址等连接元数据；请求不包含用户笔记或媒体内容。
 
-完整字幕默认通过浏览器内置 Translator API 在侧栏文档中本地翻译。浏览器可能在首次使用某个语言对时下载语言包；下载完成后翻译可断网运行，扩展不会向字幕服务发送内容。Edge 与 Chrome 分别管理自己的语言包，支持状态和翻译结果可能不同。只有用户主动把“翻译方式”切换为 OpenAI 兼容 API 时，扩展才会将当前完整字幕直接发送给其配置的 HTTPS 服务；API Key 保存在扩展本机存储，译文只保留在当前侧栏会话。
+完整字幕只通过浏览器内置 Translator API 在侧栏文档中本地翻译。扩展从字幕轨道自动识别源语言，首版允许用户选择简体中文、英语、日语、韩语或西班牙语作为目标语言；读取完整字幕后，可以提前下载当前源语言到目标语言的语言包并查看进度。下载完成后才显示约 200 MiB 的预估占用，之后可断网翻译。Edge 与 Chrome 分别管理自己的语言包，实际占用、支持状态和翻译结果可能不同。扩展不会把字幕发送给开发者或第三方翻译服务。
 
 - [产品主页](https://ironunicorn66.github.io/video-notes/)
 - [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
@@ -75,8 +75,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.17.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.17.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.18.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.18.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。
