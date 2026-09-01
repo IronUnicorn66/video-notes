@@ -124,7 +124,7 @@
       </section>
 
       <details id="permission-settings" class="settings">
-        <summary data-i18n="settingsSummary">权限、语音与快捷键</summary>
+        <summary data-i18n="settingsSummary">设置</summary>
         <div class="settings-content">
           <div class="setting-row">
             <div>
@@ -157,6 +157,25 @@
             </div>
           </div>
           <div class="setting-row">
+            <div class="full-transcript-translation-setting">
+              <strong data-i18n="fullTranscriptTranslationSettings">全文翻译</strong>
+              <p data-i18n="fullTranscriptTranslationDescription">使用 Edge 内置模型在本机翻译，下载后可离线使用。</p>
+              <p class="browser-translation-target"><span data-i18n="fullTranscriptLanguagePackSource">检测到字幕语言</span> <strong id="browser-translation-detected-source" data-i18n="fullTranscriptLanguagePackSourceWaiting">读取完整字幕后自动识别</strong></p>
+              <label for="browser-translation-language-pack-select" data-i18n="fullTranscriptLanguagePackTarget">翻译为</label>
+              <select id="browser-translation-language-pack-select">
+                <option value="zh-Hans" data-i18n="languageSimplifiedChinese">简体中文</option>
+                <option value="en" data-i18n="languageEnglish">英语</option>
+                <option value="ja" data-i18n="languageJapanese">日语</option>
+                <option value="ko" data-i18n="languageKorean">韩语</option>
+                <option value="es" data-i18n="languageSpanish">西班牙语</option>
+              </select>
+              <progress id="browser-translation-language-pack-progress" max="1" value="0" hidden></progress>
+              <p id="browser-translation-language-pack-status" class="full-transcript-local-translation-detail" role="status" aria-live="polite">正在检查语言包…</p>
+              <button id="browser-translation-language-pack-action" class="secondary-button" type="button" data-i18n="downloadLanguagePack" hidden>下载语言包</button>
+              <p class="browser-translation-language-pack-note" data-i18n="fullTranscriptLanguagePackManagedByEdge">由 Edge 下载和管理，下载后可离线使用。</p>
+            </div>
+          </div>
+          <div class="setting-row">
             <div class="whisper-setting">
               <strong data-i18n="localWhisper">本地 Whisper</strong>
               <p id="whisper-detail" data-i18n="whisperInitial">尚未启用。首次下载约 57 MiB。</p>
@@ -172,28 +191,6 @@
               <p data-i18n="shortcutDescription">仅在视频页面且光标不在输入控件中生效。</p>
             </div>
             <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
-          </div>
-          <div class="setting-row">
-            <div class="full-transcript-translation-setting">
-              <strong data-i18n="fullTranscriptTranslationSettings">全文翻译</strong>
-              <p data-i18n="fullTranscriptTranslationDescription">默认使用浏览器内置模型在本机翻译；云端 API 仅在你主动选择后使用。</p>
-              <label for="full-transcript-translation-provider" data-i18n="fullTranscriptTranslationProvider">翻译方式</label>
-              <select id="full-transcript-translation-provider">
-                <option value="browser" data-i18n="fullTranscriptTranslationProviderBrowser">浏览器本地翻译（推荐）</option>
-                <option value="api" data-i18n="fullTranscriptTranslationProviderApi">OpenAI 兼容 API（备用）</option>
-              </select>
-              <p id="full-transcript-local-translation-detail" class="full-transcript-local-translation-detail" role="status" aria-live="polite">读取字幕后检查本地语言包。</p>
-              <div id="full-transcript-api-translation-settings" class="full-transcript-api-translation-settings" hidden>
-                <p data-i18n="fullTranscriptTranslationApiDescription">仅在点击翻译后，将完整字幕直接发送给下方配置的服务。</p>
-                <label for="full-transcript-translation-base-url" data-i18n="fullTranscriptTranslationBaseUrl">API Base URL</label>
-                <input id="full-transcript-translation-base-url" type="url" inputmode="url" autocomplete="url" placeholder="https://api.example.com/v1" />
-                <label for="full-transcript-translation-api-key" data-i18n="fullTranscriptTranslationApiKey">API Key</label>
-                <input id="full-transcript-translation-api-key" type="password" autocomplete="off" />
-                <label for="full-transcript-translation-model" data-i18n="fullTranscriptTranslationModel">模型名</label>
-                <input id="full-transcript-translation-model" type="text" autocomplete="off" />
-                <button id="full-transcript-translation-save" class="secondary-button" type="button" data-i18n="fullTranscriptTranslationSave">保存云端备用配置</button>
-              </div>
-            </div>
           </div>
           <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记、转写和浏览器本地译文都保存在本机。截图权限只用于视频播放器；本地模型仅在首次使用相应功能时下载。</p>
         </div>

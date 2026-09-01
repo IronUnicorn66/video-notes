@@ -32,24 +32,18 @@ import {
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
 import {
-  authorizeCurrentTranscriptTranslation,
-  chunkTranscriptCues,
-  normalizeFullTranscriptTranslationConfig,
-  requestTranslationHostPermission,
-  translateTranscriptBatch,
-  untranslatedTranscriptCues,
-} from "./core/full-transcript-translation.js";
-import {
   BROWSER_TRANSLATION_ERROR,
   browserTranscriptTranslationAvailability,
   createBrowserTranscriptTranslator,
+  normalizedBrowserTranslationSourceLanguage,
+  normalizedBrowserTranslationTargetLanguage,
   translateBrowserTranscriptCues,
+  untranslatedTranscriptCues,
 } from "./core/browser-transcript-translation.js";
 import {
-  clearTranslationSettings,
-  FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY,
-  saveTranslationSettings,
-} from "./core/full-transcript-translation-settings.js";
+  getBrowserTranslationTargetLanguage,
+  prepareBrowserTranslationLanguagePack,
+} from "./core/browser-translation-language-packs.js";
 import {
   createHistoryConfirmationController,
   createHistoryOperationController,
@@ -104,13 +98,11 @@ const elements = {
   microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
   subtitleEnabled: document.querySelector("#subtitle-enabled"),
   subtitleWindowSeconds: document.querySelector("#subtitle-window-seconds"),
-  fullTranscriptTranslationProvider: document.querySelector("#full-transcript-translation-provider"),
-  fullTranscriptLocalTranslationDetail: document.querySelector("#full-transcript-local-translation-detail"),
-  fullTranscriptApiTranslationSettings: document.querySelector("#full-transcript-api-translation-settings"),
-  fullTranscriptTranslationBaseUrl: document.querySelector("#full-transcript-translation-base-url"),
-  fullTranscriptTranslationApiKey: document.querySelector("#full-transcript-translation-api-key"),
-  fullTranscriptTranslationModel: document.querySelector("#full-transcript-translation-model"),
-  fullTranscriptTranslationSave: document.querySelector("#full-transcript-translation-save"),
+  browserTranslationDetectedSource: document.querySelector("#browser-translation-detected-source"),
+  browserTranslationLanguagePackSelect: document.querySelector("#browser-translation-language-pack-select"),
+  browserTranslationLanguagePackProgress: document.querySelector("#browser-translation-language-pack-progress"),
+  browserTranslationLanguagePackStatus: document.querySelector("#browser-translation-language-pack-status"),
+  browserTranslationLanguagePackAction: document.querySelector("#browser-translation-language-pack-action"),
   fullTranscriptGroupButtons: document.querySelectorAll("[data-full-transcript-group-size]"),
   keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
@@ -162,11 +154,16 @@ let fullTranscriptLoading = false;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
 let fullTranscriptTranslationRunning = false;
 let fullTranscriptTranslationController = null;
-let fullTranscriptTranslationProvider = "browser";
 let browserTranscriptTranslationSession = null;
 let browserTranscriptTranslationState = globalThis.Translator
   ? { status: "waiting" }
   : { status: "unsupported" };
+let browserTranslationLanguagePackTarget = "zh-Hans";
+let browserTranslationLanguagePackState = globalThis.Translator
+  ? { status: "waitingForSource", progress: 0 }
+  : { status: "unsupported", progress: 0 };
+let browserTranslationLanguagePackController = null;
+let browserTranslationLanguagePackGeneration = 0;
 const browserTranscriptTranslationPairs = new Map();
 
 const noteSortBinding = createSidepanelNoteSortBinding({
@@ -399,6 +396,7 @@ async function request(message) {
 
 function resetFullTranscript({ hide = false } = {}) {
   cancelFullTranscriptTranslation();
+  cancelBrowserTranslationLanguagePackDownload();
   fullTranscriptGeneration += 1;
   fullTranscript = null;
   fullTranscriptLoading = false;
@@ -412,10 +410,17 @@ function resetFullTranscript({ hide = false } = {}) {
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptEmpty.hidden = false;
+  setBrowserTranslationLanguagePackState(
+    globalThis.Translator ? "waitingForSource" : "unsupported",
+  );
 }
 
 function translatedFullTranscriptCueCount() {
   return (fullTranscript?.cues ?? []).filter((cue) => String(cue.translation ?? "").trim()).length;
+}
+
+function clearFullTranscriptTranslations() {
+  for (const cue of fullTranscript?.cues ?? []) delete cue.translation;
 }
 
 function fullTranscriptLoadedStatus() {
@@ -426,11 +431,13 @@ function fullTranscriptLoadedStatus() {
     coverage: formatTranscriptTimeRange(coverage),
     language: fullTranscript.label || fullTranscript.languageCode || t("unknownLanguage"),
   });
-  if (!fullTranscriptTranslationRunning) return loaded;
-  if (
-    fullTranscriptTranslationProvider === "browser"
-    && browserTranscriptTranslationState.status === "downloading"
-  ) {
+  if (!fullTranscriptTranslationRunning) {
+    if (browserTranscriptTranslationState.status === "alreadyTarget") {
+      return `${loaded} · ${t("fullTranscriptLocalTranslationAlreadyTarget")}`;
+    }
+    return loaded;
+  }
+  if (browserTranscriptTranslationState.status === "downloading") {
     return `${loaded} · ${t("fullTranscriptLocalTranslationDownloading", {
       progress: Math.round(browserTranscriptTranslationState.progress * 100),
     })}`;
@@ -450,8 +457,12 @@ function syncFullTranscriptGroupButtons() {
 function syncFullTranscriptTranslateButton() {
   const total = fullTranscript?.cues.length ?? 0;
   const translated = translatedFullTranscriptCueCount();
-  elements.fullTranscriptTranslate.disabled = total === 0 || fullTranscriptLoading || fullTranscriptTranslationRunning;
-  elements.fullTranscriptTranslationProvider.disabled = fullTranscriptTranslationRunning;
+  elements.fullTranscriptTranslate.disabled = total === 0
+    || !globalThis.Translator
+    || browserTranscriptTranslationState.status === "alreadyTarget"
+    || fullTranscriptLoading
+    || fullTranscriptTranslationRunning
+    || Boolean(browserTranslationLanguagePackController);
   if (fullTranscriptTranslationRunning) {
     elements.fullTranscriptTranslate.textContent = t("fullTranscriptTranslate");
   } else if (translated === total && total > 0) {
@@ -500,20 +511,37 @@ function renderFullTranscript() {
 
 const disposedBrowserTranslationSessions = new WeakSet();
 
-function normalizeFullTranscriptTranslationProvider(value) {
-  return value === "api" ? "api" : "browser";
-}
-
 function browserTranslationSourceKey(transcript = fullTranscript) {
-  return String(transcript?.languageCode ?? "").trim().toLowerCase();
+  const sourceLanguage = typeof transcript === "string"
+    ? transcript
+    : transcript?.languageCode;
+  return normalizedBrowserTranslationSourceLanguage(sourceLanguage);
 }
 
-function browserTranslationPairForTranscript(transcript = fullTranscript) {
-  return browserTranscriptTranslationPairs.get(browserTranslationSourceKey(transcript));
+function browserTranslationPairKey(
+  transcript = fullTranscript,
+  targetLanguage = browserTranslationLanguagePackTarget,
+) {
+  const source = browserTranslationSourceKey(transcript);
+  const target = normalizedBrowserTranslationTargetLanguage(targetLanguage);
+  return source && target ? `${source}->${target}` : "";
 }
 
-function cacheBrowserTranslationPair(transcript, pair) {
-  const key = browserTranslationSourceKey(transcript);
+function browserTranslationPairForTranscript(
+  transcript = fullTranscript,
+  targetLanguage = browserTranslationLanguagePackTarget,
+) {
+  return browserTranscriptTranslationPairs.get(
+    browserTranslationPairKey(transcript, targetLanguage),
+  );
+}
+
+function cacheBrowserTranslationPair(
+  transcript,
+  pair,
+  targetLanguage = browserTranslationLanguagePackTarget,
+) {
+  const key = browserTranslationPairKey(transcript, targetLanguage);
   if (!key || !pair) return;
   const current = browserTranscriptTranslationPairs.get(key);
   if (
@@ -537,38 +565,77 @@ function destroyBrowserTranslationSession(session = browserTranscriptTranslation
   }
 }
 
-function localTranslationStatusMessage() {
-  if (browserTranscriptTranslationState.status === "downloading") {
-    return t("fullTranscriptLocalTranslationDownloading", {
-      progress: Math.round(browserTranscriptTranslationState.progress * 100),
+function browserLanguagePackStatusMessage() {
+  const selected = getBrowserTranslationTargetLanguage(browserTranslationLanguagePackTarget);
+  if (browserTranslationLanguagePackState.status === "downloading") {
+    return t("fullTranscriptLanguagePackDownloading", {
+      progress: Math.round(browserTranslationLanguagePackState.progress * 100),
+    });
+  }
+  if (browserTranslationLanguagePackState.status === "ready") {
+    return t("fullTranscriptLanguagePackReady", {
+      size: selected?.estimatedSizeMiB ?? 200,
     });
   }
   const keys = {
-    waiting: "fullTranscriptLocalTranslationWaiting",
-    checking: "fullTranscriptLocalTranslationChecking",
-    ready: "fullTranscriptLocalTranslationReady",
-    downloadable: "fullTranscriptLocalTranslationDownloadable",
-    unsupported: "fullTranscriptLocalTranslationUnsupported",
-    unavailable: "fullTranscriptLocalTranslationUnavailable",
-    downloadFailed: "fullTranscriptLocalTranslationDownloadFailed",
-    alreadyTarget: "fullTranscriptLocalTranslationAlreadyTarget",
+    waitingForSource: "fullTranscriptLanguagePackWaitingForSource",
+    checking: "fullTranscriptLanguagePackChecking",
+    downloadable: "fullTranscriptLanguagePackDownloadable",
+    unsupported: "fullTranscriptLanguagePackUnsupported",
+    unavailable: "fullTranscriptLanguagePackUnavailable",
+    alreadyTarget: "fullTranscriptLanguagePackAlreadyTarget",
+    downloadFailed: "fullTranscriptLanguagePackDownloadFailed",
   };
-  return t(keys[browserTranscriptTranslationState.status] ?? keys.waiting);
+  return t(keys[browserTranslationLanguagePackState.status] ?? keys.waitingForSource);
 }
 
-function renderFullTranscriptTranslationSettings() {
-  const usingApi = fullTranscriptTranslationProvider === "api";
-  elements.fullTranscriptTranslationProvider.value = fullTranscriptTranslationProvider;
-  elements.fullTranscriptApiTranslationSettings.hidden = !usingApi;
-  elements.fullTranscriptLocalTranslationDetail.hidden = usingApi;
-  elements.fullTranscriptLocalTranslationDetail.textContent = localTranslationStatusMessage();
+function browserDetectedSourceName() {
+  const names = {
+    "zh": "languageSimplifiedChinese",
+    "zh-Hant": "languageTraditionalChinese",
+    en: "languageEnglish",
+    ja: "languageJapanese",
+    ko: "languageKorean",
+    es: "languageSpanish",
+    fr: "languageFrench",
+  };
+  const source = browserTranslationSourceKey();
+  if (!source) return t("fullTranscriptLanguagePackSourceWaiting");
+  return names[source]
+    ? t(names[source])
+    : fullTranscript?.label || fullTranscript?.languageCode || t("unknownLanguage");
+}
+
+function renderBrowserTranslationLanguagePackSettings() {
+  const status = browserTranslationLanguagePackState.status;
+  const busy = fullTranscriptTranslationRunning
+    || Boolean(browserTranslationLanguagePackController)
+    || ["checking", "downloading"].includes(status);
+  elements.browserTranslationDetectedSource.textContent = browserDetectedSourceName();
+  elements.browserTranslationLanguagePackSelect.value = browserTranslationLanguagePackTarget;
+  elements.browserTranslationLanguagePackSelect.disabled = busy;
+  elements.browserTranslationLanguagePackProgress.hidden = status !== "downloading";
+  elements.browserTranslationLanguagePackProgress.value = browserTranslationLanguagePackState.progress ?? 0;
+  elements.browserTranslationLanguagePackStatus.textContent = browserLanguagePackStatusMessage();
+  const actionable = ["downloadable", "downloadFailed"].includes(status) && !busy;
+  elements.browserTranslationLanguagePackAction.hidden = !actionable;
+  elements.browserTranslationLanguagePackAction.disabled = !actionable;
+  elements.browserTranslationLanguagePackAction.textContent = t(
+    status === "downloadFailed" ? "retryLanguagePackDownload" : "downloadLanguagePack",
+  );
+}
+
+function setBrowserTranslationLanguagePackState(status, progress = 0) {
+  browserTranslationLanguagePackState = { status, progress };
+  renderBrowserTranslationLanguagePackSettings();
+  syncFullTranscriptTranslateButton();
 }
 
 function setBrowserTranscriptTranslationState(status, progress = 0) {
   browserTranscriptTranslationState = { status, progress };
-  renderFullTranscriptTranslationSettings();
-  if (fullTranscript && fullTranscriptTranslationRunning) {
+  if (fullTranscript) {
     elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+    syncFullTranscriptTranslateButton();
   }
 }
 
@@ -594,20 +661,23 @@ async function refreshBrowserTranscriptTranslationAvailability() {
     return;
   }
   const transcript = fullTranscript;
+  const targetLanguage = browserTranslationLanguagePackTarget;
   const generation = fullTranscriptGeneration;
   const contextKey = fullTranscriptContextKey;
   setBrowserTranscriptTranslationState("checking");
   try {
     const result = await browserTranscriptTranslationAvailability({
       sourceLanguage: transcript.languageCode,
-      preferredPair: browserTranslationPairForTranscript(transcript),
+      targetLanguage,
+      preferredPair: browserTranslationPairForTranscript(transcript, targetLanguage),
     });
     if (
       transcript !== fullTranscript
       || generation !== fullTranscriptGeneration
       || contextKey !== fullTranscriptContextKey
+      || targetLanguage !== browserTranslationLanguagePackTarget
     ) return;
-    cacheBrowserTranslationPair(transcript, result.pair);
+    cacheBrowserTranslationPair(transcript, result.pair, targetLanguage);
     setBrowserTranscriptTranslationState(
       result.availability === "available" ? "ready" : "downloadable",
     );
@@ -616,11 +686,125 @@ async function refreshBrowserTranscriptTranslationAvailability() {
       transcript === fullTranscript
       && generation === fullTranscriptGeneration
       && contextKey === fullTranscriptContextKey
+      && targetLanguage === browserTranslationLanguagePackTarget
     ) {
       if (!setBrowserTranslationErrorState(error)) {
         setBrowserTranscriptTranslationState("unavailable");
       }
     }
+  }
+}
+
+async function refreshBrowserTranslationLanguagePackAvailability() {
+  if (browserTranslationLanguagePackController) return;
+  const generation = ++browserTranslationLanguagePackGeneration;
+  const sourceLanguage = browserTranslationSourceKey();
+  const targetLanguage = browserTranslationLanguagePackTarget;
+  if (!globalThis.Translator) {
+    setBrowserTranslationLanguagePackState("unsupported");
+    return;
+  }
+  if (!sourceLanguage) {
+    setBrowserTranslationLanguagePackState("waitingForSource");
+    return;
+  }
+  setBrowserTranslationLanguagePackState("checking");
+  try {
+    const result = await browserTranscriptTranslationAvailability({
+      sourceLanguage,
+      targetLanguage,
+      preferredPair: browserTranslationPairForTranscript(sourceLanguage, targetLanguage),
+    });
+    if (
+      generation !== browserTranslationLanguagePackGeneration
+      || sourceLanguage !== browserTranslationSourceKey()
+      || targetLanguage !== browserTranslationLanguagePackTarget
+    ) return;
+    cacheBrowserTranslationPair(sourceLanguage, result.pair, targetLanguage);
+    setBrowserTranslationLanguagePackState(
+      result.availability === "available" ? "ready" : "downloadable",
+    );
+  } catch (error) {
+    if (
+      generation !== browserTranslationLanguagePackGeneration
+      || sourceLanguage !== browserTranslationSourceKey()
+      || targetLanguage !== browserTranslationLanguagePackTarget
+    ) return;
+    setBrowserTranslationLanguagePackState(
+      error?.code === BROWSER_TRANSLATION_ERROR.ALREADY_TARGET
+        ? "alreadyTarget"
+        : error?.code === BROWSER_TRANSLATION_ERROR.UNSUPPORTED
+          ? "unsupported"
+          : "unavailable",
+    );
+  }
+}
+
+async function downloadSelectedBrowserTranslationLanguagePack() {
+  if (browserTranslationLanguagePackController) return;
+  const sourceLanguage = browserTranslationSourceKey();
+  const targetLanguage = browserTranslationLanguagePackTarget;
+  if (!sourceLanguage) return;
+  const controller = new AbortController();
+  browserTranslationLanguagePackController = controller;
+  const generation = ++browserTranslationLanguagePackGeneration;
+  setBrowserTranslationLanguagePackState("downloading");
+  try {
+    const result = await prepareBrowserTranslationLanguagePack({
+      sourceLanguage,
+      targetLanguage,
+      preferredPair: browserTranslationPairForTranscript(sourceLanguage, targetLanguage),
+      signal: controller.signal,
+      onDownloadProgress: (progress) => {
+        if (
+          browserTranslationLanguagePackController === controller
+          && sourceLanguage === browserTranslationSourceKey()
+          && targetLanguage === browserTranslationLanguagePackTarget
+        ) {
+          setBrowserTranslationLanguagePackState("downloading", progress);
+        }
+      },
+    });
+    if (
+      controller.signal.aborted
+      || generation !== browserTranslationLanguagePackGeneration
+      || sourceLanguage !== browserTranslationSourceKey()
+      || targetLanguage !== browserTranslationLanguagePackTarget
+    ) return;
+    cacheBrowserTranslationPair(sourceLanguage, result.pair, targetLanguage);
+    setBrowserTranslationLanguagePackState("ready", 1);
+    showToast(t("fullTranscriptLanguagePackComplete"));
+    void refreshBrowserTranscriptTranslationAvailability();
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      setBrowserTranslationLanguagePackState(
+        error?.code === BROWSER_TRANSLATION_ERROR.ALREADY_TARGET
+          ? "alreadyTarget"
+          : error?.code === BROWSER_TRANSLATION_ERROR.UNSUPPORTED
+            ? "unsupported"
+            : error?.code === BROWSER_TRANSLATION_ERROR.UNAVAILABLE
+              ? "unavailable"
+              : "downloadFailed",
+      );
+    }
+  } finally {
+    if (browserTranslationLanguagePackController === controller) {
+      browserTranslationLanguagePackController = null;
+      renderBrowserTranslationLanguagePackSettings();
+      syncFullTranscriptTranslateButton();
+    }
+  }
+}
+
+function cancelBrowserTranslationLanguagePackDownload() {
+  ++browserTranslationLanguagePackGeneration;
+  browserTranslationLanguagePackController?.abort();
+  browserTranslationLanguagePackController = null;
+  if (browserTranslationLanguagePackState.status === "downloading") {
+    setBrowserTranslationLanguagePackState("downloadable");
+  } else {
+    renderBrowserTranslationLanguagePackSettings();
+    syncFullTranscriptTranslateButton();
   }
 }
 
@@ -632,116 +816,25 @@ function cancelFullTranscriptTranslation() {
   if (browserTranscriptTranslationState.status === "downloading") {
     setBrowserTranscriptTranslationState("downloadable");
   }
+  if (
+    !browserTranslationLanguagePackController
+    && browserTranslationLanguagePackState.status === "downloading"
+  ) {
+    setBrowserTranslationLanguagePackState("downloadable");
+  } else {
+    renderBrowserTranslationLanguagePackSettings();
+  }
 }
 
 function focusBrowserTranslationSettings() {
   elements.settings.open = true;
-  elements.fullTranscriptTranslationProvider.focus();
-  elements.fullTranscriptTranslationProvider.scrollIntoView({ block: "center" });
-}
-
-function focusFullTranscriptTranslationApiSettings() {
-  elements.settings.open = true;
-  renderFullTranscriptTranslationSettings();
-  elements.fullTranscriptTranslationBaseUrl.focus();
-  elements.fullTranscriptTranslationBaseUrl.scrollIntoView({ block: "center" });
-}
-
-function translationConfigFromControls() {
-  return normalizeFullTranscriptTranslationConfig({
-    baseUrl: elements.fullTranscriptTranslationBaseUrl.value,
-    apiKey: elements.fullTranscriptTranslationApiKey.value,
-    model: elements.fullTranscriptTranslationModel.value,
-  });
-}
-
-async function ensureFullTranscriptTranslationPermission(config) {
-  const granted = await requestTranslationHostPermission(chrome.permissions, config);
-  if (!granted) throw new Error(t("fullTranscriptTranslationPermissionDenied"));
-}
-
-async function translateFullTranscriptWithApi() {
-  let config;
-  try {
-    config = translationConfigFromControls();
-  } catch (error) {
-    focusFullTranscriptTranslationApiSettings();
-    showToast(error.message);
-    return;
-  }
-  let snapshot;
-  try {
-    snapshot = await authorizeCurrentTranscriptTranslation({
-      getState: () => ({
-        transcript: fullTranscript,
-        generation: fullTranscriptGeneration,
-        contextKey: fullTranscriptContextKey,
-      }),
-      requestPermission: () => ensureFullTranscriptTranslationPermission(config),
-    });
-  } catch (error) {
-    showToast(error.message);
-    return;
-  }
-  if (!snapshot) return;
-
-  const { transcript, generation, contextKey } = snapshot;
-  const allTranslated = transcript.cues.length > 0
-    && translatedFullTranscriptCueCount() === transcript.cues.length;
-  if (allTranslated) {
-    for (const cue of transcript.cues) delete cue.translation;
-  }
-  const batches = chunkTranscriptCues(untranslatedTranscriptCues(transcript.cues));
-  if (batches.length === 0) return;
-
-  const controller = new AbortController();
-  fullTranscriptTranslationController = controller;
-  fullTranscriptTranslationRunning = true;
-  elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
-  syncFullTranscriptTranslateButton();
-
-  try {
-    for (const batch of batches) {
-      const translations = await translateTranscriptBatch({
-        config,
-        cues: batch,
-        signal: controller.signal,
-      });
-      if (
-        controller.signal.aborted
-        || transcript !== fullTranscript
-        || generation !== fullTranscriptGeneration
-        || contextKey !== fullTranscriptContextKey
-      ) return;
-      for (const { id, translation } of translations) {
-        transcript.cues[id].translation = translation;
-      }
-      elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
-      renderFullTranscript();
-    }
-    showToast(t("fullTranscriptTranslationComplete"));
-  } catch (error) {
-    if (!controller.signal.aborted) {
-      showToast(`${t("fullTranscriptTranslationInterrupted")}：${localizeRuntimeMessage(interfaceLanguage, error.message)}`);
-    }
-  } finally {
-    if (fullTranscriptTranslationController === controller) {
-      fullTranscriptTranslationController = null;
-      fullTranscriptTranslationRunning = false;
-      if (
-        transcript === fullTranscript
-        && generation === fullTranscriptGeneration
-        && contextKey === fullTranscriptContextKey
-      ) {
-        elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
-        syncFullTranscriptTranslateButton();
-      }
-    }
-  }
+  elements.browserTranslationLanguagePackSelect.focus();
+  elements.browserTranslationLanguagePackSelect.scrollIntoView({ block: "center" });
 }
 
 async function translateFullTranscriptInBrowser() {
   const transcript = fullTranscript;
+  const targetLanguage = browserTranslationLanguagePackTarget;
   const generation = fullTranscriptGeneration;
   const contextKey = fullTranscriptContextKey;
   const controller = new AbortController();
@@ -750,11 +843,13 @@ async function translateFullTranscriptInBrowser() {
   fullTranscriptTranslationRunning = true;
   elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
   syncFullTranscriptTranslateButton();
+  renderBrowserTranslationLanguagePackSettings();
 
   try {
     const created = await createBrowserTranscriptTranslator({
       sourceLanguage: transcript.languageCode,
-      preferredPair: browserTranslationPairForTranscript(transcript),
+      targetLanguage,
+      preferredPair: browserTranslationPairForTranscript(transcript, targetLanguage),
       signal: controller.signal,
       onDownloadProgress: (progress) => {
         if (
@@ -762,8 +857,10 @@ async function translateFullTranscriptInBrowser() {
           && transcript === fullTranscript
           && generation === fullTranscriptGeneration
           && contextKey === fullTranscriptContextKey
+          && targetLanguage === browserTranslationLanguagePackTarget
         ) {
           setBrowserTranscriptTranslationState("downloading", progress);
+          setBrowserTranslationLanguagePackState("downloading", progress);
         }
       },
     });
@@ -773,10 +870,12 @@ async function translateFullTranscriptInBrowser() {
       || transcript !== fullTranscript
       || generation !== fullTranscriptGeneration
       || contextKey !== fullTranscriptContextKey
+      || targetLanguage !== browserTranslationLanguagePackTarget
     ) return;
     browserTranscriptTranslationSession = session;
-    cacheBrowserTranslationPair(transcript, created.pair);
+    cacheBrowserTranslationPair(transcript, created.pair, targetLanguage);
     setBrowserTranscriptTranslationState("ready");
+    setBrowserTranslationLanguagePackState("ready", 1);
 
     const allTranslated = transcript.cues.length > 0
       && transcript.cues.every((cue) => String(cue.translation ?? "").trim());
@@ -797,6 +896,7 @@ async function translateFullTranscriptInBrowser() {
           transcript !== fullTranscript
           || generation !== fullTranscriptGeneration
           || contextKey !== fullTranscriptContextKey
+          || targetLanguage !== browserTranslationLanguagePackTarget
         ) {
           controller.abort();
           return;
@@ -810,6 +910,17 @@ async function translateFullTranscriptInBrowser() {
   } catch (error) {
     if (!controller.signal.aborted) {
       const providerError = setBrowserTranslationErrorState(error);
+      if (providerError && targetLanguage === browserTranslationLanguagePackTarget) {
+        setBrowserTranslationLanguagePackState(
+          error?.code === BROWSER_TRANSLATION_ERROR.ALREADY_TARGET
+            ? "alreadyTarget"
+            : error?.code === BROWSER_TRANSLATION_ERROR.UNSUPPORTED
+              ? "unsupported"
+              : error?.code === BROWSER_TRANSLATION_ERROR.UNAVAILABLE
+                ? "unavailable"
+                : "downloadFailed",
+        );
+      }
       if (providerError) focusBrowserTranslationSettings();
       const message = localizeRuntimeMessage(interfaceLanguage, error.message);
       showToast(providerError ? message : `${t("fullTranscriptTranslationInterrupted")}：${message}`);
@@ -819,10 +930,12 @@ async function translateFullTranscriptInBrowser() {
     if (fullTranscriptTranslationController === controller) {
       fullTranscriptTranslationController = null;
       fullTranscriptTranslationRunning = false;
+      renderBrowserTranslationLanguagePackSettings();
       if (
         transcript === fullTranscript
         && generation === fullTranscriptGeneration
         && contextKey === fullTranscriptContextKey
+        && targetLanguage === browserTranslationLanguagePackTarget
       ) {
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         syncFullTranscriptTranslateButton();
@@ -832,72 +945,12 @@ async function translateFullTranscriptInBrowser() {
 }
 
 async function translateFullTranscript() {
-  if (!fullTranscript || fullTranscriptTranslationRunning) return;
-  if (fullTranscriptTranslationProvider === "api") {
-    await translateFullTranscriptWithApi();
-  } else {
-    await translateFullTranscriptInBrowser();
-  }
-}
-
-const FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS = [
-  "fullTranscriptTranslationBaseUrl",
-  "fullTranscriptTranslationApiKey",
-  "fullTranscriptTranslationModel",
-  "fullTranscriptTranslationOrigin",
-  FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY,
-];
-
-function fullTranscriptTranslationControlsAreBlank() {
-  return [
-    elements.fullTranscriptTranslationBaseUrl,
-    elements.fullTranscriptTranslationApiKey,
-    elements.fullTranscriptTranslationModel,
-  ].every((control) => !control.value.trim());
-}
-
-async function saveFullTranscriptTranslationSettings() {
-  elements.fullTranscriptTranslationSave.disabled = true;
-  try {
-    const stored = await chrome.storage.local.get({
-      fullTranscriptTranslationBaseUrl: "",
-      fullTranscriptTranslationApiKey: "",
-      fullTranscriptTranslationModel: "",
-      fullTranscriptTranslationOrigin: "",
-      [FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY]: "",
-    });
-    if (fullTranscriptTranslationControlsAreBlank()) {
-      await clearTranslationSettings({
-        storage: chrome.storage.local,
-        permissions: chrome.permissions,
-        stored,
-        keys: FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS,
-      });
-      showToast(t("fullTranscriptTranslationCleared"));
-      return;
-    }
-    const config = translationConfigFromControls();
-    const values = {
-      fullTranscriptTranslationBaseUrl: config.baseUrl,
-      fullTranscriptTranslationApiKey: config.apiKey,
-      fullTranscriptTranslationModel: config.model,
-      fullTranscriptTranslationOrigin: config.origin,
-      [FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY]: "",
-    };
-    await saveTranslationSettings({
-      storage: chrome.storage.local,
-      permissions: chrome.permissions,
-      stored,
-      config,
-      values,
-    });
-    elements.fullTranscriptTranslationBaseUrl.value = config.baseUrl;
-    showToast(t("fullTranscriptTranslationSaved"));
-  } catch (error) {
-    showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
-  } finally {
-    elements.fullTranscriptTranslationSave.disabled = false;
-  }
+  if (
+    !fullTranscript
+    || fullTranscriptTranslationRunning
+    || browserTranslationLanguagePackController
+  ) return;
+  await translateFullTranscriptInBrowser();
 }
 
 async function loadFullTranscript() {
@@ -929,6 +982,8 @@ async function loadFullTranscript() {
       return;
     }
     fullTranscript = response.transcript;
+    renderBrowserTranslationLanguagePackSettings();
+    void refreshBrowserTranslationLanguagePackAvailability();
     elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
     syncFullTranscriptTranslateButton();
     elements.fullTranscriptRetry.disabled = false;
@@ -1647,26 +1702,36 @@ elements.subtitleWindowSeconds.addEventListener("change", async () => {
   }
 });
 
-elements.fullTranscriptTranslationProvider.addEventListener("change", async () => {
-  const previous = fullTranscriptTranslationProvider;
-  fullTranscriptTranslationProvider = normalizeFullTranscriptTranslationProvider(
-    elements.fullTranscriptTranslationProvider.value,
+elements.browserTranslationLanguagePackSelect.addEventListener("change", async () => {
+  const previous = browserTranslationLanguagePackTarget;
+  const selected = getBrowserTranslationTargetLanguage(
+    elements.browserTranslationLanguagePackSelect.value,
   );
-  renderFullTranscriptTranslationSettings();
+  browserTranslationLanguagePackTarget = selected?.id ?? "zh-Hans";
+  cancelBrowserTranslationLanguagePackDownload();
+  cancelFullTranscriptTranslation();
+  clearFullTranscriptTranslations();
+  setBrowserTranscriptTranslationState("waiting");
+  renderBrowserTranslationLanguagePackSettings();
+  renderFullTranscript();
+  elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
   try {
-    await chrome.storage.local.set({ fullTranscriptTranslationProvider });
-    if (fullTranscriptTranslationProvider === "browser") {
-      void refreshBrowserTranscriptTranslationAvailability();
-    }
+    await chrome.storage.local.set({
+      fullTranscriptLanguagePackTarget: browserTranslationLanguagePackTarget,
+    });
+    void refreshBrowserTranslationLanguagePackAvailability();
+    void refreshBrowserTranscriptTranslationAvailability();
   } catch (error) {
-    fullTranscriptTranslationProvider = previous;
-    renderFullTranscriptTranslationSettings();
+    browserTranslationLanguagePackTarget = previous;
+    renderBrowserTranslationLanguagePackSettings();
+    void refreshBrowserTranslationLanguagePackAvailability();
+    void refreshBrowserTranscriptTranslationAvailability();
     showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
   }
 });
 
-elements.fullTranscriptTranslationSave.addEventListener("click", () => {
-  void saveFullTranscriptTranslationSettings();
+elements.browserTranslationLanguagePackAction.addEventListener("click", () => {
+  void downloadSelectedBrowserTranslationLanguagePack();
 });
 
 for (const button of elements.fullTranscriptGroupButtons) {
@@ -1888,20 +1953,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
   }
-  if (area === "local" && changes.fullTranscriptTranslationProvider) {
-    const nextProvider = normalizeFullTranscriptTranslationProvider(
-      changes.fullTranscriptTranslationProvider.newValue,
+  if (area === "local" && changes.fullTranscriptLanguagePackTarget?.newValue) {
+    const nextLanguage = getBrowserTranslationTargetLanguage(
+      changes.fullTranscriptLanguagePackTarget.newValue,
     );
-    if (
-      nextProvider !== fullTranscriptTranslationProvider
-      && fullTranscriptTranslationRunning
-    ) {
+    if (nextLanguage && nextLanguage.id !== browserTranslationLanguagePackTarget) {
+      cancelBrowserTranslationLanguagePackDownload();
       cancelFullTranscriptTranslation();
-      syncFullTranscriptTranslateButton();
-    }
-    fullTranscriptTranslationProvider = nextProvider;
-    renderFullTranscriptTranslationSettings();
-    if (nextProvider === "browser" && fullTranscript) {
+      browserTranslationLanguagePackTarget = nextLanguage.id;
+      clearFullTranscriptTranslations();
+      setBrowserTranscriptTranslationState("waiting");
+      renderBrowserTranslationLanguagePackSettings();
+      renderFullTranscript();
+      elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
+      void refreshBrowserTranslationLanguagePackAvailability();
       void refreshBrowserTranscriptTranslationAvailability();
     }
   }
@@ -1909,6 +1974,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 window.addEventListener("pagehide", () => {
   ++renderGeneration;
+  cancelBrowserTranslationLanguagePackDownload();
   cancelFullTranscriptTranslation();
   ++fullTranscriptGeneration;
   closeScreenshotDialog();
@@ -1937,33 +2003,28 @@ syncSubtitleSettingsControls();
 
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
-  fullTranscriptTranslationProvider: "browser",
+  fullTranscriptLanguagePackTarget: "zh-Hans",
   fullTranscriptBrowserTranslationPairs: {},
-  fullTranscriptTranslationBaseUrl: "",
-  fullTranscriptTranslationApiKey: "",
-  fullTranscriptTranslationModel: "",
 });
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
-fullTranscriptTranslationProvider = normalizeFullTranscriptTranslationProvider(
-  fullTranscriptSettings.fullTranscriptTranslationProvider,
-);
-for (const [sourceLanguage, pair] of Object.entries(
+browserTranslationLanguagePackTarget = getBrowserTranslationTargetLanguage(
+  fullTranscriptSettings.fullTranscriptLanguagePackTarget,
+)?.id ?? "zh-Hans";
+for (const pair of Object.values(
   fullTranscriptSettings.fullTranscriptBrowserTranslationPairs ?? {},
 )) {
   if (
-    sourceLanguage
-    && typeof pair?.sourceLanguage === "string"
+    typeof pair?.sourceLanguage === "string"
     && typeof pair?.targetLanguage === "string"
   ) {
-    browserTranscriptTranslationPairs.set(sourceLanguage, pair);
+    const key = browserTranslationPairKey(pair.sourceLanguage, pair.targetLanguage);
+    if (key) browserTranscriptTranslationPairs.set(key, pair);
   }
 }
-elements.fullTranscriptTranslationBaseUrl.value = fullTranscriptSettings.fullTranscriptTranslationBaseUrl;
-elements.fullTranscriptTranslationApiKey.value = fullTranscriptSettings.fullTranscriptTranslationApiKey;
-elements.fullTranscriptTranslationModel.value = fullTranscriptSettings.fullTranscriptTranslationModel;
-renderFullTranscriptTranslationSettings();
+renderBrowserTranslationLanguagePackSettings();
 syncFullTranscriptTranslateButton();
+void refreshBrowserTranslationLanguagePackAvailability();
 
 await initializeSidepanel({
   storage: chrome.storage,

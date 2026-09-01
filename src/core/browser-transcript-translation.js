@@ -6,7 +6,7 @@ export const BROWSER_TRANSLATION_ERROR = Object.freeze({
   UNSUPPORTED: "BROWSER_TRANSLATION_UNSUPPORTED",
 });
 
-const TARGET_LANGUAGE_CANDIDATES = Object.freeze(["zh-Hans", "zh"]);
+const DEFAULT_TARGET_LANGUAGE = "zh-Hans";
 
 class BrowserTranslationError extends Error {
   constructor(code, message, options) {
@@ -20,7 +20,7 @@ function normalizedLanguageTag(value) {
   return String(value ?? "").trim().replaceAll("_", "-");
 }
 
-function normalizedSourceLanguage(value) {
+export function normalizedBrowserTranslationSourceLanguage(value) {
   const tag = normalizedLanguageTag(value);
   if (!tag) return "";
   const lower = tag.toLowerCase();
@@ -35,8 +35,22 @@ function normalizedSourceLanguage(value) {
   return lower.split("-")[0];
 }
 
-function isSimplifiedChinese(value) {
-  return normalizedSourceLanguage(value) === "zh";
+export function normalizedBrowserTranslationTargetLanguage(value) {
+  const normalized = normalizedBrowserTranslationSourceLanguage(value);
+  return normalized === "zh" ? DEFAULT_TARGET_LANGUAGE : normalized;
+}
+
+function targetLanguageCandidates(targetLanguage) {
+  const normalized = normalizedBrowserTranslationTargetLanguage(targetLanguage);
+  if (!normalized) return [];
+  return normalized === DEFAULT_TARGET_LANGUAGE
+    ? [DEFAULT_TARGET_LANGUAGE, "zh"]
+    : [normalized];
+}
+
+function isSameLanguage(sourceLanguage, targetLanguage) {
+  return normalizedBrowserTranslationSourceLanguage(sourceLanguage)
+    === normalizedBrowserTranslationSourceLanguage(targetLanguage);
 }
 
 function throwIfAborted(signal) {
@@ -49,17 +63,20 @@ function isAbortError(error, signal) {
   return signal?.aborted || error?.name === "AbortError";
 }
 
-export function browserTranslationPairCandidates(sourceLanguage) {
-  const source = normalizedSourceLanguage(sourceLanguage);
-  if (!source) return [];
-  return TARGET_LANGUAGE_CANDIDATES.map((targetLanguage) => ({
+export function browserTranslationPairCandidates(
+  sourceLanguage,
+  targetLanguage = DEFAULT_TARGET_LANGUAGE,
+) {
+  const source = normalizedBrowserTranslationSourceLanguage(sourceLanguage);
+  if (!source || !normalizedBrowserTranslationTargetLanguage(targetLanguage)) return [];
+  return targetLanguageCandidates(targetLanguage).map((candidate) => ({
     sourceLanguage: source,
-    targetLanguage,
+    targetLanguage: candidate,
   }));
 }
 
-function prioritizedPairs(sourceLanguage, preferredPair) {
-  const candidates = browserTranslationPairCandidates(sourceLanguage);
+function prioritizedPairs(sourceLanguage, targetLanguage, preferredPair) {
+  const candidates = browserTranslationPairCandidates(sourceLanguage, targetLanguage);
   const preferredIndex = candidates.findIndex((pair) => (
     pair.sourceLanguage === preferredPair?.sourceLanguage
     && pair.targetLanguage === preferredPair?.targetLanguage
@@ -72,11 +89,16 @@ function prioritizedPairs(sourceLanguage, preferredPair) {
   ];
 }
 
-function validateBrowserTranslationRequest(sourceLanguage, translatorApi, { requireCreate = true } = {}) {
-  if (isSimplifiedChinese(sourceLanguage)) {
+function validateBrowserTranslationRequest(
+  sourceLanguage,
+  targetLanguage,
+  translatorApi,
+  { requireCreate = true } = {},
+) {
+  if (isSameLanguage(sourceLanguage, targetLanguage)) {
     throw new BrowserTranslationError(
       BROWSER_TRANSLATION_ERROR.ALREADY_TARGET,
-      "当前字幕已经是简体中文",
+      "当前字幕已经是目标语言",
     );
   }
   if (
@@ -89,7 +111,7 @@ function validateBrowserTranslationRequest(sourceLanguage, translatorApi, { requ
       "当前浏览器不支持本地翻译",
     );
   }
-  const pairs = browserTranslationPairCandidates(sourceLanguage);
+  const pairs = browserTranslationPairCandidates(sourceLanguage, targetLanguage);
   if (pairs.length === 0) {
     throw new BrowserTranslationError(
       BROWSER_TRANSLATION_ERROR.UNAVAILABLE,
@@ -100,17 +122,19 @@ function validateBrowserTranslationRequest(sourceLanguage, translatorApi, { requ
 
 export async function browserTranscriptTranslationAvailability({
   sourceLanguage,
+  targetLanguage = DEFAULT_TARGET_LANGUAGE,
   translatorApi = globalThis.Translator,
   preferredPair,
   signal,
 } = {}) {
   validateBrowserTranslationRequest(
     sourceLanguage,
+    targetLanguage,
     translatorApi,
     { requireCreate: false },
   );
   let lastError;
-  for (const pair of prioritizedPairs(sourceLanguage, preferredPair)) {
+  for (const pair of prioritizedPairs(sourceLanguage, targetLanguage, preferredPair)) {
     throwIfAborted(signal);
     try {
       const availability = await translatorApi.availability(pair);
@@ -139,13 +163,14 @@ function observeDownloadProgress(monitor, onDownloadProgress) {
 
 export async function createBrowserTranscriptTranslator({
   sourceLanguage,
+  targetLanguage = DEFAULT_TARGET_LANGUAGE,
   translatorApi = globalThis.Translator,
   preferredPair,
   signal,
   onDownloadProgress,
 } = {}) {
-  validateBrowserTranslationRequest(sourceLanguage, translatorApi);
-  const pairs = prioritizedPairs(sourceLanguage, preferredPair);
+  validateBrowserTranslationRequest(sourceLanguage, targetLanguage, translatorApi);
+  const pairs = prioritizedPairs(sourceLanguage, targetLanguage, preferredPair);
 
   let lastError;
   let downloadFailed = false;
@@ -207,4 +232,10 @@ export async function translateBrowserTranscriptCues({
     await onTranslated(result);
   }
   return translations;
+}
+
+export function untranslatedTranscriptCues(cues) {
+  return cues
+    .map((cue, id) => ({ id, text: cue.text }))
+    .filter((cue) => !String(cues[cue.id].translation ?? "").trim());
 }

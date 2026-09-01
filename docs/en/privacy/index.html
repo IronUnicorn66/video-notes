@@ -47,8 +47,7 @@
             <li>The visible player image when you explicitly enable player screenshots.</li>
             <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
             <li>Shortcut, subtitle window, full-transcript group size, timeline order, permission, language, and model settings.</li>
-            <li>The transcript language, Simplified Chinese target code, and browser language-pack status used for local browser translation.</li>
-            <li>Your optional backup translation API Base URL, API Key, and model name; the complete YouTube transcript only when you select the API method and then select Translate.</li>
+            <li>The transcript language, your selected target-language code, selected language pack, and browser language-pack status used for local browser translation.</li>
           </ul>
           <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
           <p>When complete YouTube transcript retrieval is restricted, the extension may briefly toggle the player captions control to capture the native caption response requested by the player, then immediately restore its prior state.</p>
@@ -56,15 +55,14 @@
 
         <section>
           <h2>Storage and processing location</h2>
-          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. The translation method, usable browser language codes, and backup API configuration are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs. Translations stay only in the current side-panel session and are not retained.</p>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Usable browser language codes, the selected language pack, and language-pair state are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs. Translations stay only in the current side-panel session and are not retained.</p>
           <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
         </section>
 
         <section>
-          <h2>Local full-transcript translation and optional cloud backup</h2>
-          <p>Full transcripts use the built-in desktop Edge or Chrome Translator API by default. The translation session runs in the side-panel document, so transcript content and translations are processed locally and are not sent to the developer or a subtitle translation service. The browser may connect to download a language pack the first time a language pair is used. Translation works offline afterward. Edge and Chrome manage these packs separately; the extension does not download, bundle, or sync a translation model.</p>
-          <p>The OpenAI-compatible API is an explicit backup method. The extension sends the complete transcript to your configured HTTPS API only after you select the API method and then select Translate. It never falls back to the cloud automatically and does not send notes, screenshots, recordings, transcriptions, or browsing history.</p>
-          <p>The API Key is saved only in local extension storage and is never synced to the developer or an included service. Your chosen API receives subtitle content plus the normal metadata needed for an HTTPS connection; its privacy practices govern that data. Clearing and saving all three translation fields removes the local configuration and revokes that API-host permission. If the browser cannot revoke the permission, the API Key, Base URL, and model name are still deleted immediately; only a key-free host identifier is retained for a later retry, and the extension shows an explicit warning.</p>
+          <h2>Local full-transcript translation</h2>
+          <p>Full transcripts use only the built-in desktop Edge or Chrome Translator API. The extension detects the source language from the full transcript track. The first release lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target. After the transcript loads, you can download the current source-to-target pack in advance and follow its progress. No size is shown before download; after the pack is ready, the interface shows an estimated 200 MiB footprint. Actual disk use depends on the browser and pack versions.</p>
+          <p>The translation session runs in the side-panel document, so transcript content and translations are processed locally and are not sent to the developer or a third-party translation service. The browser may connect to retrieve a language pack when you start its download; that request contains no transcript, note, screenshot, recording, or transcription content. Translation works offline afterward. Edge and Chrome manage their packs separately; the extension does not download, bundle, or sync a translation model.</p>
         </section>
 
         <section>
@@ -82,7 +80,7 @@
             <li><strong>Side panel:</strong> provides note input, settings, and the timeline beside the video.</li>
             <li><strong>Offscreen document:</strong> maintains authorized recording, local transcription, and export generation.</li>
             <li><strong>Downloads:</strong> saves the ZIP you explicitly export.</li>
-            <li><strong>Optional screenshot and translation-host permissions:</strong> screenshot access is requested only when you enable it and accept the browser prompt. Backup cloud translation requests access only to the single HTTPS API host you enter when saving configuration or selecting the API method and Translate. Local browser translation does not use this permission.</li>
+            <li><strong>Optional screenshot permission:</strong> is requested only when you enable player screenshots and accept the browser prompt. Local browser translation does not use this permission.</li>
             <li><strong>Optional model-host permission:</strong> is requested only for a model download you start.</li>
           </ul>
         </section>

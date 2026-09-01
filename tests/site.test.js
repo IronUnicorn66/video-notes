@@ -26,7 +26,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.17\/video-notes-edge-1\.0\.17\.zip/,
+      /releases\/download\/v1\.0\.18\/video-notes-edge-1\.0\.18\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -38,7 +38,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
   assert.match(enHome, /href="privacy\/"/);
 });
 
-test("隐私页覆盖本地存储、模型下载、可选翻译权限和删除", async () => {
+test("隐私页覆盖本地存储、本地翻译、模型下载和删除", async () => {
   const [html, englishHtml] = await Promise.all([
     read("docs/privacy/index.html"),
     read("docs/en/privacy/index.html"),
@@ -58,12 +58,17 @@ test("隐私页覆盖本地存储、模型下载、可选翻译权限和删除",
   assert.match(html, /https:\/\/huggingface\.co\/privacy/);
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
   assert.match(html, /全文翻译/);
-  assert.match(html, /API Key/);
   assert.match(html, /Translator API/);
-  assert.match(html, /不会自动回退到云端/);
+  assert.match(html, /自动识别源语言/);
+  assert.match(html, /简体中文、英语、日语、韩语或西班牙语作为目标语言/);
+  assert.match(html, /不会发送给扩展开发者或第三方翻译服务/);
   assert.match(englishHtml, /Local full-transcript translation/);
-  assert.match(englishHtml, /never falls back to the cloud automatically/);
-  assert.match(englishHtml, /API Key/);
+  assert.match(englishHtml, /detects the source language/);
+  assert.match(englishHtml, /choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target/);
+  assert.match(englishHtml, /not sent to the developer or a third-party translation service/);
+  for (const page of [html, englishHtml]) {
+    assert.doesNotMatch(page, /API Key|OpenAI|cloud backup|云端备用/);
+  }
 });
 
 test("官网提供可切换的中英文主页与隐私页", async () => {

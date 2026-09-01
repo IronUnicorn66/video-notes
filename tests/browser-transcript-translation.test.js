@@ -7,7 +7,27 @@ import {
   browserTranslationPairCandidates,
   createBrowserTranscriptTranslator,
   translateBrowserTranscriptCues,
+  untranslatedTranscriptCues,
 } from "../src/core/browser-transcript-translation.js";
+import {
+  BROWSER_TRANSLATION_TARGET_LANGUAGES,
+  getBrowserTranslationTargetLanguage,
+  prepareBrowserTranslationLanguagePack,
+} from "../src/core/browser-translation-language-packs.js";
+
+test("首版只提供五种本地翻译目标语言", () => {
+  assert.deepEqual(
+    BROWSER_TRANSLATION_TARGET_LANGUAGES.map(({ id }) => id),
+    ["zh-Hans", "en", "ja", "ko", "es"],
+  );
+  assert.equal(getBrowserTranslationTargetLanguage("zh-CN")?.id, "zh-Hans");
+  assert.equal(getBrowserTranslationTargetLanguage("en-US")?.id, "en");
+  assert.equal(getBrowserTranslationTargetLanguage("fr"), null);
+  for (const language of BROWSER_TRANSLATION_TARGET_LANGUAGES) {
+    assert.ok(Number.isInteger(language.estimatedSizeMiB));
+    assert.ok(language.estimatedSizeMiB > 0);
+  }
+});
 
 test("浏览器本地翻译将地区语言码归一化并依次尝试两种简体中文代码", () => {
   assert.deepEqual(browserTranslationPairCandidates("en-US"), [
@@ -22,6 +42,9 @@ test("浏览器本地翻译将地区语言码归一化并依次尝试两种简�
     { sourceLanguage: "zh-Hant", targetLanguage: "zh-Hans" },
     { sourceLanguage: "zh-Hant", targetLanguage: "zh" },
   ]);
+  assert.deepEqual(browserTranslationPairCandidates("en-US", "ja-JP"), [
+    { sourceLanguage: "en", targetLanguage: "ja" },
+  ]);
 });
 
 test("简体中文字幕不创建无意义的本地翻译会话", async () => {
@@ -32,6 +55,34 @@ test("简体中文字幕不创建无意义的本地翻译会话", async () => {
     }),
     (error) => error.code === BROWSER_TRANSLATION_ERROR.ALREADY_TARGET,
   );
+});
+
+test("目标语言与字幕语言相同时不创建本地翻译会话", async () => {
+  await assert.rejects(
+    () => createBrowserTranscriptTranslator({
+      translatorApi: {},
+      sourceLanguage: "ja-JP",
+      targetLanguage: "ja",
+    }),
+    (error) => error.code === BROWSER_TRANSLATION_ERROR.ALREADY_TARGET,
+  );
+});
+
+test("非中文目标语言直接使用所选语言代码", async () => {
+  const checked = [];
+  const result = await browserTranscriptTranslationAvailability({
+    sourceLanguage: "en-US",
+    targetLanguage: "ko-KR",
+    translatorApi: {
+      async availability(pair) {
+        checked.push(pair);
+        return "downloadable";
+      },
+    },
+  });
+
+  assert.deepEqual(checked, [{ sourceLanguage: "en", targetLanguage: "ko" }]);
+  assert.deepEqual(result.pair, { sourceLanguage: "en", targetLanguage: "ko" });
 });
 
 test("浏览器缺少 Translator API 时返回可识别的错误", async () => {
@@ -130,6 +181,37 @@ test("可下载状态创建会话并转发语言包下载进度", async () => {
   assert.deepEqual(progress, [0.25, 1]);
 });
 
+test("提前下载语言包会转发进度并释放临时会话", async () => {
+  const progress = [];
+  let destroyCount = 0;
+  const result = await prepareBrowserTranslationLanguagePack({
+    sourceLanguage: "ja",
+    onDownloadProgress: (value) => progress.push(value),
+    translatorApi: {
+      availability: async () => "downloadable",
+      async create({ monitor }) {
+        const listeners = new Map();
+        monitor({
+          addEventListener(type, listener) {
+            listeners.set(type, listener);
+          },
+        });
+        listeners.get("downloadprogress")({ loaded: 0.4, total: 1 });
+        listeners.get("downloadprogress")({ loaded: 1, total: 1 });
+        return {
+          destroy() {
+            destroyCount += 1;
+          },
+        };
+      },
+    },
+  });
+
+  assert.deepEqual(progress, [0.4, 1]);
+  assert.equal(destroyCount, 1);
+  assert.deepEqual(result.pair, { sourceLanguage: "ja", targetLanguage: "zh-Hans" });
+});
+
 test("创建失败后继续尝试另一种简体中文代码并缓存命中语言对", async () => {
   const createdTargets = [];
   const session = { translate: async () => "译文", destroy() {} };
@@ -224,4 +306,15 @@ test("中断信号会停止后续字幕翻译", async () => {
     (error) => error.name === "AbortError",
   );
   assert.deepEqual(requested, ["One"]);
+});
+
+test("本地翻译只保留尚未翻译的字幕及原始序号", () => {
+  assert.deepEqual(untranslatedTranscriptCues([
+    { text: "One", translation: "一" },
+    { text: "Two" },
+    { text: "Three", translation: " " },
+  ]), [
+    { id: 1, text: "Two" },
+    { id: 2, text: "Three" },
+  ]);
 });

@@ -57,16 +57,18 @@ test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
   assert.match(css, /\.full-transcript-time/);
 });
 
-test("侧栏默认提供浏览器本地翻译，并将翻译 API 保留为手动备用", () => {
-  assert.match(html, /id="full-transcript-translation-provider"/);
-  assert.match(html, /<option value="browser"[^>]*>浏览器本地翻译（推荐）<\/option>/);
-  assert.match(html, /<option value="api"[^>]*>OpenAI 兼容 API（备用）<\/option>/);
-  assert.match(html, /id="full-transcript-local-translation-detail"[^>]*role="status"/);
-  assert.match(html, /id="full-transcript-api-translation-settings"[^>]*hidden/);
-  assert.match(html, /id="full-transcript-translation-base-url"[^>]*type="url"/);
-  assert.match(html, /id="full-transcript-translation-api-key"[^>]*type="password"/);
-  assert.match(html, /id="full-transcript-translation-model"[^>]*type="text"/);
-  assert.match(html, /id="full-transcript-translation-save"/);
+test("侧栏自动显示字幕语言并只提供五种翻译目标语言", () => {
+  assert.match(html, /id="browser-translation-detected-source"/);
+  assert.match(html, /id="browser-translation-language-pack-select"/);
+  assert.deepEqual(
+    [...html.matchAll(/<option value="(zh-Hans|en|ja|ko|es)"/g)].map((match) => match[1]),
+    ["zh-Hans", "en", "ja", "ko", "es"],
+  );
+  assert.doesNotMatch(html, /<option value="fr"/);
+  assert.match(html, /id="browser-translation-language-pack-progress"[^>]*hidden/);
+  assert.match(html, /id="browser-translation-language-pack-status"[^>]*role="status"/);
+  assert.match(html, /id="browser-translation-language-pack-action"[^>]*hidden/);
+  assert.doesNotMatch(html, /OpenAI|API Base URL|API Key|full-transcript-translation-provider/);
   assert.match(html, /class="full-transcript-group-picker"/);
   for (const value of [5, 10, 20, 30]) {
     assert.match(
@@ -82,16 +84,16 @@ test("侧栏默认提供浏览器本地翻译，并将翻译 API 保留为手动
   assert.match(css, /label:has\(input:checked\)/);
 });
 
-test("侧栏翻译在文档中创建本地会话，API 仅在显式选择后授权", () => {
+test("侧栏只创建浏览器本地会话并支持提前下载语言包", () => {
   assert.match(source, /createBrowserTranscriptTranslator/);
+  assert.match(source, /prepareBrowserTranslationLanguagePack/);
   assert.match(source, /translateBrowserTranscriptCues/);
   assert.match(source, /browserTranscriptTranslationAvailability/);
-  assert.match(source, /fullTranscriptTranslationProvider === "api"/);
-  assert.match(source, /normalizeFullTranscriptTranslationConfig/);
-  assert.match(source, /translateTranscriptBatch/);
-  assert.match(source, /requestTranslationHostPermission/);
-  assert.match(source, /fullTranscriptTranslation/);
-  assert.match(source, /full-transcript-translation/);
+  assert.match(source, /targetLanguage,/);
+  assert.match(source, /fullTranscriptLanguagePackTarget/);
+  assert.match(source, /clearFullTranscriptTranslations\(\)/);
+  assert.doesNotMatch(source, /fullTranscriptLanguagePackSource:\s*["']/);
+  assert.doesNotMatch(source, /translateTranscriptBatch|requestTranslationHostPermission|apiKey|chat\/completions/);
 });
 
 test("完整字幕加载结束后会重新启用翻译按钮", () => {

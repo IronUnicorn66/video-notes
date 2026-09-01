@@ -42,6 +42,7 @@ import {
   sidePanelRequestTabIdForSender,
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
+import { clearLegacyCloudTranslationSettings } from "./core/local-only-migration.js";
 
 const repository = new VideoNotesRepository();
 const tabMessenger = createTabMessenger({
@@ -126,6 +127,7 @@ chrome.runtime.onInstalled.addListener(() => {
           settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
         ).id,
       });
+      await clearLegacyCloudTranslationSettings(chrome.storage.local);
       await configureExistingSidePanels();
     } catch (error) {
       console.warn("初始化侧栏失败", error);
