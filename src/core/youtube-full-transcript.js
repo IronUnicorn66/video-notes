@@ -189,6 +189,13 @@ export function transcriptResultAfterPlayerCapture(nativeResult, capture) {
   };
 }
 
+export function shouldAttemptYoutubePlayerCapture(result) {
+  return [
+    "YOUTUBE_CAPTION_TRACKS_MISSING",
+    "YOUTUBE_NATIVE_CAPTION_BLOCKED",
+  ].includes(result?.code);
+}
+
 export async function readYoutubeFullTranscript(root, {
   fetchImpl = fetch,
   preferredLanguages = [],

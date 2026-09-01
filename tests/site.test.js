@@ -26,7 +26,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.10\/video-notes-edge-1\.0\.10\.zip/,
+      /releases\/download\/v1\.0\.15\/video-notes-edge-1\.0\.15\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -38,8 +38,11 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
   assert.match(enHome, /href="privacy\/"/);
 });
 
-test("隐私页覆盖本地存储、模型下载、权限和删除", async () => {
-  const html = await read("docs/privacy/index.html");
+test("隐私页覆盖本地存储、模型下载、可选翻译权限和删除", async () => {
+  const [html, englishHtml] = await Promise.all([
+    read("docs/privacy/index.html"),
+    read("docs/en/privacy/index.html"),
+  ]);
 
   for (const term of [
     "IndexedDB",
@@ -54,6 +57,10 @@ test("隐私页覆盖本地存储、模型下载、权限和删除", async () =>
   }
   assert.match(html, /https:\/\/huggingface\.co\/privacy/);
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
+  assert.match(html, /全文翻译/);
+  assert.match(html, /API Key/);
+  assert.match(englishHtml, /Full transcript translation/);
+  assert.match(englishHtml, /API Key/);
 });
 
 test("官网提供可切换的中英文主页与隐私页", async () => {

@@ -4,7 +4,6 @@ import test from "node:test";
 import * as transcriptView from "../src/core/full-transcript-view.js";
 
 const {
-  filterTranscriptCues,
   transcriptFailureMessageKey,
 } = transcriptView;
 
@@ -13,15 +12,6 @@ const cues = [
   { startMs: 8000, endMs: 10000, text: "Self-improving AI agents" },
   { startMs: 11000, endMs: 13000, text: "课程概览" },
 ];
-
-test("完整字幕搜索忽略大小写和首尾空格", () => {
-  assert.deepEqual(
-    filterTranscriptCues(cues, "  AI AGENTS  "),
-    [cues[1]],
-  );
-  assert.deepEqual(filterTranscriptCues(cues, "课程"), [cues[2]]);
-  assert.deepEqual(filterTranscriptCues(cues, "   "), cues);
-});
 
 test("完整字幕状态提供第一条开始至最后一条结束的覆盖范围", () => {
   assert.deepEqual(
@@ -56,18 +46,50 @@ test("完整字幕按五条合并，末组保留剩余字幕和完整时间范�
   ]);
 });
 
-test("搜索完整字幕时保留逐条匹配而不合并", () => {
-  assert.deepEqual(
-    transcriptView.transcriptDisplayCues(cues, "AI", { grouped: true }),
-    { grouped: false, cues: [cues[1]] },
-  );
-  assert.deepEqual(
-    transcriptView.transcriptDisplayCues(cues, "", { grouped: true }),
+test("完整字幕只接受四个合并档位并回退到默认五条", () => {
+  assert.equal(transcriptView.normalizeTranscriptGroupSize(5), 5);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize("10"), 10);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize(20), 20);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize(30), 30);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize(15), 5);
+  assert.equal(transcriptView.normalizeTranscriptGroupSize("invalid"), 5);
+});
+
+test("完整字幕按自定义条数合并并拼接已有译文", () => {
+  const grouped = transcriptView.groupTranscriptCues([
+    { ...cues[0], translation: "欢迎来到 CS329A" },
+    { ...cues[1], translation: "自我改进的 AI 智能体" },
+    { ...cues[2], translation: "课程概览" },
+  ], 2);
+
+  assert.deepEqual(grouped, [
     {
-      grouped: true,
-      cues: transcriptView.groupTranscriptCues(cues),
+      startMs: 5000,
+      endMs: 10000,
+      text: "Welcome to CS329A Self-improving AI agents",
+      translation: "欢迎来到 CS329A 自我改进的 AI 智能体",
     },
-  );
+    {
+      startMs: 11000,
+      endMs: 13000,
+      text: "课程概览",
+      translation: "课程概览",
+    },
+  ]);
+});
+
+test("完整字幕分组合并不会把部分译文当作完整译文展示", () => {
+  const grouped = transcriptView.groupTranscriptCues([
+    { ...cues[0], translation: "欢迎来到 CS329A" },
+    { ...cues[1], translation: "自我改进的 AI 智能体" },
+    cues[2],
+  ], 3);
+
+  assert.deepEqual(grouped, [{
+    startMs: 5000,
+    endMs: 13000,
+    text: "Welcome to CS329A Self-improving AI agents 课程概览",
+  }]);
 });
 
 test("完整字幕失败状态映射为可理解文案", () => {

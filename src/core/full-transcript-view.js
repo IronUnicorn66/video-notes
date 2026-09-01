@@ -1,10 +1,12 @@
-export function filterTranscriptCues(cues, query) {
-  const normalizedQuery = String(query ?? "").trim().toLocaleLowerCase();
-  if (!normalizedQuery) return cues;
-  return cues.filter((cue) => cue.text.toLocaleLowerCase().includes(normalizedQuery));
-}
-
 export const TRANSCRIPT_CUE_GROUP_SIZE = 5;
+export const TRANSCRIPT_CUE_GROUP_SIZES = [5, 10, 20, 30];
+
+export function normalizeTranscriptGroupSize(value) {
+  const groupSize = Number(value);
+  return TRANSCRIPT_CUE_GROUP_SIZES.includes(groupSize)
+    ? groupSize
+    : TRANSCRIPT_CUE_GROUP_SIZE;
+}
 
 export function transcriptCoverage(cues) {
   if (cues.length === 0) return null;
@@ -33,26 +35,21 @@ export function formatTranscriptTimeRange({ startMs, endMs }) {
 
 export function groupTranscriptCues(cues, groupSize = TRANSCRIPT_CUE_GROUP_SIZE) {
   const groups = [];
-  for (let index = 0; index < cues.length; index += groupSize) {
-    const group = cues.slice(index, index + groupSize);
-    groups.push({
+  const safeGroupSize = Number.isInteger(groupSize) && groupSize > 0
+    ? groupSize
+    : TRANSCRIPT_CUE_GROUP_SIZE;
+  for (let index = 0; index < cues.length; index += safeGroupSize) {
+    const group = cues.slice(index, index + safeGroupSize);
+    const translations = group.map((cue) => String(cue.translation ?? "").trim());
+    const merged = {
       startMs: group[0].startMs,
       endMs: group.at(-1).endMs,
       text: group.map((cue) => cue.text).join(" "),
-    });
+    };
+    if (translations.every(Boolean)) merged.translation = translations.join(" ");
+    groups.push(merged);
   }
   return groups;
-}
-
-export function transcriptDisplayCues(cues, query, { grouped = true } = {}) {
-  const matchedCues = filterTranscriptCues(cues, query);
-  if (String(query ?? "").trim()) {
-    return { grouped: false, cues: matchedCues };
-  }
-  return {
-    grouped,
-    cues: grouped ? groupTranscriptCues(cues) : matchedCues,
-  };
 }
 
 export function transcriptFailureMessageKey(result) {

@@ -53,29 +53,36 @@
         </summary>
         <div class="full-transcript-content">
           <div class="full-transcript-toolbar">
-            <input
-              id="full-transcript-search"
-              class="full-transcript-search"
-              type="search"
-              placeholder="搜索完整字幕"
-              data-i18n-placeholder="fullTranscriptSearch"
-              disabled
-            />
-            <button
-              id="full-transcript-display-toggle"
-              class="secondary-button full-transcript-display-toggle"
-              type="button"
-              aria-pressed="true"
-              data-i18n="fullTranscriptShowIndividual"
-              disabled
-            >逐条展示</button>
-            <button
-              id="full-transcript-retry"
-              class="secondary-button"
-              type="button"
-              data-i18n="retry"
-              disabled
-            >重试</button>
+            <div
+              class="full-transcript-group-picker"
+              role="radiogroup"
+              data-i18n-aria-label="fullTranscriptGroupSize"
+              aria-label="合并条数"
+            >
+              <span class="full-transcript-group-label" data-i18n="fullTranscriptGroupSize">合并条数</span>
+              <div class="full-transcript-group-options">
+                <label><input type="radio" name="full-transcript-group-size" data-full-transcript-group-size value="5" checked /><span>5</span></label>
+                <label><input type="radio" name="full-transcript-group-size" data-full-transcript-group-size value="10" /><span>10</span></label>
+                <label><input type="radio" name="full-transcript-group-size" data-full-transcript-group-size value="20" /><span>20</span></label>
+                <label><input type="radio" name="full-transcript-group-size" data-full-transcript-group-size value="30" /><span>30</span></label>
+              </div>
+            </div>
+            <div class="full-transcript-actions" role="group" data-i18n-aria-label="fullTranscriptActions" aria-label="完整字幕操作">
+              <button
+                id="full-transcript-translate"
+                class="secondary-button full-transcript-action"
+                type="button"
+                data-i18n="fullTranscriptTranslate"
+                disabled
+              >翻译</button>
+              <button
+                id="full-transcript-retry"
+                class="secondary-button full-transcript-action"
+                type="button"
+                data-i18n="retry"
+                disabled
+              >重试</button>
+            </div>
           </div>
           <ol id="full-transcript-list" class="full-transcript-list"></ol>
           <p id="full-transcript-empty" class="empty-state" data-i18n="fullTranscriptWaiting">等待读取</p>
@@ -165,6 +172,19 @@
               <p data-i18n="shortcutDescription">仅在视频页面且光标不在输入控件中生效。</p>
             </div>
             <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
+          </div>
+          <div class="setting-row">
+            <div class="full-transcript-translation-setting">
+              <strong data-i18n="fullTranscriptTranslationSettings">全文翻译（OpenAI 兼容）</strong>
+              <p data-i18n="fullTranscriptTranslationDescription">仅在你点击翻译后，完整字幕会直接发送给下方配置的服务。</p>
+              <label for="full-transcript-translation-base-url" data-i18n="fullTranscriptTranslationBaseUrl">API Base URL</label>
+              <input id="full-transcript-translation-base-url" type="url" inputmode="url" autocomplete="url" placeholder="https://api.example.com/v1" />
+              <label for="full-transcript-translation-api-key" data-i18n="fullTranscriptTranslationApiKey">API Key</label>
+              <input id="full-transcript-translation-api-key" type="password" autocomplete="off" />
+              <label for="full-transcript-translation-model" data-i18n="fullTranscriptTranslationModel">模型名</label>
+              <input id="full-transcript-translation-model" type="text" autocomplete="off" />
+              <button id="full-transcript-translation-save" class="secondary-button" type="button" data-i18n="fullTranscriptTranslationSave">保存翻译配置</button>
+            </div>
           </div>
           <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记和转写都保存在本机。截图权限只用于 YouTube 和哔哩哔哩播放器；启用语音后只联网下载模型。</p>
         </div>

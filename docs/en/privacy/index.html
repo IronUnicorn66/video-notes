@@ -46,15 +46,23 @@
             <li>Native subtitles or bilingual Immersive Translate subtitles already rendered on the current page.</li>
             <li>The visible player image when you explicitly enable player screenshots.</li>
             <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
-            <li>Shortcut, subtitle window, timeline order, permission, language, and model settings.</li>
+            <li>Shortcut, subtitle window, full-transcript group size, timeline order, permission, language, and model settings.</li>
+            <li>Your optional full-transcript translation API Base URL, API Key, and model name; the current complete YouTube transcript only when you select Translate.</li>
           </ul>
           <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
+          <p>When complete YouTube transcript retrieval is restricted, the extension may briefly toggle the player captions control to capture the native caption response requested by the player, then immediately restore its prior state.</p>
         </section>
 
         <section>
           <h2>Storage and processing location</h2>
-          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Settings are stored in extension storage. Model weights are stored in Cache Storage. Personal content is processed on your device.</p>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Settings, including the full-transcript translation API configuration, are stored in local extension storage. Model weights are stored in Cache Storage. Translations stay only in the current side-panel session and are not retained. Personal content is processed on your device.</p>
           <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
+        </section>
+
+        <section>
+          <h2>Optional full transcript translation</h2>
+          <p>Full transcript translation is disabled by default. After you save an HTTPS OpenAI-compatible API Base URL, API Key, and model name, the extension requests optional access to that one API host. Only after you select Translate for the current YouTube video does the extension send the complete transcript directly to that API in batches for Simplified Chinese translation. It does not send notes, screenshots, recordings, transcriptions, or browsing history.</p>
+          <p>The API Key is saved only in local extension storage and is never synced to the developer or an included service. Your chosen API receives subtitle content plus the normal metadata needed for an HTTPS connection; its privacy practices govern that data. Clearing and saving all three translation fields removes the local configuration and revokes that API-host permission.</p>
         </section>
 
         <section>
@@ -68,11 +76,11 @@
           <h2>Why each permission is used</h2>
           <ul>
             <li><strong>Storage:</strong> saves settings, permission state, model state, and your records locally.</li>
-            <li><strong>Active tab and scripting:</strong> reads video time and already-rendered subtitles on supported lesson pages, and restores the packaged content script when the connection is interrupted.</li>
+            <li><strong>Active tab and scripting:</strong> reads video time and subtitles on supported lesson pages; when complete YouTube transcript retrieval is restricted, it may briefly toggle and restore player captions to capture the native response, and restores the packaged content script when the connection is interrupted.</li>
             <li><strong>Side panel:</strong> provides note input, settings, and the timeline beside the video.</li>
             <li><strong>Offscreen document:</strong> maintains authorized recording, local transcription, and export generation.</li>
             <li><strong>Downloads:</strong> saves the ZIP you explicitly export.</li>
-            <li><strong>Optional screenshot permission:</strong> is requested only when you enable player screenshots and accept the Edge prompt.</li>
+            <li><strong>Optional screenshot and translation-host permissions:</strong> screenshot access is requested only when you enable player screenshots and accept the Edge prompt; translation access is requested only for the single HTTPS API host you enter when saving configuration or selecting Translate.</li>
             <li><strong>Optional model-host permission:</strong> is requested only for a model download you start.</li>
           </ul>
         </section>

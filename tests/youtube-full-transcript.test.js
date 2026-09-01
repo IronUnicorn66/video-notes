@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as youtubeTranscript from "../src/core/youtube-full-transcript.js";
 
 import {
   extractYoutubeCaptionTracks,
@@ -134,4 +135,23 @@ test("页面没有暴露字幕轨道时返回明确状态", async () => {
     code: "YOUTUBE_CAPTION_TRACKS_MISSING",
     trackCount: 0,
   });
+});
+
+test("字幕轨道缺失或受限时都会尝试播放器字幕捕获", () => {
+  assert.equal(
+    typeof youtubeTranscript.shouldAttemptYoutubePlayerCapture,
+    "function",
+  );
+  assert.equal(
+    youtubeTranscript.shouldAttemptYoutubePlayerCapture({ code: "YOUTUBE_CAPTION_TRACKS_MISSING" }),
+    true,
+  );
+  assert.equal(
+    youtubeTranscript.shouldAttemptYoutubePlayerCapture({ code: "YOUTUBE_NATIVE_CAPTION_BLOCKED" }),
+    true,
+  );
+  assert.equal(
+    youtubeTranscript.shouldAttemptYoutubePlayerCapture({ code: "YOUTUBE_PLAYER_CAPTURE_FAILED" }),
+    false,
+  );
 });
