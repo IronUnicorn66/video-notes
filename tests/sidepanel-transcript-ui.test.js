@@ -99,6 +99,28 @@ test("完整字幕工具栏提供同高对齐的字号减小和增大按钮", ()
   assert.match(source, /--full-transcript-font-size/);
 });
 
+test("译文完成后在翻译和重试之间显示原文与译文选项", () => {
+  assert.match(
+    html,
+    /id="full-transcript-translate"[\s\S]*id="full-transcript-display-options"[\s\S]*id="full-transcript-retry"/,
+  );
+  assert.match(html, /id="full-transcript-display-options"[^>]*role="group"[^>]*hidden/);
+  assert.match(html, /id="full-transcript-show-original"[^>]*type="checkbox"[^>]*checked/);
+  assert.match(html, /id="full-transcript-show-translation"[^>]*type="checkbox"[^>]*checked/);
+  assert.match(html, /data-i18n="fullTranscriptOriginal">原文/);
+  assert.match(html, /data-i18n="fullTranscriptTranslation">译文/);
+  assert.match(html, /data-i18n-aria-label="fullTranscriptDisplayOptions"/);
+  assert.match(css, /\.full-transcript-display-options\s*\{[^}]*display:\s*flex/s);
+  assert.match(css, /\.full-transcript-display-options\[hidden\]\s*\{[^}]*display:\s*none/s);
+  assert.match(css, /\.full-transcript-display-option\s*\{[^}]*font-size:\s*11px/s);
+  assert.match(source, /createFullTranscriptDisplayBinding/);
+  assert.match(source, /transcriptGroupsFullyTranslated/);
+  assert.match(source, /fullTranscriptShowOriginal:\s*true/);
+  assert.match(source, /fullTranscriptShowTranslation:\s*true/);
+  assert.match(source, /if \(displayPreference\.showOriginal\)/);
+  assert.match(source, /if \(cue\.translation && displayPreference\.showTranslation\)/);
+});
+
 test("侧栏自动显示字幕语言并只提供五种翻译目标语言", () => {
   assert.match(html, /id="browser-translation-detected-source"/);
   assert.match(html, /id="browser-translation-language-pack-select"/);

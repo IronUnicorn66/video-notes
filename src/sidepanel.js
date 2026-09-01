@@ -47,6 +47,10 @@ import {
   untranslatedTranscriptSegments,
 } from "./core/browser-transcript-translation.js";
 import {
+  createFullTranscriptDisplayBinding,
+  transcriptGroupsFullyTranslated,
+} from "./core/full-transcript-display.js";
+import {
   getBrowserTranslationTargetLanguage,
   prepareBrowserTranslationLanguagePack,
 } from "./core/browser-translation-language-packs.js";
@@ -85,6 +89,9 @@ const elements = {
   fullTranscriptPanel: document.querySelector("#full-transcript-panel"),
   fullTranscriptStatus: document.querySelector("#full-transcript-status"),
   fullTranscriptTranslate: document.querySelector("#full-transcript-translate"),
+  fullTranscriptDisplayOptions: document.querySelector("#full-transcript-display-options"),
+  fullTranscriptShowOriginal: document.querySelector("#full-transcript-show-original"),
+  fullTranscriptShowTranslation: document.querySelector("#full-transcript-show-translation"),
   fullTranscriptRetry: document.querySelector("#full-transcript-retry"),
   fullTranscriptFontSizeDecrease: document.querySelector("#full-transcript-font-size-decrease"),
   fullTranscriptFontSizeIncrease: document.querySelector("#full-transcript-font-size-increase"),
@@ -177,6 +184,15 @@ let browserTranslationLanguagePackController = null;
 let browserTranslationLanguagePackGeneration = 0;
 const fullTranscriptTranslations = new Map();
 const browserTranscriptTranslationPairs = new Map();
+
+const fullTranscriptDisplayBinding = createFullTranscriptDisplayBinding({
+  group: elements.fullTranscriptDisplayOptions,
+  original: elements.fullTranscriptShowOriginal,
+  translation: elements.fullTranscriptShowTranslation,
+  storage: chrome.storage.local,
+  render: renderFullTranscript,
+  onError: (error) => showToast(localizeRuntimeMessage(interfaceLanguage, error.message)),
+});
 
 const noteSortBinding = createSidepanelNoteSortBinding({
   buttons: elements.noteSortButtons,
@@ -421,6 +437,7 @@ function resetFullTranscript({ hide = false } = {}) {
   elements.fullTranscriptPanel.open = !hide;
   elements.fullTranscriptStatus.textContent = t("fullTranscriptWaiting");
   syncFullTranscriptTranslateButton();
+  fullTranscriptDisplayBinding.setAvailable(false);
   elements.fullTranscriptRetry.disabled = true;
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
@@ -527,6 +544,10 @@ function syncFullTranscriptTranslateButton() {
 
 function renderFullTranscript() {
   const visibleCues = currentFullTranscriptGroups();
+  fullTranscriptDisplayBinding.setAvailable(
+    !fullTranscriptTranslationRunning && transcriptGroupsFullyTranslated(visibleCues),
+  );
+  const displayPreference = fullTranscriptDisplayBinding.effectivePreference();
   elements.fullTranscriptList.replaceChildren();
   for (const cue of visibleCues) {
     const item = document.createElement("li");
@@ -540,11 +561,14 @@ function renderFullTranscript() {
     time.dataset.videoId = fullTranscript?.videoId ?? "";
     time.textContent = timestamp;
     time.setAttribute("aria-label", t("jumpToTimestamp", { timestamp }));
-    const text = document.createElement("p");
-    text.className = "full-transcript-text";
-    text.textContent = cue.text;
-    item.append(time, text);
-    if (cue.translation) {
+    item.append(time);
+    if (displayPreference.showOriginal) {
+      const text = document.createElement("p");
+      text.className = "full-transcript-text";
+      text.textContent = cue.text;
+      item.append(text);
+    }
+    if (cue.translation && displayPreference.showTranslation) {
       const translation = document.createElement("p");
       translation.className = "full-transcript-translation";
       const label = document.createElement("span");
@@ -897,6 +921,7 @@ async function translateFullTranscriptInBrowser() {
   elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
   syncFullTranscriptTranslateButton();
   renderBrowserTranslationLanguagePackSettings();
+  renderFullTranscript();
 
   try {
     const created = await createBrowserTranscriptTranslator({
@@ -998,6 +1023,7 @@ async function translateFullTranscriptInBrowser() {
       ) {
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         syncFullTranscriptTranslateButton();
+        renderFullTranscript();
       }
     }
   }
@@ -2030,6 +2056,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.fullTranscriptFontSize) {
     applyFullTranscriptFontSize(changes.fullTranscriptFontSize.newValue);
   }
+  if (area === "local" && (
+    changes.fullTranscriptShowOriginal
+    || changes.fullTranscriptShowTranslation
+  )) {
+    const current = fullTranscriptDisplayBinding.preference();
+    fullTranscriptDisplayBinding.sync({
+      showOriginal: changes.fullTranscriptShowOriginal
+        ? changes.fullTranscriptShowOriginal.newValue
+        : current.showOriginal,
+      showTranslation: changes.fullTranscriptShowTranslation
+        ? changes.fullTranscriptShowTranslation.newValue
+        : current.showTranslation,
+    });
+    renderFullTranscript();
+  }
   if (area === "local" && changes.fullTranscriptLanguagePackTarget?.newValue) {
     const nextLanguage = getBrowserTranslationTargetLanguage(
       changes.fullTranscriptLanguagePackTarget.newValue,
@@ -2081,12 +2122,18 @@ syncSubtitleSettingsControls();
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
   fullTranscriptFontSize: TRANSCRIPT_FONT_SIZE,
+  fullTranscriptShowOriginal: true,
+  fullTranscriptShowTranslation: true,
   fullTranscriptLanguagePackTarget: "zh-Hans",
   fullTranscriptBrowserTranslationPairs: {},
 });
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
 applyFullTranscriptFontSize(fullTranscriptSettings.fullTranscriptFontSize);
+fullTranscriptDisplayBinding.sync({
+  showOriginal: fullTranscriptSettings.fullTranscriptShowOriginal,
+  showTranslation: fullTranscriptSettings.fullTranscriptShowTranslation,
+});
 browserTranslationLanguagePackTarget = getBrowserTranslationTargetLanguage(
   fullTranscriptSettings.fullTranscriptLanguagePackTarget,
 )?.id ?? "zh-Hans";

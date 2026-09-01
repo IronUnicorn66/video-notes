@@ -17,7 +17,7 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note.
 - Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
-- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, and timestamp jumps.
+- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, original/translation display choices, and timestamp jumps.
 - Adjusts the whole side panel from 75% to 200% with the `+` and `−` buttons beside the language selector, in 10% steps.
 - Translates sentence-aware transcript paragraphs locally with the built-in Edge/Chrome Translator API. It detects the transcript language automatically and lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target, with advance download and visible progress for the current language pair.
 - Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
@@ -29,12 +29,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.22 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.23 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.22 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip.sha256)
+[Download Video Notes 1.0.23 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.23/video-notes-edge-1.0.23.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.23/video-notes-edge-1.0.23.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -59,7 +59,7 @@ Notes, subtitles, screenshots, recordings, and transcription results stay in ext
 
 When you first download a Whisper model, the extension retrieves static weights from a pinned `ggerganov/whisper.cpp` revision on Hugging Face, verifies the exact size and SHA-256, and caches the model locally. All JavaScript, Worker, and WASM code ships inside the extension package. The download service receives normal HTTPS connection metadata such as IP address, User-Agent, request time, and model file URL; the request contains no notes or media content.
 
-Full transcripts are translated only in the side-panel document with the browser’s built-in Translator API. The source language is detected from the transcript track. The first release lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target. After the full transcript loads, you can download the current source-to-target pack in advance and follow its progress; the interface shows an estimated 200 MiB footprint only after it is ready. Translation then works offline. Edge and Chrome manage their packs separately, so actual disk use, support, and output can differ. The extension never sends transcript content to the developer or a third-party translation service.
+Full transcripts are translated only in the side-panel document with the browser’s built-in Translator API. The source language is detected from the transcript track. The first release lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target. After the current grouping is fully translated, you can show the original, the translation, or both; the display choice is stored locally. You can also download the current source-to-target pack in advance and follow its progress; the interface shows an estimated 200 MiB footprint only after it is ready. Translation then works offline. Edge and Chrome manage their packs separately, so actual disk use, support, and output can differ. The extension never sends transcript content to the developer or a third-party translation service.
 
 - [Product website](https://ironunicorn66.github.io/video-notes/en/)
 - [Privacy policy](https://ironunicorn66.github.io/video-notes/en/privacy/)
@@ -76,8 +76,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.22.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.22.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.23.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.23.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
