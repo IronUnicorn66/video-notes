@@ -24,6 +24,7 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  formatTranscriptProgress,
   formatTranscriptTimeRange,
   groupTranscriptCues,
   normalizeTranscriptGroupSize,
@@ -443,8 +444,10 @@ function fullTranscriptLoadedStatus() {
     })}`;
   }
   return `${loaded} · ${t("fullTranscriptTranslating", {
-    completed: translatedFullTranscriptCueCount(),
-    total: fullTranscript.cues.length,
+    progress: formatTranscriptProgress(
+      translatedFullTranscriptCueCount(),
+      fullTranscript.cues.length,
+    ),
   })}`;
 }
 

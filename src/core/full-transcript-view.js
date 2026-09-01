@@ -1,5 +1,5 @@
 export const TRANSCRIPT_CUE_GROUP_SIZE = 5;
-export const TRANSCRIPT_CUE_GROUP_SIZES = [5, 10, 20, 30];
+export const TRANSCRIPT_CUE_GROUP_SIZES = [5, 10, 20];
 
 export function normalizeTranscriptGroupSize(value) {
   const groupSize = Number(value);
@@ -31,6 +31,12 @@ export function formatTranscriptTimeRange({ startMs, endMs }) {
   const start = formatTranscriptTime(startMs);
   const end = formatTranscriptTime(endMs);
   return start === end ? start : `${start}–${end}`;
+}
+
+export function formatTranscriptProgress(completed, total) {
+  const totalText = String(total);
+  const completedText = String(completed).padStart(totalText.length, "\u2007");
+  return `${completedText}/${totalText}`;
 }
 
 export function groupTranscriptCues(cues, groupSize = TRANSCRIPT_CUE_GROUP_SIZE) {
