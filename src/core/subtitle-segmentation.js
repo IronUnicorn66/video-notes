@@ -55,6 +55,14 @@ function collapsedSubtitleFragments(fragments) {
     if (!fragment) continue;
     const previous = collapsed.at(-1);
     if (previous === fragment || previous?.startsWith(fragment)) continue;
+    if (
+      previous
+      && fragment.startsWith(previous)
+      && (COMPACT_SCRIPT.test(previous) || isSubtitleWordBoundary(fragment[previous.length]))
+    ) {
+      collapsed[collapsed.length - 1] = fragment;
+      continue;
+    }
     const overlapLength = previous ? subtitleOverlapLength(previous, fragment) : 0;
     if (overlapLength > 0) {
       collapsed[collapsed.length - 1] = previous + fragment.slice(overlapLength);

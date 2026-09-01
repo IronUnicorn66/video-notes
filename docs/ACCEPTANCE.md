@@ -4,7 +4,7 @@
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（301 个测试），`npm run build` 与 `npm run package` 均通过。
+- [x] 已自动验证：`npm test` 通过（302 个测试），`npm run build` 与 `npm run package` 均通过。
 - [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.22`。
 - [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.22.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。

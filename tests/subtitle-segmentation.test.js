@@ -47,6 +47,13 @@ test("连续字幕折叠滚动扩展并按完整句整理成段", () => {
   );
 });
 
+test("很短的滚动字幕片段扩展时不会重复保留前缀", () => {
+  assert.equal(
+    formatSubtitleFragments(["I", "I am learning."]),
+    "I am learning.",
+  );
+});
+
 test("字幕整理保留窗口首尾残句和原有换行", () => {
   assert.equal(formatSubtitleFragments([
     "中间残句",
