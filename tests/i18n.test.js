@@ -75,6 +75,9 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
   );
   assert.equal(translate("zh_CN", "decreaseFullTranscriptFontSize"), "减小字幕字号");
   assert.equal(translate("en", "increaseFullTranscriptFontSize"), "Increase transcript font size");
+  assert.equal(translate("zh_CN", "fullTranscriptDisplayOptions"), "字幕显示");
+  assert.equal(translate("en", "fullTranscriptOriginal"), "Original");
+  assert.equal(translate("en", "fullTranscriptTranslation"), "Translation");
   assert.equal(localizeRuntimeMessage("zh_CN", "录音启动失败"), "录音启动失败");
   assert.equal(localizeRuntimeMessage("en", "unmapped browser error"), "unmapped browser error");
 });

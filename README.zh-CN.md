@@ -17,7 +17,7 @@
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
 - 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
-- 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、按完整句调整边界的 5/10/20 条合并阅读、独立字号调节和时间跳转。
+- 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、按完整句调整边界的 5/10/20 条合并阅读、独立字号调节、原文/译文显示选择和时间跳转。
 - 使用语言切换左侧的 `+`、`−` 按钮，以 10% 为一档在 75%–200% 之间调整整个侧栏大小。
 - 使用 Edge/Chrome 内置 Translator API 在本机按完整句段落翻译字幕；自动识别字幕语言，首版可选择简体中文、英语、日语、韩语或西班牙语作为目标语言，并提前下载当前语言对。
 - 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
@@ -29,12 +29,12 @@
 
 ### Edge 商店
 
-1.0.22 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.23 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.22 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.22/video-notes-edge-1.0.22.zip.sha256)
+[下载视频笔记 1.0.23 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.23/video-notes-edge-1.0.23.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.23/video-notes-edge-1.0.23.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -59,7 +59,7 @@
 
 首次下载 Whisper 模型时，扩展会从 `ggerganov/whisper.cpp` 的固定 Hugging Face revision 下载静态权重，校验固定文件大小和 SHA-256 后缓存到本机。JavaScript、Worker 和 WASM 全部包含在扩展安装包中。下载服务会收到普通 HTTPS 请求的 IP、User-Agent、请求时间和模型文件地址等连接元数据；请求不包含用户笔记或媒体内容。
 
-完整字幕只通过浏览器内置 Translator API 在侧栏文档中本地翻译。扩展从字幕轨道自动识别源语言，首版允许用户选择简体中文、英语、日语、韩语或西班牙语作为目标语言；读取完整字幕后，可以提前下载当前源语言到目标语言的语言包并查看进度。下载完成后才显示约 200 MiB 的预估占用，之后可断网翻译。Edge 与 Chrome 分别管理自己的语言包，实际占用、支持状态和翻译结果可能不同。扩展不会把字幕发送给开发者或第三方翻译服务。
+完整字幕只通过浏览器内置 Translator API 在侧栏文档中本地翻译。扩展从字幕轨道自动识别源语言，首版允许用户选择简体中文、英语、日语、韩语或西班牙语作为目标语言；当前合并档位全部翻译完成后，可以选择只看原文、只看译文或同时查看，并在本机保存显示偏好。读取完整字幕后，也可以提前下载当前源语言到目标语言的语言包并查看进度。下载完成后才显示约 200 MiB 的预估占用，之后可断网翻译。Edge 与 Chrome 分别管理自己的语言包，实际占用、支持状态和翻译结果可能不同。扩展不会把字幕发送给开发者或第三方翻译服务。
 
 - [产品主页](https://ironunicorn66.github.io/video-notes/)
 - [隐私政策](https://ironunicorn66.github.io/video-notes/privacy/)
@@ -76,8 +76,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.22.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.22.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.23.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.23.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。

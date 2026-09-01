@@ -101,6 +101,33 @@
                 data-i18n="fullTranscriptTranslate"
                 disabled
               >翻译</button>
+              <div
+                id="full-transcript-display-options"
+                class="full-transcript-display-options"
+                role="group"
+                data-i18n-aria-label="fullTranscriptDisplayOptions"
+                aria-label="字幕显示"
+                hidden
+              >
+                <label class="full-transcript-display-option">
+                  <input
+                    id="full-transcript-show-original"
+                    type="checkbox"
+                    aria-controls="full-transcript-list"
+                    checked
+                  />
+                  <span data-i18n="fullTranscriptOriginal">原文</span>
+                </label>
+                <label class="full-transcript-display-option">
+                  <input
+                    id="full-transcript-show-translation"
+                    type="checkbox"
+                    aria-controls="full-transcript-list"
+                    checked
+                  />
+                  <span data-i18n="fullTranscriptTranslation">译文</span>
+                </label>
+              </div>
               <button
                 id="full-transcript-retry"
                 class="secondary-button full-transcript-action"
