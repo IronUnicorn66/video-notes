@@ -1,12 +1,12 @@
-# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.20）
+# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.21）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge、Chrome 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（290 个测试），`npm run build` 与 `npm run package` 均通过。
-- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.20`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.20.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm test` 通过（292 个测试），`npm run build` 与 `npm run package` 均通过。
+- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.21`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.21.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
 
@@ -37,6 +37,7 @@
 ## 三、笔记资产与侧栏（待用户手动验收）
 
 - [ ] 首次加载确认前置字幕默认开启且范围为 20 秒。
+- [ ] 确认顶部缩放按钮位于中文 / EN 左侧且同排同高，顺序为 `+ / −`；从默认 100% 逐档调整，确认每次变化 10%、75% 与 200% 达到边界时对应按钮禁用、关闭重开恢复上次比例。确认双指捏合和 `Ctrl/Command + 滚轮`不会缩放，普通滚动保持正常；分别检查中文、英文和窄侧栏布局。
 - [ ] 在 YouTube 和哔哩哔哩分别开启播放器字幕，播放超过 20 秒后创建标记，确认卡片显示标记前字幕。
 - [ ] 依次选择 5、10、20、30 秒并创建标记，确认新标记使用对应范围。
 - [ ] 编辑字幕后失焦保存，刷新侧栏并导出 ZIP，确认侧栏和 Markdown 保留修改。

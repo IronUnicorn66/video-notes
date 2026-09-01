@@ -8,15 +8,17 @@ export function normalizeSidepanelZoom(value) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value)));
 }
 
-export function sidepanelZoomAfterWheel(currentZoom, deltaY) {
+export function sidepanelZoomAfterStep(currentZoom, direction) {
   const normalized = normalizeSidepanelZoom(currentZoom);
-  if (deltaY === 0) return normalized;
-  return normalizeSidepanelZoom(normalized + (deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+  if (direction === 0) return normalized;
+  return normalizeSidepanelZoom(normalized + (direction > 0 ? ZOOM_STEP : -ZOOM_STEP));
 }
 
 export function createSidepanelZoomBinding({
   target,
   root,
+  increaseButton,
+  decreaseButton,
   storage,
   showToast,
 }) {
@@ -26,6 +28,8 @@ export function createSidepanelZoomBinding({
   function apply(value) {
     zoom = normalizeSidepanelZoom(value);
     root.style.zoom = String(zoom / 100);
+    increaseButton.disabled = zoom >= MAX_ZOOM;
+    decreaseButton.disabled = zoom <= MIN_ZOOM;
     return zoom;
   }
 
@@ -37,15 +41,21 @@ export function createSidepanelZoomBinding({
     }
   }
 
-  target.addEventListener("wheel", (event) => {
-    if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
-    event.preventDefault();
+  function step(direction) {
     hasNewerPreference = true;
-    const nextZoom = sidepanelZoomAfterWheel(zoom, event.deltaY);
+    const nextZoom = sidepanelZoomAfterStep(zoom, direction);
     if (nextZoom === zoom) return;
     apply(nextZoom);
     showToast(`侧栏缩放 ${nextZoom}%`);
     void persist(nextZoom);
+  }
+
+  increaseButton.addEventListener("click", () => step(1));
+  decreaseButton.addEventListener("click", () => step(-1));
+
+  target.addEventListener("wheel", (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
   }, { passive: false });
 
   return {

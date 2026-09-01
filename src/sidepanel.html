@@ -11,9 +11,36 @@
       <header class="video-header">
         <div class="video-header-top">
           <div class="eyebrow" data-i18n="currentVideo">当前视频</div>
-          <div class="language-switch" role="group" data-i18n-aria-label="languageSelector" aria-label="界面语言">
-            <button type="button" data-interface-language="zh_CN">中文</button>
-            <button type="button" data-interface-language="en">EN</button>
+          <div class="video-header-controls">
+            <div
+              class="sidepanel-zoom-controls"
+              role="group"
+              data-i18n-aria-label="sidepanelZoomControls"
+              aria-label="侧栏缩放"
+            >
+              <button
+                id="sidepanel-zoom-increase"
+                class="sidepanel-zoom-button"
+                type="button"
+                title="放大侧栏"
+                data-i18n-title="increaseSidepanelZoom"
+                data-i18n-aria-label="increaseSidepanelZoom"
+                aria-label="放大侧栏"
+              >+</button>
+              <button
+                id="sidepanel-zoom-decrease"
+                class="sidepanel-zoom-button"
+                type="button"
+                title="缩小侧栏"
+                data-i18n-title="decreaseSidepanelZoom"
+                data-i18n-aria-label="decreaseSidepanelZoom"
+                aria-label="缩小侧栏"
+              >−</button>
+            </div>
+            <div class="language-switch" role="group" data-i18n-aria-label="languageSelector" aria-label="界面语言">
+              <button type="button" data-interface-language="zh_CN">中文</button>
+              <button type="button" data-interface-language="en">EN</button>
+            </div>
           </div>
         </div>
         <h1 id="video-title" data-i18n="waitingForVideo">等待打开视频…</h1>
