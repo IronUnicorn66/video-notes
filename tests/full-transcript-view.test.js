@@ -21,6 +21,23 @@ test("完整字幕状态提供第一条开始至最后一条结束的覆盖范�
   assert.equal(transcriptView.transcriptCoverage([]), null);
 });
 
+test("播放器时间定位到当前字幕段或相邻边界段", () => {
+  const groups = [
+    { startMs: 5000, endMs: 10000 },
+    { startMs: 12000, endMs: 18000 },
+    { startMs: 20000, endMs: 26000 },
+  ];
+
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, 7), 0);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, 11), 0);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, 12), 1);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, 0), 0);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, 30), 2);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime([], 10), -1);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, -1), -1);
+  assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, Number.NaN), -1);
+});
+
 test("完整字幕时间范围省略不足一小时的小时前导零", () => {
   assert.equal(
     transcriptView.formatTranscriptTimeRange({ startMs: 5000, endMs: 4175000 }),

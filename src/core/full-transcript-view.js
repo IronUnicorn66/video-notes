@@ -35,6 +35,17 @@ export function transcriptCoverage(cues) {
   };
 }
 
+export function transcriptGroupIndexAtTime(groups, seconds) {
+  const position = Number(seconds);
+  if (groups.length === 0 || !Number.isFinite(position) || position < 0) return -1;
+  const positionMs = position * 1000;
+  if (positionMs < groups[0].startMs) return 0;
+  for (let index = 1; index < groups.length; index += 1) {
+    if (positionMs < groups[index].startMs) return index - 1;
+  }
+  return groups.length - 1;
+}
+
 function formatTranscriptTime(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const hours = Math.floor(totalSeconds / 3600);

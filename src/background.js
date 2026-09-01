@@ -826,6 +826,15 @@ async function handleMessage(message, sender) {
         transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
       };
     }
+    case "GET_VIDEO_POSITION": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "GET_VIDEO_POSITION",
+        sessionId: message.sessionId,
+        videoId: message.videoId,
+      });
+      return { seconds: response.seconds };
+    }
     case "SEEK_VIDEO": {
       const tab = await targetTab(sender, message.tabId);
       const response = await sendToTab(tab.id, {

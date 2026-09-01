@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [html, css, source] = await Promise.all([
+const [html, css, source, background, content] = await Promise.all([
   readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.css", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8"),
+  readFile(new URL("../src/background.js", import.meta.url), "utf8"),
+  readFile(new URL("../src/content.js", import.meta.url), "utf8"),
 ]);
 
 test("侧栏提供可折叠的完整字幕、翻译和重试入口", () => {
@@ -121,6 +123,22 @@ test("译文完成后在翻译和重试之间显示原文与译文选项", () =>
   assert.match(source, /if \(cue\.translation && displayPreference\.showTranslation\)/);
 });
 
+test("重试左侧提供按播放器进度定位字幕的按钮", () => {
+  assert.match(
+    html,
+    /id="full-transcript-display-options"[\s\S]*id="full-transcript-locate"[\s\S]*id="full-transcript-retry"/,
+  );
+  assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n="fullTranscriptLocate"/);
+  assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-title="fullTranscriptLocateTitle"/);
+  assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-aria-label="fullTranscriptLocateTitle"/);
+  assert.match(source, /type: "GET_VIDEO_POSITION"/);
+  assert.match(source, /fullTranscriptList\.scrollTo\(\{[\s\S]*behavior: "smooth"/);
+  assert.match(source, /full-transcript-cue-located/);
+  assert.match(css, /\.full-transcript-cue-located\s*\{/);
+  assert.match(background, /case "GET_VIDEO_POSITION"/);
+  assert.match(content, /case "GET_VIDEO_POSITION"/);
+});
+
 test("侧栏自动显示字幕语言并只提供五种翻译目标语言", () => {
   assert.match(html, /id="browser-translation-detected-source"/);
   assert.match(html, /id="browser-translation-language-pack-select"/);
@@ -162,7 +180,7 @@ test("侧栏只创建浏览器本地会话并支持提前下载语言包", () =>
 test("完整字幕加载结束后会重新启用翻译按钮", () => {
   assert.match(
     source,
-    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*\}/s,
+    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*syncFullTranscriptLocateButton\(\);\s*\}/s,
   );
 });
 

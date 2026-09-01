@@ -10,7 +10,10 @@ import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
 import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
-import { seekMediaForVideoContext } from "./core/video-command-context.js";
+import {
+  readMediaTimeForVideoContext,
+  seekMediaForVideoContext,
+} from "./core/video-command-context.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 let currentMedia = null;
@@ -323,6 +326,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (![
     "GET_PAGE_CONTEXT",
     "GET_FULL_YOUTUBE_TRANSCRIPT",
+    "GET_VIDEO_POSITION",
     "SEEK_VIDEO",
     "PREPARE_MARKER",
     "ACTIVATE_MARKER",
@@ -353,6 +357,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             videoId: context.videoId,
           }),
         };
+      }
+      case "GET_VIDEO_POSITION": {
+        const seconds = readMediaTimeForVideoContext({
+          media: findMedia(),
+          context: getContext(),
+          expectedSessionId: message.sessionId,
+          expectedVideoId: message.videoId,
+        });
+        return { seconds };
       }
       case "SEEK_VIDEO": {
         const seconds = seekMediaForVideoContext({

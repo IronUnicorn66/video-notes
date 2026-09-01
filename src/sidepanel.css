@@ -345,6 +345,12 @@ h2 {
   border-top: 1px solid #ebe7de;
 }
 
+.full-transcript-cue-located {
+  border-radius: 6px;
+  background: rgba(96, 124, 111, 0.14);
+  box-shadow: inset 3px 0 #607c6f;
+}
+
 .full-transcript-cue:first-child {
   border-top: 0;
 }

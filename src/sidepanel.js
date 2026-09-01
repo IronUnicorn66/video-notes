@@ -34,6 +34,7 @@ import {
   TRANSCRIPT_FONT_SIZE_MAX,
   TRANSCRIPT_FONT_SIZE_MIN,
   transcriptFontSizeAfterStep,
+  transcriptGroupIndexAtTime,
   transcriptCoverage,
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
@@ -92,6 +93,7 @@ const elements = {
   fullTranscriptDisplayOptions: document.querySelector("#full-transcript-display-options"),
   fullTranscriptShowOriginal: document.querySelector("#full-transcript-show-original"),
   fullTranscriptShowTranslation: document.querySelector("#full-transcript-show-translation"),
+  fullTranscriptLocate: document.querySelector("#full-transcript-locate"),
   fullTranscriptRetry: document.querySelector("#full-transcript-retry"),
   fullTranscriptFontSizeDecrease: document.querySelector("#full-transcript-font-size-decrease"),
   fullTranscriptFontSizeIncrease: document.querySelector("#full-transcript-font-size-increase"),
@@ -168,6 +170,8 @@ let fullTranscript = null;
 let fullTranscriptContextKey = "";
 let fullTranscriptGeneration = 0;
 let fullTranscriptLoading = false;
+let fullTranscriptLocating = false;
+let fullTranscriptLocatedCueTimer = null;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
 let fullTranscriptFontSize = TRANSCRIPT_FONT_SIZE;
 let fullTranscriptTranslationRunning = false;
@@ -415,7 +419,7 @@ function formatTranscriptionTime(createdAt) {
 }
 
 async function request(message) {
-  const payload = ["GET_ACTIVE_STATE", "GET_FULL_YOUTUBE_TRANSCRIPT", "SEEK_VIDEO"].includes(message.type)
+  const payload = ["GET_ACTIVE_STATE", "GET_FULL_YOUTUBE_TRANSCRIPT", "GET_VIDEO_POSITION", "SEEK_VIDEO"].includes(message.type)
     && Number.isInteger(sidePanelRefresh.tabId)
     ? { ...message, tabId: sidePanelRefresh.tabId }
     : message;
@@ -431,13 +435,16 @@ function resetFullTranscript({ hide = false } = {}) {
   fullTranscript = null;
   fullTranscriptTranslations.clear();
   fullTranscriptLoading = false;
+  fullTranscriptLocating = false;
   fullTranscriptContextKey = "";
+  clearLocatedFullTranscriptCue();
   setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
   elements.fullTranscriptPanel.hidden = hide;
   elements.fullTranscriptPanel.open = !hide;
   elements.fullTranscriptStatus.textContent = t("fullTranscriptWaiting");
   syncFullTranscriptTranslateButton();
   fullTranscriptDisplayBinding.setAvailable(false);
+  syncFullTranscriptLocateButton();
   elements.fullTranscriptRetry.disabled = true;
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
@@ -453,6 +460,79 @@ function currentFullTranscriptGroups() {
     fullTranscriptGroupSize,
     fullTranscriptTranslations,
   );
+}
+
+function clearLocatedFullTranscriptCue() {
+  clearTimeout(fullTranscriptLocatedCueTimer);
+  fullTranscriptLocatedCueTimer = null;
+  const cue = elements.fullTranscriptList.querySelector(".full-transcript-cue-located");
+  cue?.classList.remove("full-transcript-cue-located");
+  cue?.removeAttribute("aria-current");
+}
+
+function syncFullTranscriptLocateButton() {
+  elements.fullTranscriptLocate.disabled = fullTranscriptLocating
+    || fullTranscriptLoading
+    || currentFullTranscriptGroups().length === 0;
+}
+
+function showLocatedFullTranscriptCue(index) {
+  clearLocatedFullTranscriptCue();
+  const cue = elements.fullTranscriptList.children[index];
+  if (!cue) return;
+  cue.classList.add("full-transcript-cue-located");
+  cue.setAttribute("aria-current", "true");
+  const listBounds = elements.fullTranscriptList.getBoundingClientRect();
+  const cueBounds = cue.getBoundingClientRect();
+  elements.fullTranscriptList.scrollTo({
+    top: elements.fullTranscriptList.scrollTop
+      + cueBounds.top
+      - listBounds.top
+      - ((listBounds.height - cueBounds.height) / 2),
+    behavior: "smooth",
+  });
+  fullTranscriptLocatedCueTimer = setTimeout(() => {
+    cue.classList.remove("full-transcript-cue-located");
+    cue.removeAttribute("aria-current");
+    fullTranscriptLocatedCueTimer = null;
+  }, 1500);
+}
+
+async function locateFullTranscriptAtCurrentPosition() {
+  if (fullTranscriptLocating || !fullTranscript) return;
+  const transcript = fullTranscript;
+  const groups = currentFullTranscriptGroups();
+  const groupSize = fullTranscriptGroupSize;
+  const generation = fullTranscriptGeneration;
+  const contextKey = fullTranscriptContextKey;
+  if (groups.length === 0) return;
+
+  fullTranscriptLocating = true;
+  syncFullTranscriptLocateButton();
+  try {
+    const response = await request({
+      type: "GET_VIDEO_POSITION",
+      sessionId: activeContext?.sessionId,
+      videoId: transcript.videoId,
+    });
+    if (
+      transcript !== fullTranscript
+      || generation !== fullTranscriptGeneration
+      || contextKey !== fullTranscriptContextKey
+      || groupSize !== fullTranscriptGroupSize
+    ) return;
+    const index = transcriptGroupIndexAtTime(groups, response.seconds);
+    if (index >= 0) showLocatedFullTranscriptCue(index);
+  } catch (error) {
+    if (generation === fullTranscriptGeneration && contextKey === fullTranscriptContextKey) {
+      showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
+    }
+  } finally {
+    if (generation === fullTranscriptGeneration && contextKey === fullTranscriptContextKey) {
+      fullTranscriptLocating = false;
+      syncFullTranscriptLocateButton();
+    }
+  }
 }
 
 function translatedFullTranscriptGroupCount(groups = currentFullTranscriptGroups()) {
@@ -548,6 +628,7 @@ function renderFullTranscript() {
     !fullTranscriptTranslationRunning && transcriptGroupsFullyTranslated(visibleCues),
   );
   const displayPreference = fullTranscriptDisplayBinding.effectivePreference();
+  clearLocatedFullTranscriptCue();
   elements.fullTranscriptList.replaceChildren();
   for (const cue of visibleCues) {
     const item = document.createElement("li");
@@ -1041,6 +1122,8 @@ async function translateFullTranscript() {
 async function loadFullTranscript() {
   if (fullTranscriptLoading || !activeContext || activeContext.platform !== "youtube") return;
   cancelFullTranscriptTranslation();
+  fullTranscriptLocating = false;
+  clearLocatedFullTranscriptCue();
   const contextKey = `${sidePanelRefresh.tabId}:${activeContext.sessionId}`;
   const generation = ++fullTranscriptGeneration;
   fullTranscriptContextKey = contextKey;
@@ -1052,6 +1135,7 @@ async function loadFullTranscript() {
   elements.fullTranscriptPanel.open = true;
   elements.fullTranscriptStatus.textContent = t("fullTranscriptLoading");
   syncFullTranscriptTranslateButton();
+  syncFullTranscriptLocateButton();
   elements.fullTranscriptRetry.disabled = true;
   elements.fullTranscriptList.replaceChildren();
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptLoadingDetail");
@@ -1084,6 +1168,7 @@ async function loadFullTranscript() {
     if (generation === fullTranscriptGeneration) {
       fullTranscriptLoading = false;
       syncFullTranscriptTranslateButton();
+      syncFullTranscriptLocateButton();
     }
   }
 }
@@ -1707,6 +1792,9 @@ elements.input.addEventListener("keydown", (event) => {
 
 elements.fullTranscriptTranslate.addEventListener("click", () => {
   void translateFullTranscript();
+});
+elements.fullTranscriptLocate.addEventListener("click", () => {
+  void locateFullTranscriptAtCurrentPosition();
 });
 elements.fullTranscriptRetry.addEventListener("click", () => {
   void loadFullTranscript();
