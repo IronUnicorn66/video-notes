@@ -53,6 +53,19 @@ export async function requestTranslationHostPermission(permissions, config) {
   return permissions.request(permission);
 }
 
+export async function authorizeCurrentTranscriptTranslation({ getState, requestPermission }) {
+  const snapshot = getState();
+  if (!snapshot?.transcript) return null;
+  await requestPermission();
+  const current = getState();
+  if (
+    current?.transcript !== snapshot.transcript
+    || current?.generation !== snapshot.generation
+    || current?.contextKey !== snapshot.contextKey
+  ) return null;
+  return snapshot;
+}
+
 function jsonContent(value) {
   const trimmed = String(value ?? "").trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
@@ -93,6 +106,7 @@ export async function translateTranscriptBatch({ config, cues, fetchImpl = fetch
     },
     body: JSON.stringify({
       model: config.model,
+      stream: false,
       messages: [
         {
           role: "system",

@@ -417,6 +417,9 @@ const englishRuntimeMessages = new Map([
   ["翻译结果包含未知字幕序号", "The translation result contains an unknown cue ID"],
   ["翻译结果包含重复字幕序号", "The translation result contains a duplicate cue ID"],
   ["翻译结果不完整", "The translation result is incomplete"],
+  ["未授权访问翻译 API", "Access to the translation API was not granted"],
+  ["无法撤销旧的翻译 API 权限", "Could not revoke the previous translation API permission"],
+  ["无法回收新的翻译 API 权限", "Could not revoke the newly granted translation API permission"],
 ]);
 
 const englishRuntimePatterns = [

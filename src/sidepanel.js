@@ -32,12 +32,17 @@ import {
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
 import {
+  authorizeCurrentTranscriptTranslation,
   chunkTranscriptCues,
   normalizeFullTranscriptTranslationConfig,
   requestTranslationHostPermission,
   translateTranscriptBatch,
   untranslatedTranscriptCues,
 } from "./core/full-transcript-translation.js";
+import {
+  clearTranslationSettings,
+  saveTranslationSettings,
+} from "./core/full-transcript-translation-settings.js";
 import {
   createHistoryConfirmationController,
   createHistoryOperationController,
@@ -499,21 +504,29 @@ async function translateFullTranscript() {
     showToast(error.message);
     return;
   }
+  let snapshot;
   try {
-    await ensureFullTranscriptTranslationPermission(config);
+    snapshot = await authorizeCurrentTranscriptTranslation({
+      getState: () => ({
+        transcript: fullTranscript,
+        generation: fullTranscriptGeneration,
+        contextKey: fullTranscriptContextKey,
+      }),
+      requestPermission: () => ensureFullTranscriptTranslationPermission(config),
+    });
   } catch (error) {
     showToast(error.message);
     return;
   }
+  if (!snapshot) return;
 
-  const generation = fullTranscriptGeneration;
-  const contextKey = fullTranscriptContextKey;
-  const allTranslated = fullTranscript.cues.length > 0
-    && translatedFullTranscriptCueCount() === fullTranscript.cues.length;
+  const { transcript, generation, contextKey } = snapshot;
+  const allTranslated = transcript.cues.length > 0
+    && translatedFullTranscriptCueCount() === transcript.cues.length;
   if (allTranslated) {
-    for (const cue of fullTranscript.cues) delete cue.translation;
+    for (const cue of transcript.cues) delete cue.translation;
   }
-  const batches = chunkTranscriptCues(untranslatedTranscriptCues(fullTranscript.cues));
+  const batches = chunkTranscriptCues(untranslatedTranscriptCues(transcript.cues));
   if (batches.length === 0) return;
 
   const controller = new AbortController();
@@ -531,11 +544,12 @@ async function translateFullTranscript() {
       });
       if (
         controller.signal.aborted
+        || transcript !== fullTranscript
         || generation !== fullTranscriptGeneration
         || contextKey !== fullTranscriptContextKey
       ) return;
       for (const { id, translation } of translations) {
-        fullTranscript.cues[id].translation = translation;
+        transcript.cues[id].translation = translation;
       }
       elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
       renderFullTranscript();
@@ -549,7 +563,11 @@ async function translateFullTranscript() {
     if (fullTranscriptTranslationController === controller) {
       fullTranscriptTranslationController = null;
       fullTranscriptTranslationRunning = false;
-      if (generation === fullTranscriptGeneration && contextKey === fullTranscriptContextKey) {
+      if (
+        transcript === fullTranscript
+        && generation === fullTranscriptGeneration
+        && contextKey === fullTranscriptContextKey
+      ) {
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         syncFullTranscriptTranslateButton();
       }
@@ -575,33 +593,40 @@ function fullTranscriptTranslationControlsAreBlank() {
 async function saveFullTranscriptTranslationSettings() {
   elements.fullTranscriptTranslationSave.disabled = true;
   try {
-    const stored = await chrome.storage.local.get({ fullTranscriptTranslationOrigin: "" });
+    const stored = await chrome.storage.local.get({
+      fullTranscriptTranslationBaseUrl: "",
+      fullTranscriptTranslationApiKey: "",
+      fullTranscriptTranslationModel: "",
+      fullTranscriptTranslationOrigin: "",
+    });
     if (fullTranscriptTranslationControlsAreBlank()) {
-      await chrome.storage.local.remove(FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS);
-      if (stored.fullTranscriptTranslationOrigin) {
-        await chrome.permissions.remove({ origins: [stored.fullTranscriptTranslationOrigin] });
-      }
+      await clearTranslationSettings({
+        storage: chrome.storage.local,
+        permissions: chrome.permissions,
+        stored,
+        keys: FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS,
+      });
       showToast(t("fullTranscriptTranslationCleared"));
       return;
     }
     const config = translationConfigFromControls();
-    await ensureFullTranscriptTranslationPermission(config);
-    await chrome.storage.local.set({
+    const values = {
       fullTranscriptTranslationBaseUrl: config.baseUrl,
       fullTranscriptTranslationApiKey: config.apiKey,
       fullTranscriptTranslationModel: config.model,
       fullTranscriptTranslationOrigin: config.origin,
+    };
+    await saveTranslationSettings({
+      storage: chrome.storage.local,
+      permissions: chrome.permissions,
+      stored,
+      config,
+      values,
     });
-    if (
-      stored.fullTranscriptTranslationOrigin
-      && stored.fullTranscriptTranslationOrigin !== config.origin
-    ) {
-      await chrome.permissions.remove({ origins: [stored.fullTranscriptTranslationOrigin] });
-    }
     elements.fullTranscriptTranslationBaseUrl.value = config.baseUrl;
     showToast(t("fullTranscriptTranslationSaved"));
   } catch (error) {
-    showToast(error.message);
+    showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
   } finally {
     elements.fullTranscriptTranslationSave.disabled = false;
   }

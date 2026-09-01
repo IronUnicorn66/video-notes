@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  authorizeCurrentTranscriptTranslation,
   chunkTranscriptCues,
   normalizeFullTranscriptTranslationConfig,
   parseTranscriptTranslations,
@@ -86,6 +87,46 @@ test("翻译 API 权限只请求配置主机，拒绝时返回未授权", async 
   assert.deepEqual(requested, [{ origins: ["https://api.example.com/*"] }]);
 });
 
+test("权限确认期间切换视频不会返回可翻译快照", async () => {
+  const firstTranscript = { cues: [{ text: "Old" }] };
+  const secondTranscript = { cues: [{ text: "New" }] };
+  let state = {
+    transcript: firstTranscript,
+    generation: 1,
+    contextKey: "tab:old",
+  };
+
+  const snapshot = await authorizeCurrentTranscriptTranslation({
+    getState: () => state,
+    requestPermission: async () => {
+      state = {
+        transcript: secondTranscript,
+        generation: 2,
+        contextKey: "tab:new",
+      };
+    },
+  });
+
+  assert.equal(snapshot, null);
+});
+
+test("权限确认期间字幕被清空不会返回可翻译快照", async () => {
+  let state = {
+    transcript: { cues: [{ text: "Old" }] },
+    generation: 1,
+    contextKey: "tab:old",
+  };
+
+  const snapshot = await authorizeCurrentTranscriptTranslation({
+    getState: () => state,
+    requestPermission: async () => {
+      state = { transcript: null, generation: 2, contextKey: "tab:new" };
+    },
+  });
+
+  assert.equal(snapshot, null);
+});
+
 test("翻译响应按字幕序号映射并拒绝缺失或重复序号", () => {
   const batch = [
     { id: 7, text: "One" },
@@ -143,6 +184,7 @@ test("翻译请求使用用户模型、四十条以内字幕和 OpenAI 兼容端
   assert.equal(requestedUrl, "https://api.example.com/v1/chat/completions");
   assert.equal(requestedInit.headers.Authorization, "Bearer test-api-key");
   assert.equal(JSON.parse(requestedInit.body).model, "example-mini");
+  assert.equal(JSON.parse(requestedInit.body).stream, false);
   assert.deepEqual(translated, [
     { id: 0, translation: "欢迎" },
     { id: 1, translation: "概览" },
