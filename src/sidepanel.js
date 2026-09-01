@@ -27,8 +27,13 @@ import {
   formatTranscriptProgress,
   formatTranscriptTimeRange,
   groupTranscriptCues,
+  normalizeTranscriptFontSize,
   normalizeTranscriptGroupSize,
   TRANSCRIPT_CUE_GROUP_SIZE,
+  TRANSCRIPT_FONT_SIZE,
+  TRANSCRIPT_FONT_SIZE_MAX,
+  TRANSCRIPT_FONT_SIZE_MIN,
+  transcriptFontSizeAfterStep,
   transcriptCoverage,
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
@@ -79,6 +84,8 @@ const elements = {
   fullTranscriptStatus: document.querySelector("#full-transcript-status"),
   fullTranscriptTranslate: document.querySelector("#full-transcript-translate"),
   fullTranscriptRetry: document.querySelector("#full-transcript-retry"),
+  fullTranscriptFontSizeDecrease: document.querySelector("#full-transcript-font-size-decrease"),
+  fullTranscriptFontSizeIncrease: document.querySelector("#full-transcript-font-size-increase"),
   fullTranscriptList: document.querySelector("#full-transcript-list"),
   fullTranscriptEmpty: document.querySelector("#full-transcript-empty"),
   noteList: document.querySelector("#note-list"),
@@ -153,6 +160,7 @@ let fullTranscriptContextKey = "";
 let fullTranscriptGeneration = 0;
 let fullTranscriptLoading = false;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
+let fullTranscriptFontSize = TRANSCRIPT_FONT_SIZE;
 let fullTranscriptTranslationRunning = false;
 let fullTranscriptTranslationController = null;
 let browserTranscriptTranslationSession = null;
@@ -454,6 +462,29 @@ function fullTranscriptLoadedStatus() {
 function syncFullTranscriptGroupButtons() {
   for (const button of elements.fullTranscriptGroupButtons) {
     button.checked = Number(button.value) === fullTranscriptGroupSize;
+  }
+}
+
+function applyFullTranscriptFontSize(value) {
+  fullTranscriptFontSize = normalizeTranscriptFontSize(value);
+  elements.fullTranscriptPanel.style.setProperty(
+    "--full-transcript-font-size",
+    `${fullTranscriptFontSize}px`,
+  );
+  elements.fullTranscriptFontSizeDecrease.disabled = fullTranscriptFontSize <= TRANSCRIPT_FONT_SIZE_MIN;
+  elements.fullTranscriptFontSizeIncrease.disabled = fullTranscriptFontSize >= TRANSCRIPT_FONT_SIZE_MAX;
+}
+
+async function changeFullTranscriptFontSize(direction) {
+  const previous = fullTranscriptFontSize;
+  const next = transcriptFontSizeAfterStep(previous, direction);
+  if (next === previous) return;
+  applyFullTranscriptFontSize(next);
+  try {
+    await chrome.storage.local.set({ fullTranscriptFontSize });
+  } catch (error) {
+    applyFullTranscriptFontSize(previous);
+    showToast(error.message);
   }
 }
 
@@ -1628,6 +1659,12 @@ elements.fullTranscriptTranslate.addEventListener("click", () => {
 elements.fullTranscriptRetry.addEventListener("click", () => {
   void loadFullTranscript();
 });
+elements.fullTranscriptFontSizeDecrease.addEventListener("click", () => {
+  void changeFullTranscriptFontSize(-1);
+});
+elements.fullTranscriptFontSizeIncrease.addEventListener("click", () => {
+  void changeFullTranscriptFontSize(1);
+});
 elements.fullTranscriptList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-seconds]");
   if (!button) return;
@@ -1956,6 +1993,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
   }
+  if (area === "local" && changes.fullTranscriptFontSize) {
+    applyFullTranscriptFontSize(changes.fullTranscriptFontSize.newValue);
+  }
   if (area === "local" && changes.fullTranscriptLanguagePackTarget?.newValue) {
     const nextLanguage = getBrowserTranslationTargetLanguage(
       changes.fullTranscriptLanguagePackTarget.newValue,
@@ -2006,11 +2046,13 @@ syncSubtitleSettingsControls();
 
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
+  fullTranscriptFontSize: TRANSCRIPT_FONT_SIZE,
   fullTranscriptLanguagePackTarget: "zh-Hans",
   fullTranscriptBrowserTranslationPairs: {},
 });
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
+applyFullTranscriptFontSize(fullTranscriptSettings.fullTranscriptFontSize);
 browserTranslationLanguagePackTarget = getBrowserTranslationTargetLanguage(
   fullTranscriptSettings.fullTranscriptLanguagePackTarget,
 )?.id ?? "zh-Hans";

@@ -55,6 +55,18 @@ test("完整字幕只接受三个合并档位并回退到默认五条", () => {
   assert.equal(transcriptView.normalizeTranscriptGroupSize("invalid"), 5);
 });
 
+test("完整字幕字号按一像素调整并限制在 10 到 24 像素", () => {
+  assert.equal(transcriptView.normalizeTranscriptFontSize(undefined), 12);
+  assert.equal(transcriptView.normalizeTranscriptFontSize("invalid"), 12);
+  assert.equal(transcriptView.normalizeTranscriptFontSize(8), 10);
+  assert.equal(transcriptView.normalizeTranscriptFontSize("16"), 16);
+  assert.equal(transcriptView.normalizeTranscriptFontSize(30), 24);
+  assert.equal(transcriptView.transcriptFontSizeAfterStep(12, -1), 11);
+  assert.equal(transcriptView.transcriptFontSizeAfterStep(12, 1), 13);
+  assert.equal(transcriptView.transcriptFontSizeAfterStep(10, -1), 10);
+  assert.equal(transcriptView.transcriptFontSizeAfterStep(24, 1), 24);
+});
+
 test("完整字幕翻译进度按总数位数预留固定空间", () => {
   const progressValues = [
     transcriptView.formatTranscriptProgress(9, 1081),

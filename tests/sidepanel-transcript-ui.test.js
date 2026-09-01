@@ -44,7 +44,8 @@ test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
   assert.match(css, /\.full-transcript-toolbar\s*\{[^}]*flex-wrap:\s*nowrap/s);
   assert.match(css, /\.full-transcript-toolbar\s*\{[^}]*overflow-x:\s*auto/s);
   assert.match(css, /\.full-transcript-actions\s*\{[^}]*display:\s*flex/s);
-  assert.match(css, /\.full-transcript-action\s*\{[^}]*min-width:\s*58px/s);
+  assert.match(css, /\.full-transcript-action\s*\{[^}]*min-width:\s*50px/s);
+  assert.match(css, /\.full-transcript-action\s*\{[^}]*padding:\s*6px 8px/s);
   assert.match(css, /\.full-transcript-action\s*\{[^}]*white-space:\s*nowrap/s);
   assert.match(html, /class="full-transcript-actions" role="group"/);
   assert.match(html, /class="full-transcript-group-picker"\s+role="radiogroup"/);
@@ -68,6 +69,34 @@ test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
     /\.full-transcript-panel > summary small\s*\{[^}]*font-variant-numeric:\s*tabular-nums/s,
   );
   assert.match(css, /\.full-transcript-time/);
+});
+
+test("完整字幕工具栏提供同高对齐的字号减小和增大按钮", () => {
+  assert.match(html, /class="full-transcript-font-size-controls"[^>]*role="group"/);
+  assert.match(html, /id="full-transcript-font-size-decrease"/);
+  assert.match(html, /id="full-transcript-font-size-increase"/);
+  assert.match(html, /data-i18n-aria-label="decreaseFullTranscriptFontSize"/);
+  assert.match(html, /data-i18n-aria-label="increaseFullTranscriptFontSize"/);
+  assert.match(
+    html,
+    /id="full-transcript-font-size-increase"[\s\S]*id="full-transcript-font-size-decrease"/,
+  );
+  assert.match(css, /\.full-transcript-font-size-controls\s*\{[^}]*display:\s*flex/s);
+  assert.match(
+    css,
+    /\.full-transcript-font-size-button\s*\{[^}]*width:\s*34px[^}]*height:\s*34px/s,
+  );
+  assert.match(
+    css,
+    /\.full-transcript-text[^}]*font-size:\s*var\(--full-transcript-font-size,\s*12px\)/s,
+  );
+  assert.match(
+    css,
+    /\.full-transcript-translation[^}]*font-size:\s*var\(--full-transcript-font-size,\s*12px\)/s,
+  );
+  assert.match(source, /fullTranscriptFontSize:\s*TRANSCRIPT_FONT_SIZE/);
+  assert.match(source, /chrome\.storage\.local\.set\(\{ fullTranscriptFontSize \}\)/);
+  assert.match(source, /--full-transcript-font-size/);
 });
 
 test("侧栏自动显示字幕语言并只提供五种翻译目标语言", () => {
