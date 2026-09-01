@@ -41,6 +41,7 @@ import {
 } from "./core/full-transcript-translation.js";
 import {
   clearTranslationSettings,
+  FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY,
   saveTranslationSettings,
 } from "./core/full-transcript-translation-settings.js";
 import {
@@ -583,6 +584,7 @@ const FULL_TRANSCRIPT_TRANSLATION_STORAGE_KEYS = [
   "fullTranscriptTranslationApiKey",
   "fullTranscriptTranslationModel",
   "fullTranscriptTranslationOrigin",
+  FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY,
 ];
 
 function fullTranscriptTranslationControlsAreBlank() {
@@ -601,6 +603,7 @@ async function saveFullTranscriptTranslationSettings() {
       fullTranscriptTranslationApiKey: "",
       fullTranscriptTranslationModel: "",
       fullTranscriptTranslationOrigin: "",
+      [FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY]: "",
     });
     if (fullTranscriptTranslationControlsAreBlank()) {
       await clearTranslationSettings({
@@ -618,6 +621,7 @@ async function saveFullTranscriptTranslationSettings() {
       fullTranscriptTranslationApiKey: config.apiKey,
       fullTranscriptTranslationModel: config.model,
       fullTranscriptTranslationOrigin: config.origin,
+      [FULL_TRANSCRIPT_TRANSLATION_PENDING_ORIGIN_KEY]: "",
     };
     await saveTranslationSettings({
       storage: chrome.storage.local,

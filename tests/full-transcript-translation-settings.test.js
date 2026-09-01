@@ -11,6 +11,7 @@ const keys = [
   "fullTranscriptTranslationApiKey",
   "fullTranscriptTranslationModel",
   "fullTranscriptTranslationOrigin",
+  "fullTranscriptTranslationPendingOrigin",
 ];
 
 const oldValues = {
@@ -29,6 +30,7 @@ const newValues = {
   fullTranscriptTranslationApiKey: "new-key",
   fullTranscriptTranslationModel: "new-model",
   fullTranscriptTranslationOrigin: "https://new.example/*",
+  fullTranscriptTranslationPendingOrigin: "",
 };
 
 function fixture({ oldRemoveResult = true, failSet = false } = {}) {
@@ -94,11 +96,12 @@ test("保存失败时回收本次新增权限且不覆盖旧设置", async () =>
   }), /storage failed/);
 
   assert.deepEqual(values, oldValues);
+  assert.equal(granted.has(oldValues.fullTranscriptTranslationOrigin), true);
   assert.equal(granted.has(newConfig.origin), false);
 });
 
-test("清空设置前必须成功撤销旧主机权限", async () => {
-  const { storage, permissions, values } = fixture({ oldRemoveResult: false });
+test("撤销权限失败时仍删除敏感配置并只保留待清理主机", async () => {
+  const { storage, permissions, values, granted } = fixture({ oldRemoveResult: false });
 
   await assert.rejects(
     () => clearTranslationSettings({
@@ -107,10 +110,13 @@ test("清空设置前必须成功撤销旧主机权限", async () => {
       stored: oldValues,
       keys,
     }),
-    /无法撤销旧的翻译 API 权限/,
+    /配置已删除，但无法撤销旧的翻译 API 权限/,
   );
 
-  assert.deepEqual(values, oldValues);
+  assert.deepEqual(values, {
+    fullTranscriptTranslationPendingOrigin: oldValues.fullTranscriptTranslationOrigin,
+  });
+  assert.equal(granted.has(oldValues.fullTranscriptTranslationOrigin), true);
 });
 
 test("成功切换和清空时同步更新权限与存储", async () => {
