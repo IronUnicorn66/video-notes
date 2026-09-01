@@ -1,3 +1,5 @@
+import { subtitleBoundaryStrength } from "./subtitle-segmentation.js";
+
 export const TRANSCRIPT_CUE_GROUP_SIZE = 5;
 export const TRANSCRIPT_CUE_GROUP_SIZES = [5, 10, 20];
 export const TRANSCRIPT_FONT_SIZE = 12;
@@ -56,21 +58,56 @@ export function formatTranscriptProgress(completed, total) {
   return `${completedText}/${totalText}`;
 }
 
-export function groupTranscriptCues(cues, groupSize = TRANSCRIPT_CUE_GROUP_SIZE) {
+export function groupTranscriptCues(
+  cues,
+  groupSize = TRANSCRIPT_CUE_GROUP_SIZE,
+  translations = new Map(),
+) {
   const groups = [];
   const safeGroupSize = Number.isInteger(groupSize) && groupSize > 0
     ? groupSize
     : TRANSCRIPT_CUE_GROUP_SIZE;
-  for (let index = 0; index < cues.length; index += safeGroupSize) {
-    const group = cues.slice(index, index + safeGroupSize);
-    const translations = group.map((cue) => String(cue.translation ?? "").trim());
+  for (let index = 0; index < cues.length;) {
+    const minimumEnd = Math.min(index + safeGroupSize, cues.length);
+    const maximumEnd = Math.min(index + (safeGroupSize * 2), cues.length);
+    let end = minimumEnd;
+
+    if (minimumEnd < cues.length) {
+      let strongEnd = null;
+      for (let candidate = minimumEnd; candidate <= maximumEnd; candidate += 1) {
+        if (subtitleBoundaryStrength(cues[candidate - 1]?.text) === "strong") {
+          strongEnd = candidate;
+          break;
+        }
+      }
+      if (strongEnd !== null) {
+        end = strongEnd;
+      } else {
+        let weakEnd = null;
+        for (let candidate = maximumEnd; candidate >= minimumEnd; candidate -= 1) {
+          if (subtitleBoundaryStrength(cues[candidate - 1]?.text) === "weak") {
+            weakEnd = candidate;
+            break;
+          }
+        }
+        end = weakEnd ?? maximumEnd;
+      }
+    }
+
+    const group = cues.slice(index, end);
+    const id = `${index}:${end}`;
     const merged = {
+      id,
+      sourceStartIndex: index,
+      sourceEndIndex: end - 1,
       startMs: group[0].startMs,
       endMs: group.at(-1).endMs,
       text: group.map((cue) => cue.text).join(" "),
     };
-    if (translations.every(Boolean)) merged.translation = translations.join(" ");
+    const translation = String(translations.get?.(id) ?? "").trim();
+    if (translation) merged.translation = translation;
     groups.push(merged);
+    index = end;
   }
   return groups;
 }

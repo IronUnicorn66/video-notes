@@ -7,12 +7,12 @@ import { readRenderedSubtitleText } from "../src/core/subtitle-text.js";
 
 test("字幕缓冲去重并提取标记前窗口", () => {
   const buffer = new SubtitleBuffer({ retentionSeconds: 60 });
-  buffer.add(70, "第一句");
-  buffer.add(71, "第一句");
+  buffer.add(70, "第一");
+  buffer.add(71, "第一句。");
   buffer.add(82, "第二句");
   buffer.add(95, "标记之后");
 
-  assert.equal(buffer.before(90, { seconds: 20, maxChars: 500 }), "第一句\n第二句");
+  assert.equal(buffer.before(90, { seconds: 20, maxChars: 500 }), "第一句。\n第二句");
 });
 
 test("字幕按最大字符数从靠近标记处向前截断", () => {
@@ -21,7 +21,18 @@ test("字幕按最大字符数从靠近标记处向前截断", () => {
   buffer.add(20, "67890");
   buffer.add(30, "abcde");
 
-  assert.equal(buffer.before(31, { seconds: 30, maxChars: 11 }), "67890\nabcde");
+  assert.equal(buffer.before(31, { seconds: 30, maxChars: 11 }), "67890 abcde");
+});
+
+test("字幕窗口首尾残句会保留并与完整句连续合并", () => {
+  const buffer = new SubtitleBuffer();
+  buffer.add(10, "middle fragment");
+  buffer.add(12, "continues. trailing");
+
+  assert.equal(
+    buffer.before(15, { seconds: 10, maxChars: 500 }),
+    "middle fragment continues.\ntrailing",
+  );
 });
 
 test("清理超过保留窗口的字幕", () => {

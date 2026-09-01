@@ -44,7 +44,7 @@ import {
   normalizedBrowserTranslationSourceLanguage,
   normalizedBrowserTranslationTargetLanguage,
   translateBrowserTranscriptCues,
-  untranslatedTranscriptCues,
+  untranslatedTranscriptSegments,
 } from "./core/browser-transcript-translation.js";
 import {
   getBrowserTranslationTargetLanguage,
@@ -175,6 +175,7 @@ let browserTranslationLanguagePackState = globalThis.Translator
   : { status: "unsupported", progress: 0 };
 let browserTranslationLanguagePackController = null;
 let browserTranslationLanguagePackGeneration = 0;
+const fullTranscriptTranslations = new Map();
 const browserTranscriptTranslationPairs = new Map();
 
 const noteSortBinding = createSidepanelNoteSortBinding({
@@ -412,6 +413,7 @@ function resetFullTranscript({ hide = false } = {}) {
   cancelBrowserTranslationLanguagePackDownload();
   fullTranscriptGeneration += 1;
   fullTranscript = null;
+  fullTranscriptTranslations.clear();
   fullTranscriptLoading = false;
   fullTranscriptContextKey = "";
   setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
@@ -428,16 +430,25 @@ function resetFullTranscript({ hide = false } = {}) {
   );
 }
 
-function translatedFullTranscriptCueCount() {
-  return (fullTranscript?.cues ?? []).filter((cue) => String(cue.translation ?? "").trim()).length;
+function currentFullTranscriptGroups() {
+  return groupTranscriptCues(
+    fullTranscript?.cues ?? [],
+    fullTranscriptGroupSize,
+    fullTranscriptTranslations,
+  );
+}
+
+function translatedFullTranscriptGroupCount(groups = currentFullTranscriptGroups()) {
+  return groups.filter((group) => String(group.translation ?? "").trim()).length;
 }
 
 function clearFullTranscriptTranslations() {
-  for (const cue of fullTranscript?.cues ?? []) delete cue.translation;
+  fullTranscriptTranslations.clear();
 }
 
 function fullTranscriptLoadedStatus() {
   if (!fullTranscript) return t("fullTranscriptWaiting");
+  const groups = currentFullTranscriptGroups();
   const coverage = transcriptCoverage(fullTranscript.cues);
   const loaded = t("fullTranscriptLoaded", {
     count: fullTranscript.cues.length,
@@ -457,8 +468,8 @@ function fullTranscriptLoadedStatus() {
   }
   return `${loaded} · ${t("fullTranscriptTranslating", {
     progress: formatTranscriptProgress(
-      translatedFullTranscriptCueCount(),
-      fullTranscript.cues.length,
+      translatedFullTranscriptGroupCount(groups),
+      groups.length,
     ),
   })}`;
 }
@@ -466,6 +477,7 @@ function fullTranscriptLoadedStatus() {
 function syncFullTranscriptGroupButtons() {
   for (const button of elements.fullTranscriptGroupButtons) {
     button.checked = Number(button.value) === fullTranscriptGroupSize;
+    button.disabled = fullTranscriptTranslationRunning;
   }
 }
 
@@ -493,8 +505,9 @@ async function changeFullTranscriptFontSize(direction) {
 }
 
 function syncFullTranscriptTranslateButton() {
-  const total = fullTranscript?.cues.length ?? 0;
-  const translated = translatedFullTranscriptCueCount();
+  const groups = currentFullTranscriptGroups();
+  const total = groups.length;
+  const translated = translatedFullTranscriptGroupCount(groups);
   elements.fullTranscriptTranslate.disabled = total === 0
     || !globalThis.Translator
     || browserTranscriptTranslationState.status === "alreadyTarget"
@@ -513,8 +526,7 @@ function syncFullTranscriptTranslateButton() {
 }
 
 function renderFullTranscript() {
-  const cues = fullTranscript?.cues ?? [];
-  const visibleCues = groupTranscriptCues(cues, fullTranscriptGroupSize);
+  const visibleCues = currentFullTranscriptGroups();
   elements.fullTranscriptList.replaceChildren();
   for (const cue of visibleCues) {
     const item = document.createElement("li");
@@ -850,6 +862,7 @@ function cancelFullTranscriptTranslation() {
   fullTranscriptTranslationController?.abort();
   fullTranscriptTranslationController = null;
   fullTranscriptTranslationRunning = false;
+  syncFullTranscriptGroupButtons();
   destroyBrowserTranslationSession();
   if (browserTranscriptTranslationState.status === "downloading") {
     setBrowserTranscriptTranslationState("downloadable");
@@ -873,12 +886,14 @@ function focusBrowserTranslationSettings() {
 async function translateFullTranscriptInBrowser() {
   const transcript = fullTranscript;
   const targetLanguage = browserTranslationLanguagePackTarget;
+  const groupSize = fullTranscriptGroupSize;
   const generation = fullTranscriptGeneration;
   const contextKey = fullTranscriptContextKey;
   const controller = new AbortController();
   let session = null;
   fullTranscriptTranslationController = controller;
   fullTranscriptTranslationRunning = true;
+  syncFullTranscriptGroupButtons();
   elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
   syncFullTranscriptTranslateButton();
   renderBrowserTranslationLanguagePackSettings();
@@ -909,18 +924,21 @@ async function translateFullTranscriptInBrowser() {
       || generation !== fullTranscriptGeneration
       || contextKey !== fullTranscriptContextKey
       || targetLanguage !== browserTranslationLanguagePackTarget
+      || groupSize !== fullTranscriptGroupSize
     ) return;
     browserTranscriptTranslationSession = session;
     cacheBrowserTranslationPair(transcript, created.pair, targetLanguage);
     setBrowserTranscriptTranslationState("ready");
     setBrowserTranslationLanguagePackState("ready", 1);
 
-    const allTranslated = transcript.cues.length > 0
-      && transcript.cues.every((cue) => String(cue.translation ?? "").trim());
+    let groups = currentFullTranscriptGroups();
+    const allTranslated = groups.length > 0
+      && groups.every((group) => String(group.translation ?? "").trim());
     if (allTranslated) {
-      for (const cue of transcript.cues) delete cue.translation;
+      for (const group of groups) fullTranscriptTranslations.delete(group.id);
+      groups = currentFullTranscriptGroups();
     }
-    const cues = untranslatedTranscriptCues(transcript.cues);
+    const cues = untranslatedTranscriptSegments(groups);
     if (cues.length === 0) return;
     elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
     renderFullTranscript();
@@ -935,11 +953,12 @@ async function translateFullTranscriptInBrowser() {
           || generation !== fullTranscriptGeneration
           || contextKey !== fullTranscriptContextKey
           || targetLanguage !== browserTranslationLanguagePackTarget
+          || groupSize !== fullTranscriptGroupSize
         ) {
           controller.abort();
           return;
         }
-        transcript.cues[id].translation = translation;
+        fullTranscriptTranslations.set(id, translation);
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         renderFullTranscript();
       },
@@ -968,12 +987,14 @@ async function translateFullTranscriptInBrowser() {
     if (fullTranscriptTranslationController === controller) {
       fullTranscriptTranslationController = null;
       fullTranscriptTranslationRunning = false;
+      syncFullTranscriptGroupButtons();
       renderBrowserTranslationLanguagePackSettings();
       if (
         transcript === fullTranscript
         && generation === fullTranscriptGeneration
         && contextKey === fullTranscriptContextKey
         && targetLanguage === browserTranslationLanguagePackTarget
+        && groupSize === fullTranscriptGroupSize
       ) {
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         syncFullTranscriptTranslateButton();
@@ -999,6 +1020,7 @@ async function loadFullTranscript() {
   fullTranscriptContextKey = contextKey;
   fullTranscriptLoading = true;
   fullTranscript = null;
+  fullTranscriptTranslations.clear();
   setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
   elements.fullTranscriptPanel.hidden = false;
   elements.fullTranscriptPanel.open = true;
@@ -1781,6 +1803,10 @@ elements.browserTranslationLanguagePackAction.addEventListener("click", () => {
 for (const button of elements.fullTranscriptGroupButtons) {
   button.addEventListener("change", async () => {
     if (!button.checked) return;
+    if (fullTranscriptTranslationRunning) {
+      syncFullTranscriptGroupButtons();
+      return;
+    }
     const previous = fullTranscriptGroupSize;
     fullTranscriptGroupSize = normalizeTranscriptGroupSize(button.value);
     syncFullTranscriptGroupButtons();
@@ -1993,9 +2019,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
     sidePanelRefresh.requestRefresh({ type: "SUBTITLE_SETTINGS_CHANGED" });
   }
   if (area === "local" && changes.fullTranscriptGroupSize) {
-    fullTranscriptGroupSize = normalizeTranscriptGroupSize(changes.fullTranscriptGroupSize.newValue);
-    syncFullTranscriptGroupButtons();
-    renderFullTranscript();
+    const nextGroupSize = normalizeTranscriptGroupSize(changes.fullTranscriptGroupSize.newValue);
+    if (nextGroupSize !== fullTranscriptGroupSize) {
+      cancelFullTranscriptTranslation();
+      fullTranscriptGroupSize = nextGroupSize;
+      syncFullTranscriptGroupButtons();
+      renderFullTranscript();
+    }
   }
   if (area === "local" && changes.fullTranscriptFontSize) {
     applyFullTranscriptFontSize(changes.fullTranscriptFontSize.newValue);
