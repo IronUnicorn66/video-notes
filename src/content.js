@@ -349,6 +349,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return {
           transcript: await readYoutubeFullTranscript(document, {
             preferredLanguages: navigator.languages ?? [navigator.language],
+            videoId: context.videoId,
           }),
         };
       }

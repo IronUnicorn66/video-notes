@@ -1,3 +1,9 @@
+const YOUTUBE_TRANSCRIPT_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+]);
+
 function readBalancedJson(source, start) {
   let depth = 0;
   let quoted = false;
@@ -51,10 +57,34 @@ function languagePreference(track, preferredLanguages) {
   ));
 }
 
-export function extractYoutubeCaptionTracks(scripts, preferredLanguages = []) {
+function youtubeTranscriptUrl(value, expectedVideoId) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (
+    url.protocol !== "https:"
+    || !YOUTUBE_TRANSCRIPT_HOSTS.has(url.hostname)
+    || url.pathname !== "/api/timedtext"
+    || !expectedVideoId
+    || url.searchParams.get("v") !== expectedVideoId
+  ) {
+    return null;
+  }
+  return url;
+}
+
+export function extractYoutubeCaptionTracks(
+  scripts,
+  preferredLanguages = [],
+  expectedVideoId = "",
+) {
   const normalizedLanguages = preferredLanguages
     .filter(Boolean)
     .map((language) => language.toLowerCase().replaceAll("_", "-"));
+  const tracks = new Map();
   for (const script of scripts) {
     const source = script.textContent ?? "";
     if (!source.includes("ytInitialPlayerResponse")) continue;
@@ -63,27 +93,36 @@ export function extractYoutubeCaptionTracks(scripts, preferredLanguages = []) {
       ?.playerCaptionsTracklistRenderer
       ?.captionTracks;
     if (!Array.isArray(captionTracks)) continue;
-    return captionTracks
-      .filter((track) => track.baseUrl && track.languageCode)
-      .map((track) => ({
-        baseUrl: track.baseUrl,
+    for (const track of captionTracks) {
+      const url = youtubeTranscriptUrl(track?.baseUrl, expectedVideoId);
+      if (!url || !track.languageCode) continue;
+      tracks.set(url.href, {
+        baseUrl: url.href,
         languageCode: track.languageCode,
         label: captionLabel(track.name) || track.languageCode,
         automatic: track.kind === "asr",
-      }))
-      .sort((left, right) => {
-        if (left.automatic !== right.automatic) return Number(left.automatic) - Number(right.automatic);
-        const leftPreference = languagePreference(left, normalizedLanguages);
-        const rightPreference = languagePreference(right, normalizedLanguages);
-        if (leftPreference === -1) return rightPreference === -1 ? 0 : 1;
-        if (rightPreference === -1) return -1;
-        return leftPreference - rightPreference;
       });
+    }
   }
-  return [];
+  return [...tracks.values()].sort((left, right) => {
+    if (left.automatic !== right.automatic) return Number(left.automatic) - Number(right.automatic);
+    const leftPreference = languagePreference(left, normalizedLanguages);
+    const rightPreference = languagePreference(right, normalizedLanguages);
+    if (leftPreference === -1) return rightPreference === -1 ? 0 : 1;
+    if (rightPreference === -1) return -1;
+    return leftPreference - rightPreference;
+  });
 }
 
 function normalizedCue(startMs, durationMs, text) {
+  if (
+    !Number.isFinite(startMs)
+    || !Number.isFinite(durationMs)
+    || startMs < 0
+    || durationMs < 0
+  ) {
+    return null;
+  }
   const normalizedText = text.replace(/\s+/g, " ").trim();
   if (!normalizedText) return null;
   return {
@@ -100,11 +139,14 @@ export function parseYoutubeJson3Transcript(body) {
   } catch {
     return [];
   }
-  return (parsed.events ?? [])
+  if (!Array.isArray(parsed?.events)) return [];
+  return parsed.events
     .map((event) => normalizedCue(
-      Number(event.tStartMs ?? 0),
-      Number(event.dDurationMs ?? 0),
-      (event.segs ?? []).map((segment) => segment.utf8 ?? "").join(""),
+      Number(event?.tStartMs ?? 0),
+      Number(event?.dDurationMs ?? 0),
+      (Array.isArray(event?.segs) ? event.segs : [])
+        .map((segment) => segment?.utf8 ?? "")
+        .join(""),
     ))
     .filter(Boolean);
 }
@@ -159,20 +201,17 @@ export function parseYoutubeTranscriptBody(body, format) {
   return parseYoutubeXmlTranscript(body);
 }
 
-export function transcriptFromYoutubeCapture(capture) {
+export function transcriptFromYoutubeCapture(capture, expectedVideoId) {
   if (!capture?.ok || !capture.body || !capture.url) return null;
-  let url;
-  try {
-    url = new URL(capture.url);
-  } catch {
-    return null;
-  }
+  const url = youtubeTranscriptUrl(capture.url, expectedVideoId);
+  if (!url) return null;
   const cues = parseYoutubeTranscriptBody(capture.body, url.searchParams.get("fmt") ?? "");
   if (cues.length === 0) return null;
   const languageCode = url.searchParams.get("lang") ?? "";
   return {
     ok: true,
     source: "youtube-player-caption-response",
+    videoId: expectedVideoId,
     languageCode,
     label: url.searchParams.get("name") ?? languageCode,
     automatic: url.searchParams.get("kind") === "asr",
@@ -181,7 +220,7 @@ export function transcriptFromYoutubeCapture(capture) {
 }
 
 export function transcriptResultAfterPlayerCapture(nativeResult, capture) {
-  const transcript = transcriptFromYoutubeCapture(capture);
+  const transcript = transcriptFromYoutubeCapture(capture, nativeResult?.videoId);
   if (transcript) return transcript;
   return {
     ...nativeResult,
@@ -199,14 +238,16 @@ export function shouldAttemptYoutubePlayerCapture(result) {
 export async function readYoutubeFullTranscript(root, {
   fetchImpl = fetch,
   preferredLanguages = [],
+  videoId = "",
 } = {}) {
   const scripts = root.scripts ?? root.querySelectorAll?.("script") ?? [];
-  const tracks = extractYoutubeCaptionTracks(scripts, preferredLanguages);
+  const tracks = extractYoutubeCaptionTracks(scripts, preferredLanguages, videoId);
   if (tracks.length === 0) {
     return {
       ok: false,
       code: "YOUTUBE_CAPTION_TRACKS_MISSING",
       trackCount: 0,
+      videoId,
     };
   }
 
@@ -227,6 +268,7 @@ export async function readYoutubeFullTranscript(root, {
           return {
             ok: true,
             source: "youtube-native-caption-track",
+            videoId,
             languageCode: track.languageCode,
             label: track.label,
             automatic: track.automatic,
@@ -248,6 +290,7 @@ export async function readYoutubeFullTranscript(root, {
     ok: false,
     code: "YOUTUBE_NATIVE_CAPTION_BLOCKED",
     trackCount: tracks.length,
+    videoId,
     attempts,
   };
 }
