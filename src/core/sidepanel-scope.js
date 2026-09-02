@@ -32,11 +32,21 @@ export function sidePanelContextForSender(sender, contexts, fallbackTab = null) 
 }
 
 export function createActiveTabActivationHandler({
+  tabs,
   runtime,
+  configureSidePanelForTab,
+  onError = () => {},
 }) {
   return async ({ tabId, windowId }) => {
-    const message = activeContextChangedMessage(tabId, windowId);
-    if (message) await runtime.sendMessage(message).catch(() => {});
+    let tab;
+    try {
+      tab = await tabs.get(tabId);
+      await configureSidePanelForTab(tab);
+      const message = activeContextChangedMessage(tabId, windowId);
+      if (message) await runtime.sendMessage(message).catch(() => {});
+    } catch (error) {
+      onError(tab ?? { id: tabId }, error);
+    }
   };
 }
 
@@ -224,12 +234,15 @@ export function createSidePanelRefreshController(refresh, {
   };
 }
 
-export function sidePanelMigrationOptionsForTab(tab) {
+export function sidePanelOptionsForTab(tab) {
   if (!Number.isInteger(tab?.id)) throw new Error("缺少有效 tabId");
-  return { tabId: tab.id, path: "sidepanel.html", enabled: true };
+  const supported = Boolean(tab.url && parseVideoContext(tab.url));
+  return supported
+    ? { tabId: tab.id, path: "sidepanel.html", enabled: true }
+    : { tabId: tab.id, enabled: false };
 }
 
-export function createLegacySidePanelOptionsRepair({
+export function createExistingSidePanelOptionsConfigurator({
   tabs,
   sidePanel,
   warn = console.warn,
@@ -239,7 +252,7 @@ export function createLegacySidePanelOptionsRepair({
     try {
       openTabs = await tabs.query({});
     } catch (error) {
-      warn("查询现有标签页以修复侧栏配置失败", error);
+      warn("查询现有标签页以配置侧栏失败", error);
       return;
     }
 
@@ -247,11 +260,9 @@ export function createLegacySidePanelOptionsRepair({
       .filter((tab) => Number.isInteger(tab.id))
       .map(async (tab) => {
         try {
-          const options = await sidePanel.getOptions({ tabId: tab.id });
-          if (options?.path) return;
-          await sidePanel.setOptions(sidePanelMigrationOptionsForTab(tab));
+          await sidePanel.setOptions(sidePanelOptionsForTab(tab));
         } catch (error) {
-          warn("修复标签页侧栏配置失败", tab.id, error);
+          warn("配置标签页侧栏失败", tab.id, error);
         }
       }));
   };

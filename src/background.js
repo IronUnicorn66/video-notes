@@ -37,9 +37,10 @@ import {
   contextChangedSenderTab,
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
-  createLegacySidePanelOptionsRepair,
+  createExistingSidePanelOptionsConfigurator,
   createSidePanelContextResolver,
   sidePanelMessageForTabUpdate,
+  sidePanelOptionsForTab,
   sidePanelRequestTabIdForSender,
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
@@ -77,15 +78,30 @@ const resolveSidePanelContext = createSidePanelContextResolver({
 });
 const handleActiveTabActivation = createActiveTabActivationHandler({
   runtime: chrome.runtime,
+  tabs: chrome.tabs,
+  configureSidePanelForTab,
+  onError: logSidePanelConfigurationError,
 });
 const readCurrentPageContext = createCurrentPageContextReader({
   targetTab: ({ sender, tabId }) => targetTab(sender, tabId),
   sendPageContextRequest: (tabId) => sendToTab(tabId, { type: "GET_PAGE_CONTEXT" }),
 });
-const repairLegacySidePanelOptions = createLegacySidePanelOptionsRepair({
+const configureExistingSidePanelOptions = createExistingSidePanelOptionsConfigurator({
   tabs: chrome.tabs,
   sidePanel: chrome.sidePanel,
 });
+
+function logSidePanelConfigurationError(tab, error) {
+  console.warn("配置标签页侧栏失败", tab?.id, error);
+}
+
+async function configureSidePanelForTab(tab) {
+  try {
+    await chrome.sidePanel.setOptions(sidePanelOptionsForTab(tab));
+  } catch (error) {
+    logSidePanelConfigurationError(tab, error);
+  }
+}
 
 function notifyActiveContextChanged(tabId, windowId) {
   const message = activeContextChangedMessage(tabId, windowId);
@@ -96,7 +112,7 @@ function notifyActiveContextChanged(tabId, windowId) {
 void chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.warn("配置工具栏侧栏入口失败", error));
-void repairLegacySidePanelOptions();
+void configureExistingSidePanelOptions();
 
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
@@ -121,7 +137,14 @@ chrome.runtime.onInstalled.addListener(() => {
   })();
 });
 
+chrome.tabs.onCreated.addListener((tab) => {
+  void configureSidePanelForTab(tab);
+});
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url || changeInfo.status === "complete") {
+    void configureSidePanelForTab({ ...tab, id: tabId });
+  }
   const refreshMessage = sidePanelMessageForTabUpdate(tabId, changeInfo, tab);
   if (refreshMessage) {
     void chrome.runtime.sendMessage(refreshMessage).catch(() => {});
@@ -958,6 +981,7 @@ async function handleMessage(message, sender) {
         console.warn("视频上下文变化缺少有效发送标签页");
         return {};
       }
+      await configureSidePanelForTab(tab);
       notifyActiveContextChanged(tab.id, tab.windowId);
       return {};
     }

@@ -339,11 +339,13 @@ test("所有本地执行代码入口都来自扩展包", async () => {
   }
 });
 
-test("侧栏使用全局入口且不扩大网站访问权限", async () => {
+test("侧栏只在视频标签启用且不扩大网站访问权限", async () => {
   const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
 
   assert.equal(manifest.side_panel.default_path, "sidepanel.html");
-  assert.match(background, /createLegacySidePanelOptionsRepair/);
+  assert.match(background, /createExistingSidePanelOptionsConfigurator/);
+  assert.match(background, /chrome\.tabs\.onCreated\.addListener/);
+  assert.match(background, /changeInfo\.url \|\| changeInfo\.status === "complete"/);
   assert.doesNotMatch(background, /chrome\.sidePanel\.open/);
   assert.ok(!manifest.permissions.includes("tabs"));
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
@@ -353,12 +355,12 @@ test("后台每次加载都重新启用工具栏图标打开侧栏", async () =>
   const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
   const behaviorCall = /chrome\.sidePanel\s*\.setPanelBehavior\(\{ openPanelOnActionClick: true \}\)/g;
   const behaviorIndex = background.search(behaviorCall);
-  const repairIndex = background.indexOf("void repairLegacySidePanelOptions()");
+  const configureIndex = background.indexOf("void configureExistingSidePanelOptions()");
   const installedListenerIndex = background.indexOf("chrome.runtime.onInstalled.addListener");
 
   assert.equal((background.match(behaviorCall) ?? []).length, 1);
   assert.ok(behaviorIndex >= 0 && behaviorIndex < installedListenerIndex);
-  assert.ok(repairIndex >= 0 && repairIndex < installedListenerIndex);
+  assert.ok(configureIndex >= 0 && configureIndex < installedListenerIndex);
   assert.doesNotMatch(background, /chrome\.runtime\.onStartup\.addListener/);
   assert.doesNotMatch(background, /chrome\.action\.onClicked|chrome\.sidePanel\.open/);
 });

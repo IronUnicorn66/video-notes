@@ -6,6 +6,7 @@ import {
   activeContextChangedMessage,
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
+  createExistingSidePanelOptionsConfigurator,
   createSidePanelScrollMemory,
   createSidePanelContextResolver,
   createSidePanelRefreshController,
@@ -15,12 +16,21 @@ import {
   sidePanelContextForSender,
   sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
-  sidePanelMigrationOptionsForTab,
+  sidePanelOptionsForTab,
 } from "../src/core/sidepanel-scope.js";
 
 test("后台标签激活处理器把浏览器窗口标识写入实际广播", async () => {
   const calls = [];
   const handler = createActiveTabActivationHandler({
+    tabs: {
+      async get(tabId) {
+        calls.push(["get", tabId]);
+        return { id: tabId, url: "https://www.youtube.com/watch?v=course" };
+      },
+    },
+    async configureSidePanelForTab(tab) {
+      calls.push(["configure", tab.id]);
+    },
     runtime: {
       async sendMessage(message) {
         calls.push(["send", message]);
@@ -30,6 +40,8 @@ test("后台标签激活处理器把浏览器窗口标识写入实际广播", as
 
   await handler({ tabId: 3, windowId: 20 });
   assert.deepEqual(calls, [
+    ["get", 3],
+    ["configure", 3],
     ["send", { type: "ACTIVE_CONTEXT_CHANGED", tabId: 3, windowId: 20 }],
   ]);
 });
@@ -187,57 +199,60 @@ test("侧栏接收页面加载完成消息", () => {
   assert.equal(isSidePanelRefreshMessage({ type: "UNRELATED" }), false);
 });
 
-test("升级迁移为旧标签页补齐全局侧栏页面路径", () => {
-  assert.deepEqual(sidePanelMigrationOptionsForTab({ id: 7 }), {
+test("标签页侧栏只在受支持的视频页面启用", () => {
+  assert.deepEqual(sidePanelOptionsForTab({
+    id: 7,
+    url: "https://www.youtube.com/watch?v=course",
+  }), {
     tabId: 7,
     path: "sidepanel.html",
     enabled: true,
   });
-  assert.deepEqual(sidePanelMigrationOptionsForTab({ id: 9, url: "https://example.com/" }), {
-    tabId: 9,
+  assert.deepEqual(sidePanelOptionsForTab({
+    id: 8,
+    url: "https://www.bilibili.com/video/BV1xx411c7mD",
+  }), {
+    tabId: 8,
     path: "sidepanel.html",
     enabled: true,
   });
+  assert.deepEqual(sidePanelOptionsForTab({ id: 9, url: "https://example.com/" }), {
+    tabId: 9,
+    enabled: false,
+  });
 });
 
-test("后台加载时只修复缺少页面路径的遗留标签页", async () => {
-  assert.equal(typeof sidePanelScope.createLegacySidePanelOptionsRepair, "function");
-  const reads = [];
+test("后台每次加载时按网址重新配置所有现有标签页", async () => {
+  assert.equal(typeof sidePanelScope.createExistingSidePanelOptionsConfigurator, "function");
   const writes = [];
-  const optionsByTabId = new Map([
-    [1, { enabled: true, path: "sidepanel.html" }],
-    [2, { enabled: true, tabId: 2 }],
-    [3, { enabled: false, tabId: 3 }],
-  ]);
-  const repairLegacySidePanelOptions = sidePanelScope.createLegacySidePanelOptionsRepair({
+  const configureExistingSidePanelOptions = createExistingSidePanelOptionsConfigurator({
     tabs: {
       async query(query) {
         assert.deepEqual(query, {});
-        return [{ id: 1 }, { id: 2 }, { id: 3 }, { id: "invalid" }];
+        return [
+          { id: 1, url: "https://www.youtube.com/watch?v=course" },
+          { id: 2, url: "https://example.com/" },
+          { id: "invalid", url: "https://www.youtube.com/watch?v=ignored" },
+        ];
       },
     },
     sidePanel: {
-      async getOptions({ tabId }) {
-        reads.push(tabId);
-        return optionsByTabId.get(tabId);
-      },
       async setOptions(options) {
         writes.push(options);
       },
     },
   });
 
-  await repairLegacySidePanelOptions();
+  await configureExistingSidePanelOptions();
 
-  assert.deepEqual(reads, [1, 2, 3]);
   assert.deepEqual(writes, [
-    { tabId: 2, path: "sidepanel.html", enabled: true },
-    { tabId: 3, path: "sidepanel.html", enabled: true },
+    { tabId: 1, path: "sidepanel.html", enabled: true },
+    { tabId: 2, enabled: false },
   ]);
 });
 
 test("没有数字 tabId 时拒绝配置", () => {
-  assert.throws(() => sidePanelMigrationOptionsForTab({ url: "https://example.com/" }), /tabId/);
+  assert.throws(() => sidePanelOptionsForTab({ url: "https://example.com/" }), /tabId/);
 });
 
 test("视频内容脚本发送者提供有效标签页", () => {
