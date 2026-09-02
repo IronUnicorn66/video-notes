@@ -124,6 +124,24 @@ test("英文导出翻译固定标签并保留用户内容", () => {
   assert.match(markdown, /字幕原文/);
 });
 
+test("Markdown 将本地字幕原文和译文分别导出", () => {
+  const markdown = buildMarkdown(
+    { title: "课程", canonicalUrl: "https://example.com", platform: "youtube" },
+    [{
+      seconds: 1,
+      jumpUrl: "https://example.com?t=1",
+      body: "笔记",
+      subtitleContext: "Original subtitle",
+      subtitleTranslation: "字幕译文",
+      warnings: [],
+    }],
+  );
+
+  assert.match(markdown, /### 前置字幕/);
+  assert.match(markdown, /#### 原文\n\n> Original subtitle/);
+  assert.match(markdown, /#### 译文\n\n> 字幕译文/);
+});
+
 test("导出文件名使用当前界面语言并提供空标题回退", () => {
   assert.deepEqual(makeExportFilenames("课程", "zh_CN"), {
     markdown: "课程.md",

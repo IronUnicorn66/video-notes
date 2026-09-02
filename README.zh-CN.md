@@ -15,7 +15,7 @@
 ## 核心能力
 
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
-- 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕。
+- 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕；当前 YouTube 完整字幕已加载时，优先复用本地完整段落，选中范围全部翻译后同时保存对应译文。
 - 支持 YouTube、哔哩哔哩原生字幕，以及沉浸式翻译呈现的双语字幕。
 - 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、按完整句调整边界的 5/10/20 条合并阅读、独立字号调节、原文/译文显示选择、时间跳转和播放器当前进度定位。
 - 使用语言切换左侧的 `+`、`−` 按钮，以 10% 为一档在 75%–200% 之间调整整个侧栏大小。
@@ -29,12 +29,12 @@
 
 ### Edge 商店
 
-1.0.24 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+1.0.25 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.24 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.24/video-notes-edge-1.0.24.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.24/video-notes-edge-1.0.24.zip.sha256)
+[下载视频笔记 1.0.25 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.25/video-notes-edge-1.0.25.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.25/video-notes-edge-1.0.25.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -76,8 +76,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.24.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.24.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.25.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.25.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。
@@ -89,7 +89,7 @@ cd artifacts && shasum -a 256 -c video-notes-edge-1.0.24.zip.sha256
 - 桌面版 Microsoft Edge 150 或更高版本。
 - 桌面版 Google Chrome 138 或更高版本。
 
-笔记的前置字幕只读取播放器已经渲染的内容。完整字幕读取遇到平台限制时，扩展可能短暂切换 YouTube 的字幕开关以捕获播放器发起的原生字幕响应，随后恢复原先状态；不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
+笔记的前置字幕优先读取当前会话已经加载的 YouTube 完整字幕，并在选中范围全部翻译后把对应译文一起保存；本地来源不可用时才读取播放器已经渲染的内容。完整字幕读取遇到平台限制时，扩展可能短暂切换 YouTube 的字幕开关以捕获播放器发起的原生字幕响应，随后恢复原先状态；不调用视频网站的私有字幕接口。Whisper 性能取决于模型大小、设备内存和录音质量。
 
 ## 贡献与安全
 

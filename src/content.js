@@ -10,6 +10,7 @@ import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
 import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
+import { localTranscriptNoteContext } from "./core/local-transcript-note-context.js";
 import {
   readMediaTimeForVideoContext,
   seekMediaForVideoContext,
@@ -25,6 +26,8 @@ let recordingOverlay = null;
 let shortcutError = null;
 let shortcutErrorTimer = null;
 let shortcutCode = "AltRight";
+let localTranscriptNoteSource = null;
+let localTranscriptNoteSourceRevision = 0;
 let interfaceLanguage = resolveLanguage(undefined, chrome.i18n.getUILanguage());
 const t = (key, variables) => translate(interfaceLanguage, key, variables);
 
@@ -163,12 +166,20 @@ function markerSnapshot(markerId, { deferPause = false } = {}) {
   const media = bindMedia();
   if (!context || !media) throw new Error("当前标签页没有受支持的视频");
   const seconds = Math.max(0, media.currentTime || 0);
+  const localSubtitles = localTranscriptNoteContext({
+    context,
+    source: localTranscriptNoteSource,
+    markerSeconds: seconds,
+    windowSeconds: subtitleCapture.windowSeconds,
+    enabled: subtitleCapture.enabled,
+  });
   const rect = findPlayerElement(context, media).getBoundingClientRect();
   const snapshot = {
     context,
     seconds,
     jumpUrl: buildJumpUrl(context, seconds),
-    subtitleContext: subtitleCapture.before(seconds),
+    subtitleContext: localSubtitles?.subtitleContext ?? subtitleCapture.before(seconds),
+    subtitleTranslation: localSubtitles?.subtitleTranslation ?? "",
     rect: {
       x: rect.left,
       y: rect.top,
@@ -180,6 +191,32 @@ function markerSnapshot(markerId, { deferPause = false } = {}) {
   snapshot.wasPlaying = !media.paused;
   if (!deferPause) activateMarker(markerId, snapshot.wasPlaying);
   return snapshot;
+}
+
+function syncLocalTranscriptNoteSource(message) {
+  const context = getContext();
+  const revision = Number(message.revision);
+  if (
+    !context
+    || context.platform !== "youtube"
+    || context.sessionId !== message.sessionId
+    || context.videoId !== message.videoId
+    || !Number.isSafeInteger(revision)
+    || revision < localTranscriptNoteSourceRevision
+  ) return false;
+
+  localTranscriptNoteSourceRevision = revision;
+  if (!message.source) {
+    localTranscriptNoteSource = null;
+    return true;
+  }
+  if (
+    message.source.sessionId !== context.sessionId
+    || message.source.videoId !== context.videoId
+    || !Array.isArray(message.source.groups)
+  ) return false;
+  localTranscriptNoteSource = message.source;
+  return true;
 }
 
 function showRecordingOverlay() {
@@ -327,6 +364,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     "GET_PAGE_CONTEXT",
     "GET_FULL_YOUTUBE_TRANSCRIPT",
     "GET_VIDEO_POSITION",
+    "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
     "SEEK_VIDEO",
     "PREPARE_MARKER",
     "ACTIVATE_MARKER",
@@ -367,6 +405,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
         return { seconds };
       }
+      case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE":
+        return { synced: syncLocalTranscriptNoteSource(message) };
       case "SEEK_VIDEO": {
         const seconds = seekMediaForVideoContext({
           media: findMedia(),
@@ -409,6 +449,8 @@ setInterval(() => {
     currentUrl = location.href;
     if (activeLease) void releaseMarker(activeLease.markerId);
     subtitleCapture.clear();
+    localTranscriptNoteSource = null;
+    localTranscriptNoteSourceRevision = 0;
     chrome.runtime.sendMessage({ type: "CONTEXT_CHANGED", context: getContext() });
   }
 }, 400);

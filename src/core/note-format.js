@@ -118,12 +118,22 @@ export function buildMarkdown(session, entries, { language = "zh_CN" } = {}) {
       lines.push(`> ⚠ ${localizeRuntimeMessage(language, warning)}`, "");
     }
     if (entry.subtitleContext?.trim()) {
-      lines.push(
-        `### ${translate(language, "markdownLeadInSubtitles")}`,
-        "",
-        `> ${entry.subtitleContext.trim().replace(/\n/g, "\n> ")}`,
-        "",
-      );
+      const subtitleTranslation = String(entry.subtitleTranslation ?? "").trim();
+      lines.push(`### ${translate(language, "markdownLeadInSubtitles")}`, "");
+      if (subtitleTranslation) {
+        lines.push(
+          `#### ${translate(language, "markdownSubtitleOriginal")}`,
+          "",
+          `> ${entry.subtitleContext.trim().replace(/\n/g, "\n> ")}`,
+          "",
+          `#### ${translate(language, "markdownSubtitleTranslation")}`,
+          "",
+          `> ${subtitleTranslation.replace(/\n/g, "\n> ")}`,
+          "",
+        );
+      } else {
+        lines.push(`> ${entry.subtitleContext.trim().replace(/\n/g, "\n> ")}`, "");
+      }
     }
   });
 

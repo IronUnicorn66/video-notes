@@ -207,3 +207,24 @@ test("完整字幕将时间范围置于正文上方以避免两列留白", () =>
     /\.full-transcript-time\s*\{[^}]*justify-self:\s*start/s,
   );
 });
+
+test("当前完整字幕和译文同步给所有记笔记入口", () => {
+  assert.match(source, /type: "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
+  assert.match(source, /currentFullTranscriptGroups\(\)\.map/);
+  assert.match(source, /translation: group\.translation \?\? ""/);
+  assert.match(source, /fullTranscriptTranslations\.set\(id, translation\);\s*syncLocalTranscriptNoteSource\(\)/);
+  assert.match(background, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
+  assert.match(content, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
+  assert.match(content, /localTranscriptNoteContext\(\{/);
+  assert.match(content, /localSubtitles\?\.subtitleContext \?\? subtitleCapture\.before\(seconds\)/);
+  assert.match(content, /subtitleTranslation: localSubtitles\?\.subtitleTranslation \?\? ""/);
+  assert.match(background, /subtitleTranslation: String\(snapshot\.subtitleTranslation \?\? ""\)\.trim\(\)/);
+});
+
+test("笔记卡片将本地字幕原文与译文分块显示", () => {
+  assert.match(source, /subtitleState\.translation/);
+  assert.match(source, /t\("fullTranscriptOriginal"\)/);
+  assert.match(source, /t\("fullTranscriptTranslation"\)/);
+  assert.match(css, /\.note-subtitle-part \+ \.note-subtitle-part\s*\{/);
+  assert.match(css, /\.note-subtitle-translation\s*\{/);
+});

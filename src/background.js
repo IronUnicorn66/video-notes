@@ -411,6 +411,7 @@ async function beginMarker(tab, inputType, { beforePause, onPrepared } = {}) {
     studySoundLinked: false,
     userEditVersion: 0,
     status: inputType === "voice" ? "recording" : "draft",
+    subtitleTranslation: String(snapshot.subtitleTranslation ?? "").trim(),
     createdAt: now,
     updatedAt: now,
   };
@@ -834,6 +835,17 @@ async function handleMessage(message, sender) {
         videoId: message.videoId,
       });
       return { seconds: response.seconds };
+    }
+    case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
+        revision: message.revision,
+        sessionId: message.sessionId,
+        videoId: message.videoId,
+        source: message.source,
+      });
+      return { synced: response.synced === true };
     }
     case "SEEK_VIDEO": {
       const tab = await targetTab(sender, message.tabId);
