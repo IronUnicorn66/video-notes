@@ -122,6 +122,12 @@ test("本地字幕身份、平台或覆盖范围无效时返回空结果供画�
   assert.equal(localTranscriptNoteContext({
     context,
     source: source(groups),
+    markerSeconds: 6,
+    windowSeconds: 20,
+  }), null);
+  assert.equal(localTranscriptNoteContext({
+    context,
+    source: source(groups),
     markerSeconds: 30,
     windowSeconds: 5,
   }), null);

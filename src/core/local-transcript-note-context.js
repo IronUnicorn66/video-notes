@@ -19,12 +19,15 @@ function normalizedGroup(group) {
   };
 }
 
-function matchingGroups(groups, windowStartMs, markerMs) {
+function normalizedGroups(groups) {
   return (Array.isArray(groups) ? groups : [])
     .map(normalizedGroup)
     .filter(Boolean)
-    .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs)
-    .filter((group) => group.endMs >= windowStartMs && group.startMs <= markerMs);
+    .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs);
+}
+
+function matchingGroups(groups, windowStartMs, markerMs) {
+  return groups.filter((group) => group.endMs >= windowStartMs && group.startMs <= markerMs);
 }
 
 function groupsWithinCharacterTarget(groups, maxChars) {
@@ -76,8 +79,15 @@ export function localTranscriptNoteContext({
   ) return null;
 
   const markerMs = marker * 1000;
+  const allGroups = normalizedGroups(currentSource.groups);
+  if (
+    allGroups.length === 0
+    || markerMs < allGroups[0].startMs
+    || markerMs > allGroups[allGroups.length - 1].endMs
+  ) return null;
+
   const groups = groupsWithinCharacterTarget(
-    matchingGroups(currentSource.groups, Math.max(0, markerMs - (window * 1000)), markerMs),
+    matchingGroups(allGroups, Math.max(0, markerMs - (window * 1000)), markerMs),
     limit,
   );
   if (groups.length === 0) return null;
