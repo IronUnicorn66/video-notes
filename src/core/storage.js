@@ -6,7 +6,7 @@ import {
   undoNoteHistory,
 } from "./note-history.js";
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 function requestResult(request) {
   return new Promise((resolve, reject) => {
@@ -76,6 +76,9 @@ export class VideoNotesRepository {
       }
       if (!database.objectStoreNames.contains("history")) {
         database.createObjectStore("history", { keyPath: "sessionId" });
+      }
+      if (!database.objectStoreNames.contains("transcriptCache")) {
+        database.createObjectStore("transcriptCache", { keyPath: "id" });
       }
     };
     return requestResult(request).then((database) => {
@@ -190,6 +193,14 @@ export class VideoNotesRepository {
 
   deleteAsset(key) {
     return this.remove("assets", key);
+  }
+
+  putTranscriptCache(cache) {
+    return this.write("transcriptCache", cache);
+  }
+
+  getTranscriptCache(sessionId) {
+    return this.read("transcriptCache", sessionId);
   }
 
   async mutateHistory(sessionId, now, callback) {

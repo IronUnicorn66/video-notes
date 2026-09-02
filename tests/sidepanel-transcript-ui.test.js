@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [html, css, source, background, content] = await Promise.all([
+const [html, css, source, background, content, transcriptCache] = await Promise.all([
   readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.css", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8"),
   readFile(new URL("../src/background.js", import.meta.url), "utf8"),
   readFile(new URL("../src/content.js", import.meta.url), "utf8"),
+  readFile(new URL("../src/core/full-transcript-cache.js", import.meta.url), "utf8"),
 ]);
 
 test("侧栏提供可折叠的完整字幕、翻译和重试入口", () => {
@@ -37,6 +38,18 @@ test("完整字幕在 YouTube 上自动读取并按标签页发送跳转", () =>
   assert.match(
     source,
     /\["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"\][\s\S]*resetFullTranscript\(\)/,
+  );
+});
+
+test("同一视频优先恢复本地字幕与译文缓存，重试时强制重新采集", () => {
+  assert.match(source, /createFullTranscriptCacheLoader/);
+  assert.match(transcriptCache, /repository\.getTranscriptCache/);
+  assert.match(source, /cachedFullTranscriptTranslations/);
+  assert.match(source, /fullTranscriptCacheWithTranslations/);
+  assert.match(source, /await persistFullTranscriptTranslations\(/);
+  assert.match(
+    source,
+    /fullTranscriptRetry\.addEventListener\("click", \(\) => \{\s*void loadFullTranscript\(\{ force: true \}\);/s,
   );
 });
 
@@ -186,12 +199,12 @@ test("完整字幕加载结束后会重新启用翻译按钮", () => {
   );
 });
 
-test("切换视频、重试和关闭侧栏会中断本地翻译并销毁文档会话", () => {
+test("切换视频、重新加载和关闭侧栏会中断本地翻译并销毁文档会话", () => {
   assert.match(
     source,
     /function cancelFullTranscriptTranslation\(\) \{[\s\S]*fullTranscriptTranslationController\?\.abort\(\);[\s\S]*destroyBrowserTranslationSession\(\);[\s\S]*\}/,
   );
-  assert.match(source, /async function loadFullTranscript\(\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
+  assert.match(source, /async function loadFullTranscript\([^)]*\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /session\.destroy\(\)/);
   assert.match(source, /untranslatedTranscriptSegments\(groups\)/);

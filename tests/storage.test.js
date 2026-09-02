@@ -36,6 +36,66 @@ test("会话、标记和二进制资产可跨仓库实例读取", async () => {
   await second.destroy();
 });
 
+test("完整字幕缓存可跨侧栏仓库实例读取", async () => {
+  const databaseName = `transcript-cache-${crypto.randomUUID()}`;
+  const first = new VideoNotesRepository({ databaseName, indexedDB, IDBKeyRange });
+  await first.putTranscriptCache({
+    id: "youtube:abc",
+    schemaVersion: 1,
+    videoId: "abc",
+    transcript: {
+      ok: true,
+      videoId: "abc",
+      cues: [{ startMs: 0, endMs: 1000, text: "字幕" }],
+    },
+    translationSets: {},
+    updatedAt: 1,
+  });
+  first.close();
+
+  const second = new VideoNotesRepository({ databaseName, indexedDB, IDBKeyRange });
+  assert.equal(
+    (await second.getTranscriptCache("youtube:abc")).transcript.cues[0].text,
+    "字幕",
+  );
+  await second.destroy();
+});
+
+test("旧版数据库升级后保留笔记并新增完整字幕缓存", async () => {
+  const databaseName = `transcript-cache-upgrade-${crypto.randomUUID()}`;
+  const legacyRequest = indexedDB.open(databaseName, 2);
+  legacyRequest.onupgradeneeded = () => {
+    const database = legacyRequest.result;
+    database.createObjectStore("sessions", { keyPath: "id" });
+    const notes = database.createObjectStore("notes", { keyPath: "id" });
+    notes.createIndex("sessionId", "sessionId", { unique: false });
+    database.createObjectStore("assets", { keyPath: "key" });
+    database.createObjectStore("history", { keyPath: "sessionId" });
+  };
+  const legacyDatabase = await new Promise((resolve, reject) => {
+    legacyRequest.onsuccess = () => resolve(legacyRequest.result);
+    legacyRequest.onerror = () => reject(legacyRequest.error);
+  });
+  await new Promise((resolve, reject) => {
+    const transaction = legacyDatabase.transaction("notes", "readwrite");
+    transaction.objectStore("notes").put({
+      id: "legacy-note",
+      sessionId: "youtube:abc",
+      status: "saved",
+      createdAt: 1,
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+  legacyDatabase.close();
+
+  const repository = new VideoNotesRepository({ databaseName, indexedDB, IDBKeyRange });
+  assert.equal((await repository.getNote("legacy-note")).id, "legacy-note");
+  await repository.putTranscriptCache({ id: "youtube:abc", schemaVersion: 1 });
+  assert.equal((await repository.getTranscriptCache("youtube:abc")).schemaVersion, 1);
+  await repository.destroy();
+});
+
 test("可恢复已经保存音频但尚未完成的转写任务", async () => {
   const repository = new VideoNotesRepository({
     databaseName: `video-notes-test-${crypto.randomUUID()}`,
