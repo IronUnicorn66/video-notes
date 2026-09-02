@@ -43,6 +43,7 @@ function groupsWithinCharacterTarget(groups, maxChars) {
 export function localTranscriptNoteContext({
   context,
   source,
+  preferredSource,
   markerSeconds,
   windowSeconds,
   maxChars = NOTE_SUBTITLE_MAX_CHARS,
@@ -54,9 +55,6 @@ export function localTranscriptNoteContext({
   if (
     enabled !== true
     || context?.platform !== "youtube"
-    || !source
-    || source.sessionId !== context.sessionId
-    || source.videoId !== context.videoId
     || !Number.isFinite(marker)
     || marker < 0
     || !Number.isFinite(window)
@@ -65,9 +63,21 @@ export function localTranscriptNoteContext({
     || limit <= 0
   ) return null;
 
+  const currentSource = preferredSource
+    && preferredSource.sessionId === context.sessionId
+    && preferredSource.videoId === context.videoId
+    && Array.isArray(preferredSource.groups)
+    ? preferredSource
+    : source;
+  if (
+    !currentSource
+    || currentSource.sessionId !== context.sessionId
+    || currentSource.videoId !== context.videoId
+  ) return null;
+
   const markerMs = marker * 1000;
   const groups = groupsWithinCharacterTarget(
-    matchingGroups(source.groups, Math.max(0, markerMs - (window * 1000)), markerMs),
+    matchingGroups(currentSource.groups, Math.max(0, markerMs - (window * 1000)), markerMs),
     limit,
   );
   if (groups.length === 0) return null;

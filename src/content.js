@@ -161,7 +161,10 @@ function collectSubtitles() {
   );
 }
 
-function markerSnapshot(markerId, { deferPause = false } = {}) {
+function markerSnapshot(
+  markerId,
+  { deferPause = false, localTranscriptNoteSource: preferredSource } = {},
+) {
   const context = getContext();
   const media = bindMedia();
   if (!context || !media) throw new Error("当前标签页没有受支持的视频");
@@ -169,6 +172,7 @@ function markerSnapshot(markerId, { deferPause = false } = {}) {
   const localSubtitles = localTranscriptNoteContext({
     context,
     source: localTranscriptNoteSource,
+    preferredSource,
     markerSeconds: seconds,
     windowSeconds: subtitleCapture.windowSeconds,
     enabled: subtitleCapture.enabled,
@@ -418,7 +422,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return { seconds };
       }
       case "PREPARE_MARKER":
-        return markerSnapshot(message.markerId, { deferPause: message.deferPause === true });
+        return markerSnapshot(message.markerId, {
+          deferPause: message.deferPause === true,
+          localTranscriptNoteSource: message.localTranscriptNoteSource,
+        });
       case "ACTIVATE_MARKER":
         return { wasPlaying: activateMarker(message.markerId, message.wasPlaying === true) };
       case "GET_MARKER_RESUME_ELIGIBILITY":

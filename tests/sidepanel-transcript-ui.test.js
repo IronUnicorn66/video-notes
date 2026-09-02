@@ -219,6 +219,10 @@ test("当前完整字幕和译文同步给所有记笔记入口", () => {
   assert.match(content, /localSubtitles\?\.subtitleContext \?\? subtitleCapture\.before\(seconds\)/);
   assert.match(content, /subtitleTranslation: localSubtitles\?\.subtitleTranslation \?\? ""/);
   assert.match(background, /subtitleTranslation: String\(snapshot\.subtitleTranslation \?\? ""\)\.trim\(\)/);
+  assert.match(source, /type: "BEGIN_TYPED_NOTE",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
+  assert.match(source, /type: "VOICE_START_REQUEST",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
+  assert.match(background, /type: "PREPARE_MARKER",[\s\S]*localTranscriptNoteSource/);
+  assert.match(content, /source: localTranscriptNoteSource,\s*preferredSource/);
 });
 
 test("笔记卡片将本地字幕原文与译文分块显示", () => {

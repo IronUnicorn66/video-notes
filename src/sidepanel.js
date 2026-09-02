@@ -435,13 +435,8 @@ async function request(message) {
   return response;
 }
 
-function syncLocalTranscriptNoteSource({ clear = false } = {}) {
-  if (!activeContext || activeContext.platform !== "youtube") return;
-  localTranscriptNoteSourceRevision = Math.max(
-    Date.now() * 1000,
-    localTranscriptNoteSourceRevision + 1,
-  );
-  const source = !clear && fullTranscript
+function currentLocalTranscriptNoteSource() {
+  return activeContext?.platform === "youtube" && fullTranscript
     ? {
         sessionId: activeContext.sessionId,
         videoId: activeContext.videoId,
@@ -453,12 +448,20 @@ function syncLocalTranscriptNoteSource({ clear = false } = {}) {
         })),
       }
     : null;
+}
+
+function syncLocalTranscriptNoteSource({ clear = false } = {}) {
+  if (!activeContext || activeContext.platform !== "youtube") return;
+  localTranscriptNoteSourceRevision = Math.max(
+    Date.now() * 1000,
+    localTranscriptNoteSourceRevision + 1,
+  );
   void request({
     type: "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
     revision: localTranscriptNoteSourceRevision,
     sessionId: activeContext.sessionId,
     videoId: activeContext.videoId,
-    source,
+    source: clear ? null : currentLocalTranscriptNoteSource(),
   }).catch(() => {});
 }
 
@@ -1624,7 +1627,10 @@ refreshRunner = createSidePanelRefreshRunner({
 
 async function beginTypedDraft() {
   if (currentDraft || draftPromise || !activeContext) return;
-  draftPromise = request({ type: "BEGIN_TYPED_NOTE" });
+  draftPromise = request({
+    type: "BEGIN_TYPED_NOTE",
+    localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
+  });
   syncHistoryControls();
   try {
     const response = await draftPromise;
@@ -1711,7 +1717,10 @@ async function startVoice() {
       showToast(t("completeMicrophonePermission"));
       return;
     }
-    await request({ type: "VOICE_START_REQUEST" });
+    await request({
+      type: "VOICE_START_REQUEST",
+      localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
+    });
     setRecordingUi(true);
     if (pendingVoiceStopReason) {
       const reason = pendingVoiceStopReason;

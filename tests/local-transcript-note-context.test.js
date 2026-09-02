@@ -52,6 +52,26 @@ test("范围内存在未翻译分段时只保存完整原文", () => {
   });
 });
 
+test("创建笔记时优先使用请求携带的最新译文而不是旧同步快照", () => {
+  const staleSource = source([
+    { startMs: 0, endMs: 12000, text: "原文" },
+  ]);
+  const freshSource = source([
+    { startMs: 0, endMs: 12000, text: "原文", translation: "Translation" },
+  ]);
+
+  assert.deepEqual(localTranscriptNoteContext({
+    context,
+    source: staleSource,
+    preferredSource: freshSource,
+    markerSeconds: 10,
+    windowSeconds: 20,
+  }), {
+    subtitleContext: "原文",
+    subtitleTranslation: "Translation",
+  });
+});
+
 test("字符限制从最早分段开始丢弃但不拆开完整分段", () => {
   const result = localTranscriptNoteContext({
     context,
