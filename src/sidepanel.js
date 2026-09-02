@@ -22,6 +22,7 @@ import {
 import { VideoNotesRepository } from "./core/storage.js";
 import {
   createSidePanelRefreshController,
+  createSidePanelScrollMemory,
   isSidePanelRefreshMessage,
 } from "./core/sidepanel-scope.js";
 import {
@@ -31,6 +32,7 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  centeredTranscriptScrollTop,
   formatTranscriptProgress,
   formatTranscriptTimeRange,
   groupTranscriptCues,
@@ -228,6 +230,11 @@ const sidepanelZoomBinding = createSidepanelZoomBinding({
   showToast,
 });
 
+const sidePanelScrollMemory = createSidePanelScrollMemory({
+  readPosition: () => window.scrollY,
+  restorePosition: (position) => window.scrollTo(0, position),
+});
+
 const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refreshNow();
 }, {
@@ -238,6 +245,9 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
       resetFullTranscript();
     }
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
+  },
+  onTabChanged(_previousTabId, tabId) {
+    sidePanelScrollMemory.activateTab(tabId);
   },
   shouldRefresh(message) {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
@@ -533,12 +543,16 @@ function showLocatedFullTranscriptCue(index) {
   cue.setAttribute("aria-current", "true");
   const listBounds = elements.fullTranscriptList.getBoundingClientRect();
   const cueBounds = cue.getBoundingClientRect();
-  elements.fullTranscriptList.scrollTo({
-    top: elements.fullTranscriptList.scrollTop
-      + cueBounds.top
-      - listBounds.top
-      - ((listBounds.height - cueBounds.height) / 2),
-    behavior: "smooth",
+  const coordinateScale = elements.fullTranscriptList.clientHeight > 0
+    ? listBounds.height / elements.fullTranscriptList.clientHeight
+    : 1;
+  elements.fullTranscriptList.scrollTop = centeredTranscriptScrollTop({
+    currentScrollTop: elements.fullTranscriptList.scrollTop,
+    listTop: listBounds.top,
+    listHeight: listBounds.height,
+    cueTop: cueBounds.top,
+    cueHeight: cueBounds.height,
+    coordinateScale,
   });
   fullTranscriptLocatedCueTimer = setTimeout(() => {
     cue.classList.remove("full-transcript-cue-located");
@@ -1635,6 +1649,7 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
     syncFullTranscriptContext();
+    sidePanelScrollMemory.restoreTab(sidePanelRefresh.tabId);
   },
   applyError(error) {
     if (activeContext || activeContextTabId !== null) historyContextToken += 1;
@@ -1649,6 +1664,7 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.exportButton.disabled = true;
     renderNotes([]);
     resetFullTranscript({ hide: true });
+    sidePanelScrollMemory.restoreTab(sidePanelRefresh.tabId);
   },
   isBlocked: () => inlineEditController.blocked,
   defer() {
@@ -2366,6 +2382,7 @@ await initializeSidepanel({
   setPanelContext: async () => {
     const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
     sidePanelRefresh.setTabId(panelContext.tabId, panelContext.windowId);
+    sidePanelScrollMemory.activateTab(panelContext.tabId);
   },
   refresh,
   renderWhisperStatus,

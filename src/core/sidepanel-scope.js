@@ -32,21 +32,54 @@ export function sidePanelContextForSender(sender, contexts, fallbackTab = null) 
 }
 
 export function createActiveTabActivationHandler({
-  tabs,
   runtime,
-  configureSidePanelForTab,
-  onError = () => {},
 }) {
   return async ({ tabId, windowId }) => {
-    let tab;
-    try {
-      tab = await tabs.get(tabId);
-      await configureSidePanelForTab(tab);
-      const message = activeContextChangedMessage(tabId, windowId);
-      if (message) await runtime.sendMessage(message).catch(() => {});
-    } catch (error) {
-      onError(tab ?? { id: tabId }, error);
-    }
+    const message = activeContextChangedMessage(tabId, windowId);
+    if (message) await runtime.sendMessage(message).catch(() => {});
+  };
+}
+
+export function createCurrentPageContextReader({
+  targetTab,
+  sendPageContextRequest,
+}) {
+  return async (request) => {
+    const tab = await targetTab(request);
+    if (!tab?.url || !parseVideoContext(tab.url)) return null;
+    const response = await sendPageContextRequest(tab.id);
+    return response?.context ?? null;
+  };
+}
+
+export function createSidePanelScrollMemory({
+  readPosition,
+  restorePosition,
+}) {
+  const positions = new Map();
+  let activeTabId = null;
+  let pendingRestoreTabId = null;
+
+  function normalizedPosition(value) {
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  return {
+    activateTab(tabId) {
+      if (!validContextId(tabId) || tabId === activeTabId) return false;
+      if (activeTabId !== null) {
+        positions.set(activeTabId, normalizedPosition(readPosition()));
+      }
+      activeTabId = tabId;
+      pendingRestoreTabId = tabId;
+      return true;
+    },
+    restoreTab(tabId) {
+      if (tabId !== activeTabId || tabId !== pendingRestoreTabId) return false;
+      pendingRestoreTabId = null;
+      restorePosition(positions.get(tabId) ?? 0);
+      return true;
+    },
   };
 }
 
@@ -126,6 +159,7 @@ export function sidePanelRequestTabIdForSender(
 
 export function createSidePanelRefreshController(refresh, {
   onContextEvent = () => {},
+  onTabChanged = () => {},
   shouldRefresh = () => true,
   shouldDeferRefresh = () => false,
 } = {}) {
@@ -164,7 +198,9 @@ export function createSidePanelRefreshController(refresh, {
           || !validContextId(message.windowId)
           || message.windowId !== windowId
         ) return false;
+        const previousTabId = tabId;
         tabId = message.tabId;
+        if (tabId !== previousTabId) onTabChanged(previousTabId, tabId);
       }
       if (!Number.isInteger(tabId) || message?.tabId !== tabId) return false;
       refreshOrDefer(message);
@@ -188,10 +224,35 @@ export function createSidePanelRefreshController(refresh, {
   };
 }
 
-export function sidePanelOptionsForTab(tab) {
+export function sidePanelMigrationOptionsForTab(tab) {
   if (!Number.isInteger(tab?.id)) throw new Error("缺少有效 tabId");
-  const supported = Boolean(tab.url && parseVideoContext(tab.url));
-  return supported
-    ? { tabId: tab.id, path: "sidepanel.html", enabled: true }
-    : { tabId: tab.id, enabled: false };
+  return { tabId: tab.id, path: "sidepanel.html", enabled: true };
+}
+
+export function createLegacySidePanelOptionsRepair({
+  tabs,
+  sidePanel,
+  warn = console.warn,
+}) {
+  return async () => {
+    let openTabs;
+    try {
+      openTabs = await tabs.query({});
+    } catch (error) {
+      warn("查询现有标签页以修复侧栏配置失败", error);
+      return;
+    }
+
+    await Promise.all(openTabs
+      .filter((tab) => Number.isInteger(tab.id))
+      .map(async (tab) => {
+        try {
+          const options = await sidePanel.getOptions({ tabId: tab.id });
+          if (options?.path) return;
+          await sidePanel.setOptions(sidePanelMigrationOptionsForTab(tab));
+        } catch (error) {
+          warn("修复标签页侧栏配置失败", tab.id, error);
+        }
+      }));
+  };
 }

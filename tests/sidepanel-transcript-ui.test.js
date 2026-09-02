@@ -123,7 +123,7 @@ test("译文完成后在翻译和重试之间显示原文与译文选项", () =>
   assert.match(source, /if \(cue\.translation && displayPreference\.showTranslation\)/);
 });
 
-test("重试左侧提供按播放器进度定位字幕的按钮", () => {
+test("重试左侧的定位按钮直接跳到播放器当前字幕", () => {
   assert.match(
     html,
     /id="full-transcript-display-options"[\s\S]*id="full-transcript-locate"[\s\S]*id="full-transcript-retry"/,
@@ -132,7 +132,9 @@ test("重试左侧提供按播放器进度定位字幕的按钮", () => {
   assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-title="fullTranscriptLocateTitle"/);
   assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-aria-label="fullTranscriptLocateTitle"/);
   assert.match(source, /type: "GET_VIDEO_POSITION"/);
-  assert.match(source, /fullTranscriptList\.scrollTo\(\{[\s\S]*behavior: "smooth"/);
+  assert.match(source, /centeredTranscriptScrollTop\(\{/);
+  assert.match(source, /listBounds\.height\s*\/\s*elements\.fullTranscriptList\.clientHeight/);
+  assert.doesNotMatch(source, /fullTranscriptList\.scrollTo\(\{[\s\S]*behavior: "smooth"/);
   assert.match(source, /full-transcript-cue-located/);
   assert.match(css, /\.full-transcript-cue-located\s*\{/);
   assert.match(background, /case "GET_VIDEO_POSITION"/);

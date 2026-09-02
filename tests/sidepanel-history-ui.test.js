@@ -163,3 +163,19 @@ test("窄侧栏时间线标题与操作按钮保持单行对齐", () => {
   assert.match(css, /\.note-delete-button[\s\S]*color[^;]*#[0-9a-f]{6}/i);
   assert.match(css, /min-width:\s*320px/);
 });
+
+test("课程标签切换后恢复各自的侧栏滚动位置", () => {
+  assert.match(
+    source,
+    /createSidePanelScrollMemory\(\{[\s\S]*readPosition:\s*\(\)\s*=>\s*window\.scrollY,[\s\S]*restorePosition:\s*\(position\)\s*=>\s*window\.scrollTo\(0, position\)/,
+  );
+  assert.match(
+    source,
+    /onTabChanged\(_previousTabId, tabId\)\s*\{\s*sidePanelScrollMemory\.activateTab\(tabId\)/,
+  );
+  assert.equal(occurrences(source, /sidePanelScrollMemory\.restoreTab\(/g), 2);
+  assert.match(
+    source,
+    /sidePanelRefresh\.setTabId\(panelContext\.tabId, panelContext\.windowId\);\s*sidePanelScrollMemory\.activateTab\(panelContext\.tabId\)/,
+  );
+});
