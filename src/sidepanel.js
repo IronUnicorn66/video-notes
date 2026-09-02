@@ -5,6 +5,13 @@ import {
   initializeSidepanel,
 } from "./core/sidepanel-note-sort.js";
 import { createSidepanelZoomBinding } from "./core/sidepanel-zoom.js";
+import {
+  NOTE_FONT_SIZE,
+  NOTE_FONT_SIZE_MAX,
+  NOTE_FONT_SIZE_MIN,
+  normalizeNoteFontSize,
+  noteFontSizeAfterStep,
+} from "./core/note-font-size.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
@@ -99,9 +106,12 @@ const elements = {
   fullTranscriptFontSizeIncrease: document.querySelector("#full-transcript-font-size-increase"),
   fullTranscriptList: document.querySelector("#full-transcript-list"),
   fullTranscriptEmpty: document.querySelector("#full-transcript-empty"),
+  timeline: document.querySelector(".timeline"),
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
   noteSortButtons: document.querySelectorAll("[data-note-sort-order]"),
+  noteFontSizeDecrease: document.querySelector("#note-font-size-decrease"),
+  noteFontSizeIncrease: document.querySelector("#note-font-size-increase"),
   undoButton: document.querySelector("#undo-button"),
   redoButton: document.querySelector("#redo-button"),
   clearButton: document.querySelector("#clear-button"),
@@ -174,6 +184,7 @@ let fullTranscriptLocating = false;
 let fullTranscriptLocatedCueTimer = null;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
 let fullTranscriptFontSize = TRANSCRIPT_FONT_SIZE;
+let noteFontSize = NOTE_FONT_SIZE;
 let fullTranscriptTranslationRunning = false;
 let fullTranscriptTranslationController = null;
 let browserTranscriptTranslationSession = null;
@@ -613,6 +624,26 @@ function syncFullTranscriptGroupButtons() {
   for (const button of elements.fullTranscriptGroupButtons) {
     button.checked = Number(button.value) === fullTranscriptGroupSize;
     button.disabled = fullTranscriptTranslationRunning;
+  }
+}
+
+function applyNoteFontSize(value) {
+  noteFontSize = normalizeNoteFontSize(value);
+  elements.timeline.style.setProperty("--note-font-size", `${noteFontSize}px`);
+  elements.noteFontSizeDecrease.disabled = noteFontSize <= NOTE_FONT_SIZE_MIN;
+  elements.noteFontSizeIncrease.disabled = noteFontSize >= NOTE_FONT_SIZE_MAX;
+}
+
+async function changeNoteFontSize(direction) {
+  const previous = noteFontSize;
+  const next = noteFontSizeAfterStep(previous, direction);
+  if (next === previous) return;
+  applyNoteFontSize(next);
+  try {
+    await chrome.storage.local.set({ noteFontSize });
+  } catch (error) {
+    applyNoteFontSize(previous);
+    showToast(error.message);
   }
 }
 
@@ -1874,6 +1905,12 @@ elements.fullTranscriptFontSizeDecrease.addEventListener("click", () => {
 elements.fullTranscriptFontSizeIncrease.addEventListener("click", () => {
   void changeFullTranscriptFontSize(1);
 });
+elements.noteFontSizeDecrease.addEventListener("click", () => {
+  void changeNoteFontSize(-1);
+});
+elements.noteFontSizeIncrease.addEventListener("click", () => {
+  void changeNoteFontSize(1);
+});
 elements.fullTranscriptList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-seconds]");
   if (!button) return;
@@ -2217,6 +2254,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.fullTranscriptFontSize) {
     applyFullTranscriptFontSize(changes.fullTranscriptFontSize.newValue);
   }
+  if (area === "local" && changes.noteFontSize) {
+    applyNoteFontSize(changes.noteFontSize.newValue);
+  }
   if (area === "local" && (
     changes.fullTranscriptShowOriginal
     || changes.fullTranscriptShowTranslation
@@ -2284,6 +2324,7 @@ syncSubtitleSettingsControls();
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
   fullTranscriptFontSize: TRANSCRIPT_FONT_SIZE,
+  noteFontSize: NOTE_FONT_SIZE,
   fullTranscriptShowOriginal: true,
   fullTranscriptShowTranslation: true,
   fullTranscriptLanguagePackTarget: "zh-Hans",
@@ -2292,6 +2333,7 @@ const fullTranscriptSettings = await chrome.storage.local.get({
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
 applyFullTranscriptFontSize(fullTranscriptSettings.fullTranscriptFontSize);
+applyNoteFontSize(fullTranscriptSettings.noteFontSize);
 fullTranscriptDisplayBinding.sync({
   showOriginal: fullTranscriptSettings.fullTranscriptShowOriginal,
   showTranslation: fullTranscriptSettings.fullTranscriptShowTranslation,

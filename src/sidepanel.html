@@ -179,7 +179,7 @@
       </details>
 
       <section class="timeline" aria-labelledby="timeline-title">
-        <div class="section-row">
+        <div class="section-row timeline-header">
           <h2 id="timeline-title" data-i18n="timeline">标记时间线</h2>
           <div class="timeline-actions">
             <div class="note-sort-toggle" role="group" aria-label="笔记显示顺序" data-i18n-aria-label="noteSortOrder">
@@ -202,8 +202,51 @@
                 data-i18n="newest"
               >倒序</button>
             </div>
-            <button id="undo-button" class="secondary-button" type="button" disabled data-i18n="undo">撤销</button>
-            <button id="redo-button" class="secondary-button" type="button" disabled data-i18n="redo">反撤销</button>
+            <button
+              id="undo-button"
+              class="secondary-button timeline-history-button"
+              type="button"
+              disabled
+              title="撤销"
+              data-i18n-title="undo"
+              data-i18n-aria-label="undo"
+              aria-label="撤销"
+            ><span aria-hidden="true">↶</span></button>
+            <button
+              id="redo-button"
+              class="secondary-button timeline-history-button"
+              type="button"
+              disabled
+              title="反撤销"
+              data-i18n-title="redo"
+              data-i18n-aria-label="redo"
+              aria-label="反撤销"
+            ><span aria-hidden="true">↷</span></button>
+            <div
+              class="note-font-size-controls"
+              role="group"
+              aria-label="笔记字号"
+              data-i18n-aria-label="noteFontSize"
+            >
+              <button
+                id="note-font-size-increase"
+                class="note-font-size-button"
+                type="button"
+                title="增大笔记字号"
+                data-i18n-title="increaseNoteFontSize"
+                data-i18n-aria-label="increaseNoteFontSize"
+                aria-label="增大笔记字号"
+              >+</button>
+              <button
+                id="note-font-size-decrease"
+                class="note-font-size-button"
+                type="button"
+                title="减小笔记字号"
+                data-i18n-title="decreaseNoteFontSize"
+                data-i18n-aria-label="decreaseNoteFontSize"
+                aria-label="减小笔记字号"
+              >−</button>
+            </div>
             <button id="clear-button" class="danger-button" type="button" disabled data-i18n="clear">清空</button>
             <button id="export-button" class="secondary-button" type="button" disabled data-i18n="exportZip">导出 ZIP</button>
           </div>

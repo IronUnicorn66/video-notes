@@ -1,17 +1,18 @@
-# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.25）
+# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.26）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge、Chrome 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（313 个测试），`npm run build` 与 `npm run package` 均通过。
-- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.25`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.25.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm test` 通过（327 个测试），`npm run build` 与 `npm run package` 均通过。
+- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.26`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.26.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：当前会话本地字幕按前置时间范围选择完整段落，500 字限制从最早段落开始收缩；范围全部翻译时保存独立译文，部分译文、旧会话、Bilibili 或本地来源缺失时保持安全回退。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
 - [x] 已在实际 Chromium 窄宽度页面验证：“原文 / 译文”位于“重新翻译”和“重试”之间，三种显示模式正确，最后一个选项不能取消，未完整翻译时控件隐藏且原文和已有译文保持可见。
 - [x] 已在隔离 Edge 152 运行时验证：固定 `dist` 的运行版本为 `1.0.24`，560px 窄侧栏中“翻译 / 定位 / 重试 / 字号 +/−”同排对齐，定位高亮样式可见；播放器停在 616 秒时读取结果为 616 秒，读取前后播放器进度均保持 616 秒。用户个人 Edge 中的完整点击流程仍保留在下方人工验收项。
+- [x] 已在实际 Edge 中使用 320px 侧栏布局用例验证：中英文均按“标题、排序、弯箭头撤销/反撤销、独立 `+`、独立 `−`、清空、导出”的顺序保持单行；按钮按内容取宽，清空不伸展，两个字号按钮边框分离，工具栏及按钮文字均无横向溢出。笔记正文在 10/13/24px 时分别呈现预期字号，附带字幕保持至少 10px。Chrome 外部会话未连接，不计为 Chrome 实机已验证。
 
 ### 此前完成的 Edge 150 实机烟测
 

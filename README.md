@@ -22,19 +22,19 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 - Translates sentence-aware transcript paragraphs locally with the built-in Edge/Chrome Translator API. It detects the transcript language automatically and lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target, with advance download and visible progress for the current language pair.
 - Records while you hold Right Option/Alt or the side-panel button, then restores eligible playback when you release.
 - Runs Base, Small, or Medium Whisper models locally in the browser.
-- Shows notes oldest-first or newest-first, with edit, delete, clear, undo, and redo controls.
+- Shows notes oldest-first or newest-first, with edit, delete, clear, curved-arrow undo/redo controls, and persistent 10–24 px note font sizing.
 - Exports a ZIP containing Markdown, screenshots, and original recordings.
 
 ## Install
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.25 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.26 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.25 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.25/video-notes-edge-1.0.25.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.25/video-notes-edge-1.0.25.zip.sha256)
+[Download Video Notes 1.0.26 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.26/video-notes-edge-1.0.26.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.26/video-notes-edge-1.0.26.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -76,8 +76,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.25.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.25.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.26.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.26.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
