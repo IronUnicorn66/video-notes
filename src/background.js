@@ -372,12 +372,17 @@ async function cropVisiblePlayer(tab, snapshot) {
   }
 }
 
-async function beginMarker(tab, inputType, { beforePause, onPrepared } = {}) {
+async function beginMarker(
+  tab,
+  inputType,
+  { beforePause, onPrepared, localTranscriptNoteSource } = {},
+) {
   const markerId = crypto.randomUUID();
   const snapshot = await sendToTab(tab.id, {
     type: "PREPARE_MARKER",
     markerId,
     deferPause: Boolean(beforePause),
+    localTranscriptNoteSource,
   });
   const now = Date.now();
   const session = {
@@ -411,6 +416,7 @@ async function beginMarker(tab, inputType, { beforePause, onPrepared } = {}) {
     studySoundLinked: false,
     userEditVersion: 0,
     status: inputType === "voice" ? "recording" : "draft",
+    subtitleTranslation: String(snapshot.subtitleTranslation ?? "").trim(),
     createdAt: now,
     updatedAt: now,
   };
@@ -538,9 +544,9 @@ async function releaseStudySoundHold(note, shouldResumeMain) {
   }
 }
 
-async function startVoice(tab) {
+async function startVoice(tab, localTranscriptNoteSource) {
   if (voiceStartPromise || voiceStopPromise) throw new Error("录音正在启动或保存，请稍候");
-  voiceStartPromise = startVoiceUnlocked(tab);
+  voiceStartPromise = startVoiceUnlocked(tab, localTranscriptNoteSource);
   try {
     return await voiceStartPromise;
   } finally {
@@ -548,7 +554,7 @@ async function startVoice(tab) {
   }
 }
 
-async function startVoiceUnlocked(tab) {
+async function startVoiceUnlocked(tab, localTranscriptNoteSource) {
   cancelPendingVoice = false;
   const { microphoneReady = false } = await chrome.storage.local.get({ microphoneReady: false });
   if (!microphoneReady) {
@@ -566,6 +572,7 @@ async function startVoiceUnlocked(tab) {
   let preparedNote = null;
   try {
     const { note, session } = await beginMarker(tab, "voice", {
+      localTranscriptNoteSource,
       beforePause(noteToPrepare) {
         preparedNote = noteToPrepare;
         activeVoiceNote = noteToPrepare;
@@ -835,6 +842,17 @@ async function handleMessage(message, sender) {
       });
       return { seconds: response.seconds };
     }
+    case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE": {
+      const tab = await targetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
+        revision: message.revision,
+        sessionId: message.sessionId,
+        videoId: message.videoId,
+        source: message.source,
+      });
+      return { synced: response.synced === true };
+    }
     case "SEEK_VIDEO": {
       const tab = await targetTab(sender, message.tabId);
       const response = await sendToTab(tab.id, {
@@ -847,14 +865,16 @@ async function handleMessage(message, sender) {
     }
     case "BEGIN_TYPED_NOTE": {
       const tab = await targetTab(sender);
-      return beginMarker(tab, "typed");
+      return beginMarker(tab, "typed", {
+        localTranscriptNoteSource: message.localTranscriptNoteSource,
+      });
     }
     case "CANCEL_NOTE":
       await cancelNote(message.noteId);
       return {};
     case "VOICE_START_REQUEST": {
       const tab = await targetTab(sender);
-      return startVoice(tab);
+      return startVoice(tab, message.localTranscriptNoteSource);
     }
     case "OPEN_MICROPHONE_PERMISSION_PAGE": {
       const tab = await targetTab(sender);

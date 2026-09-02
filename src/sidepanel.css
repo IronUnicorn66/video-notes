@@ -857,6 +857,29 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.note-subtitle-part {
+  margin-top: 8px;
+}
+
+.note-subtitle-part + .note-subtitle-part {
+  border-top: 1px solid #e4e0d7;
+  padding-top: 8px;
+}
+
+.note-subtitle-label {
+  color: #777266;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.note-subtitle-part .note-subtitle-text {
+  margin-top: 4px;
+}
+
+.note-subtitle-translation {
+  color: #476357;
+}
+
 .note-subtitle-text.is-empty {
   color: #858174;
 }

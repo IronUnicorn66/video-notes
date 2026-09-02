@@ -188,6 +188,7 @@ let browserTranslationLanguagePackController = null;
 let browserTranslationLanguagePackGeneration = 0;
 const fullTranscriptTranslations = new Map();
 const browserTranscriptTranslationPairs = new Map();
+let localTranscriptNoteSourceRevision = Date.now() * 1000;
 
 const fullTranscriptDisplayBinding = createFullTranscriptDisplayBinding({
   group: elements.fullTranscriptDisplayOptions,
@@ -419,7 +420,13 @@ function formatTranscriptionTime(createdAt) {
 }
 
 async function request(message) {
-  const payload = ["GET_ACTIVE_STATE", "GET_FULL_YOUTUBE_TRANSCRIPT", "GET_VIDEO_POSITION", "SEEK_VIDEO"].includes(message.type)
+  const payload = [
+    "GET_ACTIVE_STATE",
+    "GET_FULL_YOUTUBE_TRANSCRIPT",
+    "GET_VIDEO_POSITION",
+    "SEEK_VIDEO",
+    "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
+  ].includes(message.type)
     && Number.isInteger(sidePanelRefresh.tabId)
     ? { ...message, tabId: sidePanelRefresh.tabId }
     : message;
@@ -428,7 +435,38 @@ async function request(message) {
   return response;
 }
 
+function currentLocalTranscriptNoteSource() {
+  return activeContext?.platform === "youtube" && fullTranscript
+    ? {
+        sessionId: activeContext.sessionId,
+        videoId: activeContext.videoId,
+        groups: currentFullTranscriptGroups().map((group) => ({
+          startMs: group.startMs,
+          endMs: group.endMs,
+          text: group.text,
+          translation: group.translation ?? "",
+        })),
+      }
+    : null;
+}
+
+function syncLocalTranscriptNoteSource({ clear = false } = {}) {
+  if (!activeContext || activeContext.platform !== "youtube") return;
+  localTranscriptNoteSourceRevision = Math.max(
+    Date.now() * 1000,
+    localTranscriptNoteSourceRevision + 1,
+  );
+  void request({
+    type: "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
+    revision: localTranscriptNoteSourceRevision,
+    sessionId: activeContext.sessionId,
+    videoId: activeContext.videoId,
+    source: clear ? null : currentLocalTranscriptNoteSource(),
+  }).catch(() => {});
+}
+
 function resetFullTranscript({ hide = false } = {}) {
+  syncLocalTranscriptNoteSource({ clear: true });
   cancelFullTranscriptTranslation();
   cancelBrowserTranslationLanguagePackDownload();
   fullTranscriptGeneration += 1;
@@ -1043,6 +1081,7 @@ async function translateFullTranscriptInBrowser() {
     if (allTranslated) {
       for (const group of groups) fullTranscriptTranslations.delete(group.id);
       groups = currentFullTranscriptGroups();
+      syncLocalTranscriptNoteSource();
     }
     const cues = untranslatedTranscriptSegments(groups);
     if (cues.length === 0) return;
@@ -1065,6 +1104,7 @@ async function translateFullTranscriptInBrowser() {
           return;
         }
         fullTranscriptTranslations.set(id, translation);
+        syncLocalTranscriptNoteSource();
         elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
         renderFullTranscript();
       },
@@ -1130,6 +1170,7 @@ async function loadFullTranscript() {
   fullTranscriptLoading = true;
   fullTranscript = null;
   fullTranscriptTranslations.clear();
+  syncLocalTranscriptNoteSource({ clear: true });
   setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
   elements.fullTranscriptPanel.hidden = false;
   elements.fullTranscriptPanel.open = true;
@@ -1152,6 +1193,7 @@ async function loadFullTranscript() {
       return;
     }
     fullTranscript = response.transcript;
+    syncLocalTranscriptNoteSource();
     renderBrowserTranslationLanguagePackSettings();
     void refreshBrowserTranslationLanguagePackAvailability();
     elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
@@ -1403,6 +1445,8 @@ function renderNotes(notes, order = noteSortBinding.order) {
       subtitleEdit.textContent = t("editSubtitles");
       const subtitle = document.createElement("p");
       subtitle.className = "note-subtitle-text";
+      const subtitleTranslation = document.createElement("p");
+      subtitleTranslation.className = "note-subtitle-text note-subtitle-translation";
 
       const renderSubtitle = () => {
         const state = subtitleBlockState(note, true);
@@ -1410,11 +1454,30 @@ function renderNotes(notes, order = noteSortBinding.order) {
           ? t("subtitlesUnavailable")
           : state.text;
         subtitle.classList.toggle("is-empty", state.empty);
+        subtitleTranslation.textContent = state.translation;
       };
 
       renderSubtitle();
       subtitleHeader.append(subtitleTitle, subtitleEdit);
-      subtitleBlock.append(subtitleHeader, subtitle);
+      subtitleBlock.append(subtitleHeader);
+      if (subtitleState.translation) {
+        const originalPart = document.createElement("div");
+        originalPart.className = "note-subtitle-part";
+        const originalLabel = document.createElement("strong");
+        originalLabel.className = "note-subtitle-label";
+        originalLabel.textContent = t("fullTranscriptOriginal");
+        originalPart.append(originalLabel, subtitle);
+
+        const translationPart = document.createElement("div");
+        translationPart.className = "note-subtitle-part";
+        const translationLabel = document.createElement("strong");
+        translationLabel.className = "note-subtitle-label";
+        translationLabel.textContent = t("fullTranscriptTranslation");
+        translationPart.append(translationLabel, subtitleTranslation);
+        subtitleBlock.append(originalPart, translationPart);
+      } else {
+        subtitleBlock.append(subtitle);
+      }
       item.append(subtitleBlock);
 
       inlineEditController.bind({
@@ -1564,7 +1627,10 @@ refreshRunner = createSidePanelRefreshRunner({
 
 async function beginTypedDraft() {
   if (currentDraft || draftPromise || !activeContext) return;
-  draftPromise = request({ type: "BEGIN_TYPED_NOTE" });
+  draftPromise = request({
+    type: "BEGIN_TYPED_NOTE",
+    localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
+  });
   syncHistoryControls();
   try {
     const response = await draftPromise;
@@ -1651,7 +1717,10 @@ async function startVoice() {
       showToast(t("completeMicrophonePermission"));
       return;
     }
-    await request({ type: "VOICE_START_REQUEST" });
+    await request({
+      type: "VOICE_START_REQUEST",
+      localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
+    });
     setRecordingUi(true);
     if (pendingVoiceStopReason) {
       const reason = pendingVoiceStopReason;
@@ -1891,6 +1960,7 @@ elements.browserTranslationLanguagePackSelect.addEventListener("change", async (
   cancelBrowserTranslationLanguagePackDownload();
   cancelFullTranscriptTranslation();
   clearFullTranscriptTranslations();
+  syncLocalTranscriptNoteSource();
   setBrowserTranscriptTranslationState("waiting");
   renderBrowserTranslationLanguagePackSettings();
   renderFullTranscript();
@@ -1925,12 +1995,14 @@ for (const button of elements.fullTranscriptGroupButtons) {
     fullTranscriptGroupSize = normalizeTranscriptGroupSize(button.value);
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
+    syncLocalTranscriptNoteSource();
     try {
       await chrome.storage.local.set({ fullTranscriptGroupSize });
     } catch (error) {
       fullTranscriptGroupSize = previous;
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      syncLocalTranscriptNoteSource();
       showToast(error.message);
     }
   });
@@ -2139,6 +2211,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       fullTranscriptGroupSize = nextGroupSize;
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      syncLocalTranscriptNoteSource();
     }
   }
   if (area === "local" && changes.fullTranscriptFontSize) {
@@ -2168,6 +2241,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       cancelFullTranscriptTranslation();
       browserTranslationLanguagePackTarget = nextLanguage.id;
       clearFullTranscriptTranslations();
+      syncLocalTranscriptNoteSource();
       setBrowserTranscriptTranslationState("waiting");
       renderBrowserTranslationLanguagePackSettings();
       renderFullTranscript();

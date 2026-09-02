@@ -9,6 +9,7 @@ test("关闭设置时隐藏字幕块并保留笔记数据", () => {
     visible: false,
     empty: false,
     text: "历史字幕",
+    translation: "",
   });
   assert.equal(note.subtitleContext, "历史字幕");
 });
@@ -18,10 +19,24 @@ test("开启设置时区分已有字幕和空字幕", () => {
     visible: true,
     empty: false,
     text: "老师原话",
+    translation: "",
   });
   assert.deepEqual(subtitleBlockState({}, true), {
     visible: true,
     empty: true,
     text: "",
+    translation: "",
+  });
+});
+
+test("本地译文与字幕原文保持为独立内容", () => {
+  assert.deepEqual(subtitleBlockState({
+    subtitleContext: "原文",
+    subtitleTranslation: "  Translation  ",
+  }, true), {
+    visible: true,
+    empty: false,
+    text: "原文",
+    translation: "Translation",
   });
 });
