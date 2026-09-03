@@ -245,7 +245,8 @@ test("当前完整字幕和译文同步给所有记笔记入口", () => {
   assert.match(background, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
   assert.match(content, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
   assert.match(content, /new BilibiliTranscriptSource\(\)/);
-  assert.match(content, /await loadBilibiliTranscriptNoteSource\(context\)/);
+  assert.match(content, /bilibiliTranscriptSource\.get\(context\)/);
+  assert.doesNotMatch(content, /await loadBilibiliTranscriptNoteSource\(context\)/);
   assert.match(content, /localTranscriptNoteContext\(\{/);
   assert.match(content, /preferredNoteSubtitleContext\(\{/);
   assert.match(content, /renderedText: subtitleCapture\.before\(seconds\)/);

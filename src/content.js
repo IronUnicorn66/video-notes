@@ -177,7 +177,7 @@ async function loadBilibiliTranscriptNoteSource(context = getContext()) {
   });
 }
 
-async function markerSnapshot(
+function markerSnapshot(
   markerId,
   { deferPause = false, localTranscriptNoteSource: preferredSource } = {},
 ) {
@@ -187,13 +187,7 @@ async function markerSnapshot(
   const seconds = Math.max(0, media.currentTime || 0);
   const wasPlaying = !media.paused;
   const rect = findPlayerElement(context, media).getBoundingClientRect();
-  const bilibiliSource = await loadBilibiliTranscriptNoteSource(context);
-  const currentContext = getContext();
-  if (
-    !currentContext
-    || currentContext.sessionId !== context.sessionId
-    || currentContext.videoId !== context.videoId
-  ) throw new Error("字幕加载期间视频已切换，请重试");
+  const bilibiliSource = bilibiliTranscriptSource.get(context);
   const localSubtitles = localTranscriptNoteContext({
     context,
     source: context.platform === "bilibili" ? bilibiliSource : localTranscriptNoteSource,
