@@ -55,9 +55,14 @@ test("同一视频优先恢复本地字幕与译文缓存，重试时强制重�
 
 test("侧栏重开和切换合并档位后恢复完整字幕列表位置", () => {
   assert.match(source, /readTranscriptPosition:\s*\(\)\s*=>\s*elements\.fullTranscriptList\.scrollTop/);
+  assert.match(source, /readTranscriptAnchor:\s*captureFullTranscriptReadingAnchor/);
   assert.match(
     source,
     /restoreTranscriptPosition:\s*\(position\)\s*=>\s*\{\s*elements\.fullTranscriptList\.scrollTop = position;/,
+  );
+  assert.match(
+    source,
+    /restoreTranscriptAnchor:\s*\(anchor, fallbackPosition\)\s*=>\s*restoreFullTranscriptReadingAnchor\(\s*anchor,\s*fallbackPosition,\s*\)/,
   );
   assert.match(
     source,
@@ -65,6 +70,14 @@ test("侧栏重开和切换合并档位后恢复完整字幕列表位置", () =>
   );
   assert.match(source, /sidePanelViewPosition\.prepareTranscriptGroupChange\(\)/);
   assert.match(source, /renderFullTranscript\(\);\s*void sidePanelViewPosition\.restoreTranscript\(\);/);
+  const applyStart = source.indexOf("  async apply({ nextWhisperStatus, response }, isCurrent) {");
+  const applyEnd = source.indexOf("\n  applyError(error) {", applyStart);
+  const refreshApply = source.slice(applyStart, applyEnd);
+  assert.ok(applyStart >= 0 && applyEnd > applyStart);
+  assert.match(
+    refreshApply,
+    /await sidePanelViewPosition\.activate\(response\.context\.sessionId\);[\s\S]*!isCurrent\(\)[\s\S]*return;[\s\S]*syncFullTranscriptContext\(\);/,
+  );
 });
 
 test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
@@ -148,6 +161,16 @@ test("译文完成后在翻译和重试之间显示原文与译文选项", () =>
   assert.match(source, /fullTranscriptShowTranslation:\s*true/);
   assert.match(source, /if \(displayPreference\.showOriginal\)/);
   assert.match(source, /if \(cue\.translation && displayPreference\.showTranslation\)/);
+});
+
+test("完整字幕重绘按稳定段落标识保持当前阅读上下文", () => {
+  assert.match(source, /transcriptReadingAnchor\(/);
+  assert.match(source, /anchoredTranscriptScrollTop\(/);
+  assert.match(source, /item\.dataset\.transcriptGroupId = cue\.id/);
+  assert.match(
+    source,
+    /const readingAnchor = captureFullTranscriptReadingAnchor\(\);[\s\S]*replaceChildren\(\);[\s\S]*restoreFullTranscriptReadingAnchor\(readingAnchor, scrollPosition\)/,
+  );
 });
 
 test("重试左侧的定位按钮直接跳到播放器当前字幕", () => {

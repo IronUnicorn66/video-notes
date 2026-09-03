@@ -13,6 +13,18 @@ function storageKey(sessionId) {
   return `${STORAGE_KEY_PREFIX}${sessionId}`;
 }
 
+function normalizedTranscriptAnchor(value) {
+  if (
+    typeof value?.id !== "string"
+    || !value.id
+    || !Number.isFinite(value.viewportOffset)
+  ) return null;
+  return {
+    id: value.id,
+    viewportOffset: value.viewportOffset,
+  };
+}
+
 function normalizedRecord(value) {
   const transcriptPositions = {};
   if (value?.transcriptPositions && typeof value.transcriptPositions === "object") {
@@ -20,9 +32,17 @@ function normalizedRecord(value) {
       transcriptPositions[groupSize] = normalizedPosition(position);
     }
   }
+  const transcriptAnchors = {};
+  if (value?.transcriptAnchors && typeof value.transcriptAnchors === "object") {
+    for (const [groupSize, anchor] of Object.entries(value.transcriptAnchors)) {
+      const normalized = normalizedTranscriptAnchor(anchor);
+      if (normalized) transcriptAnchors[groupSize] = normalized;
+    }
+  }
   return {
     pagePosition: normalizedPosition(value?.pagePosition),
     transcriptPositions,
+    transcriptAnchors,
   };
 }
 
@@ -32,6 +52,8 @@ export function createSidePanelViewPositionController({
   restorePagePosition,
   readTranscriptPosition,
   restoreTranscriptPosition,
+  readTranscriptAnchor = () => null,
+  restoreTranscriptAnchor = () => false,
   getTranscriptGroupSize,
   saveDelay = DEFAULT_SAVE_DELAY,
   onError = () => {},
@@ -94,9 +116,12 @@ export function createSidePanelViewPositionController({
     const record = records.get(activeSessionId);
     if (includePage) record.pagePosition = normalizedPosition(readPagePosition());
     if (includeTranscript) {
-      record.transcriptPositions[groupKey(groupSize)] = normalizedPosition(
+      const transcriptGroupKey = groupKey(groupSize);
+      record.transcriptPositions[transcriptGroupKey] = normalizedPosition(
         readTranscriptPosition(),
       );
+      const anchor = normalizedTranscriptAnchor(readTranscriptAnchor());
+      if (anchor) record.transcriptAnchors[transcriptGroupKey] = anchor;
     }
     return true;
   }
@@ -162,9 +187,10 @@ export function createSidePanelViewPositionController({
       ) return false;
       const record = await load(sessionId);
       if (activeSessionId !== sessionId || groupKey() !== transcriptGroupKey) return false;
-      restoreTranscriptPosition(
-        record.transcriptPositions[transcriptGroupKey] ?? 0,
-      );
+      const fallbackPosition = record.transcriptPositions[transcriptGroupKey] ?? 0;
+      restoreTranscriptPosition(fallbackPosition);
+      const anchor = record.transcriptAnchors[transcriptGroupKey];
+      if (anchor) restoreTranscriptAnchor(anchor, fallbackPosition);
       pendingTranscriptRestore = false;
       restoredTranscriptGroupKey = transcriptGroupKey;
       return true;

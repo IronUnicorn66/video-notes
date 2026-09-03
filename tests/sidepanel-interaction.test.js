@@ -151,6 +151,60 @@ test("历史操作等待期间不能开始正文或字幕行内编辑", async ()
   await session.completion;
 });
 
+test("刷新会等待异步界面应用完成后再报告成功", async () => {
+  const applyGate = deferred();
+  const applied = [];
+  const refreshRunner = createSidePanelRefreshRunner({
+    async load() {
+      return { sessionId: "youtube:course-a" };
+    },
+    async apply(value) {
+      await applyGate.promise;
+      applied.push(value.sessionId);
+    },
+    applyError(error) { throw error; },
+  });
+
+  let settled = false;
+  const refreshPromise = refreshRunner.run().then((value) => {
+    settled = true;
+    return value;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(settled, false);
+  assert.deepEqual(applied, []);
+
+  applyGate.resolve();
+  assert.equal(await refreshPromise, true);
+  assert.deepEqual(applied, ["youtube:course-a"]);
+});
+
+test("较新的刷新开始后异步应用可识别旧响应已经失效", async () => {
+  const firstApplyGate = deferred();
+  const values = ["旧页面", "新页面"];
+  const applied = [];
+  const refreshRunner = createSidePanelRefreshRunner({
+    async load() {
+      return values.shift();
+    },
+    async apply(value, isCurrent) {
+      if (value === "旧页面") await firstApplyGate.promise;
+      if (isCurrent()) applied.push(value);
+    },
+    applyError(error) { throw error; },
+  });
+
+  const firstRefresh = refreshRunner.run();
+  await new Promise((resolve) => setImmediate(resolve));
+  const secondRefresh = refreshRunner.run();
+
+  assert.equal(await secondRefresh, true);
+  firstApplyGate.resolve();
+  assert.equal(await firstRefresh, false);
+  assert.deepEqual(applied, ["新页面"]);
+});
+
 test("刷新响应应用前发现编辑会登记延迟刷新并丢弃响应", async () => {
   const loadGate = deferred();
   const applied = [];

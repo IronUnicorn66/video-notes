@@ -52,6 +52,89 @@ test("完整字幕定位在不同侧栏缩放下都一次跳到目标中心", ()
   }
 });
 
+test("完整字幕重绘前选择最接近视口中央的可见段落作为阅读锚点", () => {
+  assert.deepEqual(transcriptView.transcriptReadingAnchor({
+    listTop: 100,
+    listHeight: 600,
+    cues: [
+      { id: "0:5", top: 20, height: 120 },
+      { id: "5:10", top: 180, height: 180 },
+      { id: "10:15", top: 390, height: 160 },
+      { id: "15:20", top: 720, height: 100 },
+    ],
+  }), {
+    id: "10:15",
+    viewportOffset: 290,
+  });
+
+  assert.deepEqual(transcriptView.transcriptReadingAnchor({
+    listTop: 0,
+    listHeight: 600,
+    cues: [
+      { id: "long", top: -500, height: 900 },
+      { id: "next", top: 420, height: 100 },
+    ],
+  }), {
+    id: "long",
+    viewportOffset: -500,
+  });
+
+  assert.equal(transcriptView.transcriptReadingAnchor({
+    listTop: 100,
+    listHeight: 600,
+    cues: [
+      { id: "above", top: 0, height: 50 },
+      { id: "below", top: 710, height: 50 },
+    ],
+  }), null);
+});
+
+test("完整字幕重绘后按阅读锚点高度差恢复位置并兼容侧栏缩放", () => {
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 800,
+    previousViewportOffset: 200,
+    nextViewportOffset: 500,
+  }), 1100);
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 800,
+    previousViewportOffset: 200,
+    nextViewportOffset: 50,
+  }), 650);
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 800,
+    previousViewportOffset: 200,
+    nextViewportOffset: 500,
+    coordinateScale: 2,
+  }), 950);
+});
+
+test("完整字幕阅读锚点缺失时保留旧位置并限制在滚动边界内", () => {
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 420,
+    previousViewportOffset: null,
+    nextViewportOffset: 260,
+    maxScrollTop: 1000,
+  }), 420);
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 80,
+    previousViewportOffset: 300,
+    nextViewportOffset: 0,
+    maxScrollTop: 1000,
+  }), 0);
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 900,
+    previousViewportOffset: 0,
+    nextViewportOffset: 400,
+    maxScrollTop: 1000,
+  }), 1000);
+  assert.equal(transcriptView.anchoredTranscriptScrollTop({
+    currentScrollTop: 700,
+    previousViewportOffset: 200,
+    nextViewportOffset: 0,
+    maxScrollTop: 700,
+  }), 500);
+});
+
 test("完整字幕时间范围省略不足一小时的小时前导零", () => {
   assert.equal(
     transcriptView.formatTranscriptTimeRange({ startMs: 5000, endMs: 4175000 }),
