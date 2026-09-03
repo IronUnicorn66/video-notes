@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { localTranscriptNoteContext } from "../src/core/local-transcript-note-context.js";
+import {
+  localTranscriptNoteContext,
+  preferredNoteSubtitleContext,
+} from "../src/core/local-transcript-note-context.js";
 
 const context = {
   platform: "youtube",
@@ -114,7 +117,7 @@ test("本地字幕身份、平台或覆盖范围无效时返回空结果供画�
     windowSeconds: 5,
   }), null);
   assert.equal(localTranscriptNoteContext({
-    context: { ...context, platform: "bilibili" },
+    context: { ...context, platform: "vimeo" },
     source: source(groups),
     markerSeconds: 3,
     windowSeconds: 5,
@@ -131,6 +134,75 @@ test("本地字幕身份、平台或覆盖范围无效时返回空结果供画�
     markerSeconds: 30,
     windowSeconds: 5,
   }), null);
+});
+
+test("B 站本地字幕轨道可按笔记时间窗口提供回退内容", () => {
+  const bilibiliContext = {
+    platform: "bilibili",
+    sessionId: "bilibili:BV1example:1",
+    videoId: "BV1example",
+  };
+  const result = localTranscriptNoteContext({
+    context: bilibiliContext,
+    source: {
+      sessionId: bilibiliContext.sessionId,
+      videoId: bilibiliContext.videoId,
+      groups: [
+        { startMs: 0, endMs: 7000, text: "范围外" },
+        { startMs: 8000, endMs: 14000, text: "前一句" },
+        { startMs: 14000, endMs: 22000, text: "当前句" },
+      ],
+    },
+    markerSeconds: 18,
+    windowSeconds: 10,
+  });
+
+  assert.deepEqual(result, {
+    subtitleContext: "前一句\n当前句",
+    subtitleTranslation: "",
+  });
+});
+
+test("B 站优先保留页面已渲染的双语字幕", () => {
+  assert.deepEqual(preferredNoteSubtitleContext({
+    platform: "bilibili",
+    renderedText: "页面原文\n页面译文",
+    localSubtitles: {
+      subtitleContext: "原生字幕轨",
+      subtitleTranslation: "",
+    },
+  }), {
+    subtitleContext: "页面原文\n页面译文",
+    subtitleTranslation: "",
+  });
+});
+
+test("B 站页面未渲染字幕时回退到原生字幕轨", () => {
+  assert.deepEqual(preferredNoteSubtitleContext({
+    platform: "bilibili",
+    renderedText: "",
+    localSubtitles: {
+      subtitleContext: "原生字幕轨",
+      subtitleTranslation: "",
+    },
+  }), {
+    subtitleContext: "原生字幕轨",
+    subtitleTranslation: "",
+  });
+});
+
+test("YouTube 继续优先使用完整字幕源及其译文", () => {
+  assert.deepEqual(preferredNoteSubtitleContext({
+    platform: "youtube",
+    renderedText: "页面字幕",
+    localSubtitles: {
+      subtitleContext: "完整字幕",
+      subtitleTranslation: "Translation",
+    },
+  }), {
+    subtitleContext: "完整字幕",
+    subtitleTranslation: "Translation",
+  });
 });
 
 test("关闭前置字幕或传入非法时间时不使用本地字幕", () => {

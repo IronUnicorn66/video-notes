@@ -179,6 +179,13 @@ test("时间线标题和各组控件使用统一的垂直尺寸与居中方式",
   );
 });
 
+test("窄侧栏中的快速标记、时间线和设置卡片保持相同横向边界", () => {
+  assert.doesNotMatch(
+    css,
+    /@media\s*\(max-width:\s*480px\)[\s\S]*\.timeline\s*\{[^}]*(?:margin-(?:right|left):\s*-|margin:\s*[^;}]*-)/s,
+  );
+});
+
 test("侧栏重新打开后按视频恢复整页滚动位置", () => {
   assert.match(
     source,

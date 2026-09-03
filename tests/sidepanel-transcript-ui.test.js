@@ -244,14 +244,17 @@ test("当前完整字幕和译文同步给所有记笔记入口", () => {
   assert.match(source, /fullTranscriptTranslations\.set\(id, translation\);\s*syncLocalTranscriptNoteSource\(\)/);
   assert.match(background, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
   assert.match(content, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
+  assert.match(content, /new BilibiliTranscriptSource\(\)/);
+  assert.match(content, /await loadBilibiliTranscriptNoteSource\(context\)/);
   assert.match(content, /localTranscriptNoteContext\(\{/);
-  assert.match(content, /localSubtitles\?\.subtitleContext \?\? subtitleCapture\.before\(seconds\)/);
-  assert.match(content, /subtitleTranslation: localSubtitles\?\.subtitleTranslation \?\? ""/);
+  assert.match(content, /preferredNoteSubtitleContext\(\{/);
+  assert.match(content, /renderedText: subtitleCapture\.before\(seconds\)/);
   assert.match(background, /subtitleTranslation: String\(snapshot\.subtitleTranslation \?\? ""\)\.trim\(\)/);
   assert.match(source, /type: "BEGIN_TYPED_NOTE",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
   assert.match(source, /type: "VOICE_START_REQUEST",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
   assert.match(background, /type: "PREPARE_MARKER",[\s\S]*localTranscriptNoteSource/);
-  assert.match(content, /source: localTranscriptNoteSource,\s*preferredSource/);
+  assert.match(content, /source: context\.platform === "bilibili" \? bilibiliSource : localTranscriptNoteSource/);
+  assert.match(content, /preferredSource: context\.platform === "youtube" \? preferredSource : null/);
 });
 
 test("笔记卡片将本地字幕原文与译文分块显示", () => {

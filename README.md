@@ -16,7 +16,7 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note. When the current YouTube transcript is already loaded, notes reuse its complete local paragraphs and include the matching local translation when the selected range is fully translated.
-- Reads native YouTube and Bilibili subtitles, plus bilingual subtitles rendered by Immersive Translate.
+- Reads native subtitles actually rendered by YouTube and Bilibili, plus bilingual subtitles rendered by Immersive Translate. It also attempts to retrieve the current Bilibili part's native track, but this remains unavailable on some newer pages.
 - For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, original/translation display choices, timestamp jumps, and current-playback-position locating.
 - Caches a loaded YouTube transcript, each completed target-language/group-size translation, and the side-panel/transcript reading positions locally, so reopening the same video resumes where you left off without another transcript request. Retry always refreshes the source.
 - Adjusts the whole side panel from 75% to 200% with the `+` and `−` buttons beside the language selector, in 10% steps.
@@ -31,12 +31,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.30 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.31 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.30 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.30/video-notes-edge-1.0.30.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.30/video-notes-edge-1.0.30.zip.sha256)
+[Download Video Notes 1.0.31 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -78,8 +78,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.30.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.30.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.31.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.31.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
@@ -91,7 +91,7 @@ After building, load the project’s `dist` directory from `edge://extensions/` 
 - Microsoft Edge 150 or later on desktop.
 - Google Chrome 138 or later on desktop.
 
-Lead-in subtitles prefer complete paragraphs from the current locally loaded YouTube transcript and include its matching translation when the whole selected range has been translated. If that local source is unavailable, notes fall back to content already rendered by the player. When complete YouTube transcript retrieval is blocked, the side panel may briefly toggle the YouTube captions control to capture the native caption response requested by the player, then restore its prior state. This stays local to the browser and does not use a private site API or a third-party subtitle service. Whisper performance depends on model size, device memory, and recording quality.
+Lead-in subtitles prefer complete paragraphs from the current locally loaded YouTube transcript and include its matching translation when the whole selected range has been translated. If that local source is unavailable, notes fall back to content already rendered by the player. When complete YouTube transcript retrieval is blocked, the side panel may briefly toggle the YouTube captions control to capture the native caption response requested by the player, then restore its prior state. On Bilibili, Video Notes makes a best-effort request for the current part's native track through the same-site endpoints used by the web player, but this fallback can still fail on some newer pages; enabling player captions is recommended. Text burned only into video pixels cannot be read. Subtitle content is not sent to a third-party subtitle service. Whisper performance depends on model size, device memory, and recording quality.
 
 ## Contributing and security
 

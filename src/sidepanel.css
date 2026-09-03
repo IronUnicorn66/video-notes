@@ -990,13 +990,6 @@ textarea:focus {
     gap: 8px;
   }
 
-  .timeline {
-    margin-right: -13px;
-    margin-left: -13px;
-    padding-right: 3px;
-    padding-left: 3px;
-  }
-
   #timeline-title {
     height: 22px;
     font-size: 9.5px;
