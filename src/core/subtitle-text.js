@@ -3,7 +3,7 @@ const IMMERSIVE_CONTAINER_SELECTOR = ".imt-captions-text";
 const IMMERSIVE_CUE_SELECTOR = ".source-cue, .target-cue";
 const NATIVE_SELECTORS = {
   youtube: ".ytp-caption-segment",
-  bilibili: ".bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle",
+  bilibili: ".bili-subtitle-x-subtitle-panel-text, .bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle",
 };
 
 function isVisible(element) {

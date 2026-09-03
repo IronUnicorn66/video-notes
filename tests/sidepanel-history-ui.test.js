@@ -164,6 +164,21 @@ test("窄侧栏时间线标题与操作按钮保持单行对齐", () => {
   assert.match(css, /min-width:\s*320px/);
 });
 
+test("时间线标题和各组控件使用统一的垂直尺寸与居中方式", () => {
+  assert.match(
+    css,
+    /#timeline-title\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*height:\s*30px;[^}]*line-height:\s*1;/s,
+  );
+  assert.match(
+    css,
+    /\.note-font-size-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
+  );
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*480px\)[\s\S]*#timeline-title\s*\{[^}]*height:\s*22px;/s,
+  );
+});
+
 test("侧栏重新打开后按视频恢复整页滚动位置", () => {
   assert.match(
     source,

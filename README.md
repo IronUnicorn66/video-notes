@@ -31,12 +31,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.29 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+Version 1.0.30 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.29 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.29/video-notes-edge-1.0.29.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.29/video-notes-edge-1.0.29.zip.sha256)
+[Download Video Notes 1.0.30 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.30/video-notes-edge-1.0.30.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.30/video-notes-edge-1.0.30.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -78,8 +78,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.29.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.29.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.30.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.30.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.

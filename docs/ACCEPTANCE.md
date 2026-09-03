@@ -1,12 +1,12 @@
-# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.29）
+# Edge 150/152 与 Chrome 138+ 实机验收清单（1.0.30）
 
 此清单区分可自动执行的发布校验和需要在桌面 Edge、Chrome 中完成的人工验收。人工项目由用户实际操作并记录结果，未执行前保持“待用户手动验收”。
 
 ## 一、发布自动校验
 
-- [x] 已自动验证：`npm test` 通过（344 个测试），`npm run build` 与 `npm run package` 均通过。
-- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.29`。
-- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.29.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
+- [x] 已自动验证：`npm test` 通过（346 个测试），`npm run build` 与 `npm run package` 均通过。
+- [x] 已自动验证：`manifest.json`、`package.json`、`package-lock.json`、`dist/manifest.json` 和发布 ZIP 版本均为 `1.0.30`。
+- [x] 已自动验证：`unzip -t artifacts/video-notes-edge-1.0.30.zip` 与 SHA-256 校验通过；根目录包含 `manifest.json`、`sidepanel.html` 和 `offscreen.html`。
 - [x] 已自动验证：当前会话本地字幕按前置时间范围选择完整段落，500 字限制从最早段落开始收缩；范围全部翻译时保存独立译文，部分译文、旧会话、Bilibili 或本地来源缺失时保持安全回退。
 - [x] 已自动验证：发布 ZIP 不包含 `ggml-small-q5_1.bin` 或 `ggml-medium-q5_0.bin`。
 - [x] 已自动验证：`git diff --check` 无空白错误。
@@ -17,6 +17,7 @@
 - [x] 已自动验证：工具栏侧栏绑定在后台服务每次加载时执行且只执行一次；后台加载会重新配置全部现有标签页，不依赖安装或浏览器启动事件，也未增加 `action.onClicked` 或 `sidePanel.open()`。
 - [x] 已自动验证：同一 YouTube 视频再次打开时优先读取 IndexedDB 中的完整字幕缓存，不再请求页面；完成译文按目标语言和 5/10/20 合并档位隔离保存，手动“重试”会跳过缓存重新采集，字幕内容变化时不会沿用旧译文；1.0.28 旧数据库升级后保留原笔记并新增缓存仓库。
 - [x] 已自动验证：侧栏整页位置按视频持久保存，完整字幕列表位置按视频及 5/10/20 合并档位隔离保存；侧栏隐藏、文档销毁、课程切换和字幕重绘前均会保留当前位置，重新打开后不会被加载占位内容误写为 0。
+- [x] 已自动验证：时间线标题、排序、撤销/反撤销、字号、清空和导出控件使用统一外框高度及垂直居中方式；B 站字幕采集同时兼容新版 `.bili-subtitle-x-subtitle-panel-text` 与旧版播放器节点。
 - [x] 已在实际 Edge 中重新加载当前 `dist`，无需重启浏览器即可从原 YouTube 课程页点击工具栏图标打开侧栏；关闭后再次点击可以重新打开，课程标题、快速标记、完整字幕和已有笔记均正常恢复。
 - [x] 已在实际 Edge 1.0.28 中验证完整字幕定位：侧栏缩放至 75%，视频停在 `56:12`，字幕列表仍位于开头时只点击一次“定位”，列表立即跳到并居中显示 `56:12–56:32` 的绿色高亮段落，无中间滚动动画；自动计算同时覆盖 100% 和 200% 缩放。
 

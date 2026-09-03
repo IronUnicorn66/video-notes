@@ -396,7 +396,11 @@ h2 {
 }
 
 #timeline-title {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  height: 30px;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -483,15 +487,16 @@ h2 {
 }
 
 .note-font-size-button {
-  display: grid;
+  display: inline-flex;
   flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   min-width: 30px;
   height: 30px;
   border: 1px solid #cfcabe;
   border-radius: 8px;
   padding: 0;
-  place-items: center;
   color: #34463e;
   background: #f8f7f2;
   font-size: 16px;
@@ -993,6 +998,7 @@ textarea:focus {
   }
 
   #timeline-title {
+    height: 22px;
     font-size: 9.5px;
   }
 
