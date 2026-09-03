@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("双语主页按问题、用法和价值组织核心信息", async () => {
+test("双语主页按首屏、用法和当前功能组织核心信息", async () => {
   const [zhHome, enHome] = await Promise.all([
     read("docs/index.html"),
     read("docs/en/index.html"),
@@ -24,9 +24,10 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
       /id="features"|class="numbers\b|feature-grid|local-section|support-section/,
     );
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
+    assert.match(html, /microsoftedge\.microsoft\.com\/addons\/detail\/cndejflmchbjejlflldlmfplcadnpjkj/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.31\/video-notes-edge-1\.0\.31\.zip/,
+      /releases\/download\/v1\.0\.32\/video-notes-edge-1\.0\.32\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -83,7 +84,14 @@ test("官网提供可切换的中英文主页与隐私页", async () => {
 
   assert.match(zhHome, /data-language="en"/);
   assert.match(enHome, /<html lang="en" data-language="en">/);
-  assert.match(enHome, /screenshot-1-note-en\.png/);
+  for (const html of [zhHome, enHome]) {
+    assert.match(html, /product-translation\.webp/);
+  }
+  assert.match(zhHome, /浏览器本地翻译/);
+  assert.match(zhHome, /Translator API/);
+  assert.match(zhHome, /简体中文、英语、日语、韩语或西班牙语/);
+  assert.match(enHome, /Local browser translation/);
+  assert.match(enHome, /built-in Edge \/ Chrome Translator API/);
   assert.match(enPrivacy, /Connection metadata/);
   assert.match(enPrivacy, /delete your data/i);
   assert.match(zhPrivacy, /data-language="en"/);
@@ -118,4 +126,5 @@ test("站点提供窄屏和减少动态效果样式", async () => {
 test("GitHub Pages 静态资源齐全", async () => {
   await access(new URL("../docs/.nojekyll", import.meta.url));
   await access(new URL("../docs/assets/icon.svg", import.meta.url));
+  await access(new URL("../docs/assets/product-translation.webp", import.meta.url));
 });

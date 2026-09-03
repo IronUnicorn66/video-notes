@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const execute = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const artifactName = 'video-notes-edge-1.0.31.zip';
+const artifactName = 'video-notes-edge-1.0.32.zip';
 const artifactPath = path.join(repoRoot, 'artifacts', artifactName);
 
 function readStoredZipEntries(archive) {
@@ -68,13 +68,13 @@ test('发布包包含 Edge 运行文件和本地化资源', async () => {
   assert.ok(files.every((name) => !name.startsWith('node_modules/')));
 
   const packagedManifest = JSON.parse(entries.get('manifest.json').toString('utf8'));
-  assert.equal(packagedManifest.version, '1.0.31');
+  assert.equal(packagedManifest.version, '1.0.32');
   assert.ok(!('key' in packagedManifest), 'Edge 商店包不得包含开发环境 key');
 });
 
 test('发布包生成可核验的 SHA-256 文件', async () => {
   const checksum = await readFile(`${artifactPath}.sha256`, 'utf8');
-  assert.match(checksum, /^[a-f0-9]{64}  video-notes-edge-1\.0\.31\.zip\n$/);
+  assert.match(checksum, /^[a-f0-9]{64}  video-notes-edge-1\.0\.32\.zip\n$/);
   const expected = checksum.slice(0, 64);
   const actual = createHash('sha256').update(await readFile(artifactPath)).digest('hex');
   assert.equal(actual, expected);

@@ -39,7 +39,7 @@ const enMessages = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.31");
+  assert.equal(manifest.version, "1.0.32");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
@@ -57,11 +57,16 @@ test("Edge 发布包声明中英文和公开主页", async () => {
   assert.equal(zhCnMessages.extensionName?.message, "视频笔记");
   assert.equal(
     zhCnMessages.extensionDescription?.message,
-    "在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。",
+    "在 YouTube 和哔哩哔哩课程旁阅读与本地翻译字幕，用文字或语音快速标记，并导出带截图和录音的 Markdown。",
   );
   assert.equal(zhCnMessages.actionTitle?.message, "打开视频笔记");
   assert.equal(enMessages.extensionName?.message, "Video Notes");
-  assert.match(enMessages.extensionDescription?.message ?? "", /YouTube and Bilibili/);
+  assert.equal(
+    enMessages.extensionDescription?.message,
+    "Read and locally translate YouTube and Bilibili transcripts, capture notes by text or voice, and export Markdown with screenshots.",
+  );
+  assert.ok(zhCnMessages.extensionDescription.message.length <= 132);
+  assert.ok(enMessages.extensionDescription.message.length <= 132);
   assert.equal(enMessages.actionTitle?.message, "Open Video Notes");
   const builtMessages = JSON.parse(
     await readFile(

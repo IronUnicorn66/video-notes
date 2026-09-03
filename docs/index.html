@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="视频笔记是一款适用于桌面 Microsoft Edge 与 Google Chrome 的扩展，帮助你在 YouTube 与哔哩哔哩课程中把重点、时点和上下文一起留下，并导出为 Markdown。">
+    <meta name="description" content="视频笔记是一款适用于桌面 Microsoft Edge 与 Google Chrome 的扩展，可在 YouTube 与哔哩哔哩课程旁阅读字幕、使用浏览器本地翻译、记录时点笔记，并导出为 Markdown。">
     <meta name="theme-color" content="#f5f2ea">
-    <title>视频笔记 · 看课时把重点和上下文一起留下</title>
+    <title>视频笔记 · 看视频、读字幕、做笔记</title>
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -20,7 +20,7 @@
         </a>
         <div class="nav-links">
           <a href="#how">怎样使用</a>
-          <a href="#value">能带来什么</a>
+          <a href="#value">当前功能</a>
           <a href="#install">安装</a>
           <a href="privacy/">隐私</a>
           <a href="en/?language=en" data-language="en" lang="en">English</a>
@@ -32,95 +32,88 @@
     <main id="main-content">
       <section id="problem" class="hero shell" aria-labelledby="problem-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span>Microsoft Edge / Chrome · 视频课程笔记</p>
-          <h1 id="problem-title">重点出现了，<br>上下文却很快过去。</h1>
-          <p class="lead">看视频时，我们常在继续播放和停下来记录之间做取舍。视频笔记把想法、时点、截图、前置字幕和语音放在视频旁，重点出现时就能连同语境一起留下。</p>
+          <p class="eyebrow"><span></span>Edge / Chrome · 字幕阅读、翻译与笔记</p>
+          <h1 id="problem-title">看视频，<br>读懂字幕，<br>记下重点。</h1>
+          <p class="lead">视频笔记把 YouTube 和哔哩哔哩课程的字幕阅读、浏览器本地翻译、时点笔记、截图与语音放到视频旁。看到重点当场记，看完导出 Markdown 继续整理。</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip">下载 1.0.31 测试版</a>
-            <a class="button button-secondary" href="#how">看看怎样使用</a>
+            <a class="button button-primary" href="https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj">从 Edge 商店安装</a>
+            <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip">下载 1.0.32 ZIP</a>
           </div>
           <div class="trust-row" aria-label="产品特点">
             <span>YouTube 与哔哩哔哩</span>
+            <span>字幕本地翻译</span>
             <span>数据留在本机</span>
-            <span>开源</span>
-            <span>无需账号</span>
+            <span>开源 · 无需账号</span>
           </div>
         </div>
 
-        <div class="product-stage" aria-label="视频笔记侧栏界面示意">
-          <div class="video-canvas">
-            <div class="video-grid" aria-hidden="true"></div>
-            <div class="video-copy">
-              <span>LESSON 04</span>
-              <strong>理解注意力的<br>另一种路径</strong>
-            </div>
-            <div class="caption">The useful idea starts from this constraint.<br>关键思路从这个约束开始。</div>
+        <figure class="product-figure">
+          <div class="screenshot-frame">
+            <img
+              class="product-screenshot"
+              src="assets/product-translation.webp"
+              width="2000"
+              height="1147"
+              decoding="async"
+              fetchpriority="high"
+              alt="视频笔记实际界面，左侧为 YouTube 课程，右侧显示完整英文字幕、本地中文译文和标记时间线"
+            >
           </div>
-          <aside class="note-panel">
-            <div class="panel-head">
-              <div>
-                <span>当前视频</span>
-                <strong>Attention alternatives</strong>
-              </div>
-              <span class="live-dot" aria-hidden="true"></span>
-            </div>
-            <div class="quick-note">
-              <span>快速标记</span>
-              <p>这里值得回看：约束如何改变模型结构</p>
-              <small>⌘ + Enter 保存 · Esc 取消</small>
-            </div>
-            <div class="timeline-label">
-              <strong>标记时间线</strong>
-              <span>倒序</span>
-            </div>
-            <article class="note-card">
-              <div class="note-time">00:19:57</div>
-              <p>把课程里的关键转折保留下来，之后再整理成自己的表达。</p>
-              <div class="context-block">
-                <strong>前置字幕 · 20 秒</strong>
-                <span>The useful idea starts from this constraint.</span>
-                <span>关键思路从这个约束开始。</span>
-              </div>
-            </article>
-          </aside>
-        </div>
+          <figcaption>实际产品界面 · 完整字幕、本地译文与笔记时间线并排显示</figcaption>
+        </figure>
       </section>
 
       <section id="how" class="section shell how-section" aria-labelledby="how-title">
         <div class="section-heading">
           <p class="section-label">怎样使用</p>
-          <h2 id="how-title">四步，把视频重点变成可整理的笔记</h2>
-          <p>侧栏一直留在视频旁。记录完成后接着播放，看完再统一整理。</p>
+          <h2 id="how-title">四步，把一段课程变成能继续使用的材料</h2>
+          <p>字幕、译文与笔记一直留在视频旁。看懂、记录、回看和导出不必来回切换窗口。</p>
         </div>
         <div class="steps">
           <article>
             <span class="step-number">01</span>
             <h3>安装到 Edge / Chrome</h3>
-            <p>下载测试版 ZIP，在扩展管理页加载解压后的目录。</p>
+            <p>优先从 Edge 商店安装；在 Chrome 使用或提前试用时，可下载 ZIP 并加载解压后的目录。</p>
           </article>
           <article>
             <span class="step-number">02</span>
-            <h3>打开视频侧栏</h3>
-            <p>进入 YouTube 或哔哩哔哩课程，点击工具栏中的“视频笔记”；普通网页不会启用课程侧栏。</p>
+            <h3>在课程旁打开侧栏</h3>
+            <p>进入 YouTube 或哔哩哔哩课程，点击工具栏中的“视频笔记”；YouTube 有可用字幕轨时还能读取完整字幕。</p>
           </article>
           <article>
             <span class="step-number">03</span>
-            <h3>看到重点就记</h3>
-            <p>输入时视频暂停，保存后续播；按需带上字幕、截图或语音。</p>
+            <h3>读原文，也读译文</h3>
+            <p>自动识别字幕语言，用浏览器本地语言包翻译完整段落，并切换原文、译文或双语对照。</p>
           </article>
           <article>
             <span class="step-number">04</span>
-            <h3>导出继续整理</h3>
-            <p>一键导出 Markdown ZIP，在自己的笔记工具中继续编辑。</p>
+            <h3>记下重点再导出</h3>
+            <p>输入时视频暂停、保存后续播；笔记可带时点、字幕、译文、截图或语音，最后导出 Markdown ZIP。</p>
           </article>
+        </div>
+
+        <div class="translation-callout" aria-label="浏览器本地字幕翻译">
+          <div>
+            <p class="section-label">浏览器本地翻译</p>
+            <h3>完整字幕可以直接双语对照</h3>
+            <p>扩展使用 Edge / Chrome 内置 Translator API，字幕内容不会发送给开发者或第三方翻译服务。源语言自动识别，目标语言可选简体中文、英语、日语、韩语或西班牙语。</p>
+          </div>
+          <ul class="translation-points">
+            <li><strong>下载后可离线</strong><span>提前下载当前语言对，断网后仍能翻译。</span></li>
+            <li><strong>三种阅读方式</strong><span>只看原文、只看译文，或上下双语对照。</span></li>
+            <li><strong>回到上次位置</strong><span>字幕、已完成译文和阅读进度按视频缓存在本机。</span></li>
+          </ul>
         </div>
 
         <div id="install" class="install-bar">
           <div class="install-copy">
-            <p class="section-label">安装测试版</p>
-            <h3>下载 ZIP，三步加载到 Edge / Chrome</h3>
-            <p>Microsoft Edge Add-ons 审核期间，可以先安装同一份 1.0.31 发布包。</p>
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip">下载视频笔记 1.0.31</a>
+            <p class="section-label">安装</p>
+            <h3>从 Edge 商店安装，或手动加载到 Edge / Chrome</h3>
+            <p>Edge 商店已公开上架；1.0.32 更新通过审核后会自动更新。需要在 Chrome 使用或提前试用时，可下载同一份 GitHub Release 发布包。</p>
+            <div class="install-actions">
+              <a class="button button-primary" href="https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj">打开 Edge 商店</a>
+              <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip">下载 1.0.32 ZIP</a>
+            </div>
           </div>
           <ol class="install-steps">
             <li><span>1</span><p><strong>下载并解压 ZIP</strong><small>保留到一个固定目录</small></p></li>
@@ -133,30 +126,30 @@
       <section id="value" class="section value-section" aria-labelledby="value-title">
         <div class="shell">
           <div class="section-heading section-heading-light">
-            <p class="section-label">能带来什么</p>
-            <h2 id="value-title">看完一门课，带走一份能继续使用的材料</h2>
+            <p class="section-label">当前功能</p>
+            <h2 id="value-title">从阅读到记录，再到整理，一条流程完成</h2>
           </div>
           <div class="value-grid">
             <article class="value-card">
-              <span class="value-icon">▶</span>
-              <h3>跟得上课程节奏</h3>
-              <p>输入时自动暂停，保存后接着播放。重点当场记下，观看节奏仍然连贯。</p>
+              <span class="value-icon">≡</span>
+              <h3>完整字幕跟着进度读</h3>
+              <p>YouTube 完整字幕可按完整句合并阅读、点击时间跳转、定位当前播放段落并调整字号；字幕列表和阅读位置会在本机恢复。</p>
             </article>
             <article class="value-card">
               <span class="value-icon">⌁</span>
-              <h3>每条笔记都找得到来处</h3>
-              <p>时点、按完整句整理的标记前字幕、匹配的本地译文、播放器截图和语音跟着笔记保存；YouTube 完整字幕和阅读位置也会在本机恢复。</p>
+              <h3>每条笔记保留完整来处</h3>
+              <p>时点、按完整句整理的标记前字幕、匹配的本地译文、播放器截图和原始语音都能跟着笔记保存；语音还可用 Whisper 在本机转写。</p>
             </article>
             <article class="value-card">
-              <span class="value-icon">⇩</span>
-              <h3>看完就能继续整理</h3>
-              <p>导出 Markdown、图片和原始录音，在 Obsidian 等现有工具中继续组织；内容与转写留在浏览器本机。</p>
+              <span class="value-icon">↶</span>
+              <h3>时间线可改，也能撤回</h3>
+              <p>正序或倒序查看，编辑、删除、清空、撤销与反撤销；调整侧栏和笔记字号后，一键导出 Markdown、图片与原始录音。</p>
             </article>
           </div>
           <div class="value-cta">
             <div>
               <h3>支持 YouTube 与哔哩哔哩课程视频</h3>
-              <p>支持 YouTube 普通视频页、哔哩哔哩 BV 视频页与分 P；YouTube 会在本机缓存完整字幕、完成的匹配译文和阅读位置。哔哩哔哩以播放器已经渲染的字幕为准，部分新版页面仍可能无法取得原生轨回退。</p>
+              <p>YouTube 普通视频页支持完整字幕阅读与本地全文翻译；哔哩哔哩支持 BV 视频与分 P，优先读取播放器已显示的原生或双语字幕，并尽力读取当前分 P 的原生字幕轨。部分新版 B 站页面仍可能无法取得原生轨回退。</p>
             </div>
             <div class="value-actions">
               <a class="button button-light" href="privacy/">查看隐私政策</a>

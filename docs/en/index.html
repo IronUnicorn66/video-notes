@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Video Notes is a desktop Microsoft Edge and Google Chrome extension that keeps key ideas, timestamps, and context together while you watch YouTube and Bilibili lessons, then exports everything as Markdown.">
+    <meta name="description" content="Video Notes is a desktop Microsoft Edge and Google Chrome extension for reading transcripts, translating locally in the browser, capturing timestamped notes, and exporting Markdown beside YouTube and Bilibili lessons.">
     <meta name="theme-color" content="#f5f2ea">
-    <title>Video Notes · Keep the key idea and its context</title>
+    <title>Video Notes · Watch, translate, and take notes</title>
     <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../styles.css">
   </head>
@@ -20,7 +20,7 @@
         </a>
         <div class="nav-links">
           <a href="#how">How it works</a>
-          <a href="#value">Benefits</a>
+          <a href="#value">Features</a>
           <a href="#install">Install</a>
           <a href="privacy/">Privacy</a>
           <a href="../?language=zh_CN" data-language="zh_CN" lang="zh-CN">简体中文</a>
@@ -32,63 +32,88 @@
     <main id="main-content">
       <section id="problem" class="hero shell" aria-labelledby="problem-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span>Microsoft Edge / Chrome · Notes for video lessons</p>
-          <h1 id="problem-title">The key idea moves on before your notes catch up.</h1>
-          <p class="lead">Watching and taking useful notes pull your attention in different directions. Video Notes keeps your thoughts, timestamps, screenshots, lead-in subtitles, and voice beside the video, so the context stays with every idea.</p>
+          <p class="eyebrow"><span></span>Edge / Chrome · Transcripts, translation, and notes</p>
+          <h1 id="problem-title">Watch, translate, and take notes—all in one side panel.</h1>
+          <p class="lead">Video Notes keeps transcript reading, on-device browser translation, timestamped notes, screenshots, and voice beside your YouTube or Bilibili lesson. Capture an idea in place, then export Markdown when you are ready to organize it.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip">Download the 1.0.31 preview</a>
-            <a class="button button-secondary" href="#how">See how it works</a>
+            <a class="button button-primary" href="https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj">Install for Edge</a>
+            <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip">Download 1.0.32 ZIP</a>
           </div>
           <div class="trust-row" aria-label="Product principles">
             <span>YouTube and Bilibili</span>
+            <span>Local transcript translation</span>
             <span>Data stays local</span>
-            <span>Open source</span>
-            <span>No account</span>
+            <span>Open source · No account</span>
           </div>
         </div>
 
-        <img
-          class="product-screenshot"
-          src="../assets/screenshot-1-note-en.png"
-          alt="Video Notes side panel with a quick note and a timestamped timeline"
-        >
+        <figure class="product-figure">
+          <div class="screenshot-frame">
+            <img
+              class="product-screenshot"
+              src="../assets/product-translation.webp"
+              width="2000"
+              height="1147"
+              decoding="async"
+              fetchpriority="high"
+              alt="The real Video Notes interface, with a YouTube lesson on the left and full English transcripts, local Chinese translations, and the note timeline on the right"
+            >
+          </div>
+          <figcaption>Real product view · Full transcript, local translation, and note timeline side by side</figcaption>
+        </figure>
       </section>
 
       <section id="how" class="section shell how-section" aria-labelledby="how-title">
         <div class="section-heading">
           <p class="section-label">How it works</p>
-          <h2 id="how-title">Four steps from a video moment to a useful note</h2>
-          <p>The side panel stays next to the lesson. Capture the moment, keep watching, and organize everything when you finish.</p>
+          <h2 id="how-title">Four steps from a lesson to material you can keep using</h2>
+          <p>Transcripts, translations, and notes stay beside the video, so reading, capturing, revisiting, and exporting do not require constant window switching.</p>
         </div>
         <div class="steps">
           <article>
             <span class="step-number">01</span>
             <h3>Install it in Edge / Chrome</h3>
-            <p>Download the preview ZIP and load its extracted folder from the extensions page.</p>
+            <p>Install from Microsoft Edge Add-ons, or download the ZIP and load its extracted folder to use Chrome or try the update sooner.</p>
           </article>
           <article>
             <span class="step-number">02</span>
-            <h3>Open the side panel</h3>
-            <p>Start a YouTube or Bilibili lesson, then select Video Notes in the toolbar. Course notes stay disabled on ordinary pages.</p>
+            <h3>Open it beside the lesson</h3>
+            <p>Start a YouTube or Bilibili lesson and select Video Notes in the toolbar. YouTube transcripts appear when a compatible native track is available.</p>
           </article>
           <article>
             <span class="step-number">03</span>
-            <h3>Capture the moment</h3>
-            <p>The video pauses while you type and resumes after saving. Add subtitles, a screenshot, or voice when useful.</p>
+            <h3>Read the source and translation</h3>
+            <p>Detect the transcript language, translate complete paragraphs with a local browser language pack, and switch between source, translation, or both.</p>
           </article>
           <article>
             <span class="step-number">04</span>
-            <h3>Export and refine</h3>
-            <p>Export a Markdown ZIP and continue working in the notes app you already use.</p>
+            <h3>Capture, then export</h3>
+            <p>Playback pauses while you type and resumes after saving. Notes can include time, subtitles, translation, a screenshot, or voice before export.</p>
           </article>
+        </div>
+
+        <div class="translation-callout" aria-label="Local browser transcript translation">
+          <div>
+            <p class="section-label">Local browser translation</p>
+            <h3>Read the full transcript bilingually</h3>
+            <p>Video Notes uses the built-in Edge / Chrome Translator API, so transcript content is not sent to the developer or a third-party translation service. It detects the source language and can target Simplified Chinese, English, Japanese, Korean, or Spanish.</p>
+          </div>
+          <ul class="translation-points">
+            <li><strong>Works offline after download</strong><span>Pre-download the current language pair and keep translating without a connection.</span></li>
+            <li><strong>Three reading modes</strong><span>Show only the source, only the translation, or a bilingual comparison.</span></li>
+            <li><strong>Resume where you left off</strong><span>Transcripts, completed translations, and reading positions are cached locally per video.</span></li>
+          </ul>
         </div>
 
         <div id="install" class="install-bar">
           <div class="install-copy">
-            <p class="section-label">Install the preview</p>
-            <h3>Download the ZIP and load it in Edge / Chrome</h3>
-            <p>While the Microsoft Edge Add-ons review is in progress, you can install the same 1.0.31 release package manually.</p>
-            <a class="button button-primary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip">Download Video Notes 1.0.31</a>
+            <p class="section-label">Install</p>
+            <h3>Install from Microsoft Edge or load it manually in Edge / Chrome</h3>
+            <p>The extension is already public in Microsoft Edge Add-ons and will update after the 1.0.32 review. To use it in Chrome or try 1.0.32 sooner, download the matching GitHub Release package.</p>
+            <div class="install-actions">
+              <a class="button button-primary" href="https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj">Open Edge Add-ons</a>
+              <a class="button button-secondary" href="https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip">Download 1.0.32 ZIP</a>
+            </div>
           </div>
           <ol class="install-steps">
             <li><span>1</span><p><strong>Download and extract the ZIP</strong><small>Keep it in a permanent folder</small></p></li>
@@ -101,30 +126,30 @@
       <section id="value" class="section value-section" aria-labelledby="value-title">
         <div class="shell">
           <div class="section-heading section-heading-light">
-            <p class="section-label">Benefits</p>
-            <h2 id="value-title">Finish the lesson with material you can keep using</h2>
+            <p class="section-label">Current features</p>
+            <h2 id="value-title">One flow from reading to capture and organization</h2>
           </div>
           <div class="value-grid">
             <article class="value-card">
-              <span class="value-icon">▶</span>
-              <h3>Stay with the lesson</h3>
-              <p>Playback pauses while you type and resumes after saving. Capture the idea in place without losing your viewing rhythm.</p>
+              <span class="value-icon">≡</span>
+              <h3>Read the full transcript with playback</h3>
+              <p>Group YouTube transcripts into complete sentences, jump by timestamp, locate the current passage, adjust text size, and restore your reading position locally.</p>
             </article>
             <article class="value-card">
               <span class="value-icon">⌁</span>
-              <h3>Keep the context</h3>
-              <p>Each note can carry its timestamp, sentence-aware recent subtitles, a matching local translation, a player screenshot, and voice. YouTube full transcripts and reading positions also resume locally.</p>
+              <h3>Keep every note traceable</h3>
+              <p>Save a timestamp, sentence-aware lead-in subtitles, matching local translation, player screenshot, and original voice with a note. Optional Whisper models transcribe voice locally.</p>
             </article>
             <article class="value-card">
-              <span class="value-icon">⇩</span>
-              <h3>Continue in your own tools</h3>
-              <p>Export Markdown, images, and original recordings for apps such as Obsidian. Your content and transcription stay in the browser.</p>
+              <span class="value-icon">↶</span>
+              <h3>Edit the timeline and undo changes</h3>
+              <p>Sort, edit, delete, clear, undo, and redo. Adjust the panel and note text size, then export Markdown, images, and original recordings in one ZIP.</p>
             </article>
           </div>
           <div class="value-cta">
             <div>
               <h3>Built for YouTube and Bilibili lessons</h3>
-              <p>Supports standard YouTube videos and Bilibili BV videos, including multi-part lessons. YouTube transcripts, completed matching translations, and reading positions are cached locally. Bilibili relies on subtitles rendered by the player; native-track fallback remains unavailable on some newer pages.</p>
+              <p>Standard YouTube videos support full-transcript reading and local translation. Bilibili BV videos and multi-part lessons use native or bilingual subtitles already shown by the player, with a best-effort native-track fallback that may still be unavailable on some newer pages.</p>
             </div>
             <div class="value-actions">
               <a class="button button-light" href="privacy/">Read the privacy policy</a>

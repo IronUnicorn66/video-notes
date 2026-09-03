@@ -1,9 +1,9 @@
 # 视频笔记 Edge 商店上架资料
 
 更新日期：2026-09-03
-版本：1.0.31
+版本：1.0.32
 
-本文件保存 Microsoft Partner Center 首次上架时可直接填写的内容。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
+本文件保存 Microsoft Partner Center 已发布产品的 1.0.32 更新资料。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
 
 ## 1. 基本信息
 
@@ -19,7 +19,9 @@
 - Edge Product ID：`ce0862d8-274e-4f87-9cfb-bf523f3f792a`
 - Edge Store ID：`0RDCKGDTZD56`
 - Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
-- 首次提交：2026-07-28，状态为 `In review`
+- 商店页面：https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj
+- 当前公开版本：1.0.5，2026-07-30 发布
+- 本次更新版本：1.0.32，待提交审核
 
 ## 2. 商店名称与说明
 
@@ -29,7 +31,7 @@
 
 ### 简短说明
 
-在 YouTube 和哔哩哔哩课程中用文字或按住说话快速标记，导出带截图、字幕和录音的 Markdown。
+在 YouTube 和哔哩哔哩课程旁阅读与本地翻译字幕，用文字或语音快速标记，并导出带截图和录音的 Markdown。
 
 ### 完整说明
 
@@ -55,7 +57,7 @@
 
 ### 搜索词
 
-视频笔记、网课、字幕、截图、语音转写、Markdown、学习工具
+视频笔记、网课、完整字幕、本地翻译、截图、语音转写、Markdown、学习工具
 
 ## 3. 权限理由
 
@@ -162,7 +164,7 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 ## 8. 发布包检查
 
 - ZIP 根目录直接包含 `manifest.json`。
-- Manifest V3 版本为 1.0.31，默认语言为 `zh_CN`。
+- Manifest V3 版本为 1.0.32，默认语言为 `zh_CN`。
 - ZIP 包含 `_locales/zh_CN/messages.json` 和 `_locales/en/messages.json`。
 - ZIP 不包含测试、开发文档、商店素材、Git 元数据或模型权重。
 - 包内没有远程 JavaScript 或动态代码加载器。

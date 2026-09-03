@@ -6,9 +6,9 @@
 
 <h1 align="center">视频笔记</h1>
 
-<p align="center">看课程时快速留下时点、截图、字幕和自己的想法。</p>
+<p align="center">在课程旁阅读与本地翻译字幕，快速留下时点、截图、语音和自己的想法。</p>
 
-视频笔记是一款面向桌面版 Microsoft Edge 和 Google Chrome 的开源扩展。它在 YouTube 和哔哩哔哩视频旁提供持续可见的笔记侧栏，让文字记录、播放器截图、标记前字幕、本地语音转写和 Markdown 导出保持在同一条时间线上。
+视频笔记是一款面向桌面版 Microsoft Edge 和 Google Chrome 的开源扩展。它在 YouTube 和哔哩哔哩视频旁提供持续可见的侧栏，让完整字幕阅读、浏览器本地翻译、文字记录、播放器截图、本地语音转写和 Markdown 导出保持在同一条流程里。
 
 ![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
 
@@ -31,12 +31,12 @@
 
 ### Edge 商店
 
-1.0.31 正在准备 Microsoft Edge Add-ons 首次审核。商店页面开放后，官网会把主安装入口切换为商店安装。
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.5。1.0.32 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.31 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip.sha256)
+[下载视频笔记 1.0.32 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -78,8 +78,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.31.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.31.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.32.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.32.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。

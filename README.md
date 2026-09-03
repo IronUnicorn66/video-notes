@@ -6,9 +6,9 @@
 
 <h1 align="center">Video Notes</h1>
 
-<p align="center">Capture timestamps, screenshots, subtitles, and your own thoughts while watching a lesson.</p>
+<p align="center">Read and locally translate transcripts while capturing timestamps, screenshots, voice, and your own thoughts beside a lesson.</p>
 
-Video Notes is an open-source extension for desktop Microsoft Edge and Google Chrome. It keeps a note panel visible beside YouTube and Bilibili videos, placing typed notes, player screenshots, lead-in subtitles, local voice transcription, and Markdown export on one timeline.
+Video Notes is an open-source extension for desktop Microsoft Edge and Google Chrome. It keeps a side panel visible beside YouTube and Bilibili videos, putting full-transcript reading, local browser translation, typed notes, player screenshots, local voice transcription, and Markdown export in one flow.
 
 ![Video Notes side panel](store-assets/edge/screenshot-1-note-en.png)
 
@@ -31,12 +31,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-Version 1.0.31 is being prepared for the first Microsoft Edge Add-ons review. Once the listing is available, the website will point its primary install action to the store.
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.5. Version 1.0.32 is being prepared for an update review; until it is approved, you can install the matching GitHub Release package.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.31 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.31/video-notes-edge-1.0.31.zip.sha256)
+[Download Video Notes 1.0.32 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -78,8 +78,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.31.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.31.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.32.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.32.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
