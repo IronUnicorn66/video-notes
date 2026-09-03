@@ -38,6 +38,20 @@ test("播放器时间定位到当前字幕段或相邻边界段", () => {
   assert.equal(transcriptView.transcriptGroupIndexAtTime(groups, Number.NaN), -1);
 });
 
+test("完整字幕定位在不同侧栏缩放下都一次跳到目标中心", () => {
+  const expected = 3740;
+  for (const scale of [0.75, 1, 2]) {
+    assert.equal(transcriptView.centeredTranscriptScrollTop({
+      currentScrollTop: 1000,
+      listTop: 100 * scale,
+      listHeight: 600 * scale,
+      cueTop: 3100 * scale,
+      cueHeight: 80 * scale,
+      coordinateScale: scale,
+    }), expected);
+  }
+});
+
 test("完整字幕时间范围省略不足一小时的小时前导零", () => {
   assert.equal(
     transcriptView.formatTranscriptTimeRange({ startMs: 5000, endMs: 4175000 }),

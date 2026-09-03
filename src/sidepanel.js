@@ -5,6 +5,13 @@ import {
   initializeSidepanel,
 } from "./core/sidepanel-note-sort.js";
 import { createSidepanelZoomBinding } from "./core/sidepanel-zoom.js";
+import {
+  NOTE_FONT_SIZE,
+  NOTE_FONT_SIZE_MAX,
+  NOTE_FONT_SIZE_MIN,
+  normalizeNoteFontSize,
+  noteFontSizeAfterStep,
+} from "./core/note-font-size.js";
 import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
@@ -17,6 +24,7 @@ import {
   createSidePanelRefreshController,
   isSidePanelRefreshMessage,
 } from "./core/sidepanel-scope.js";
+import { createSidePanelViewPositionController } from "./core/sidepanel-view-position.js";
 import {
   createSidePanelInlineEditController,
   createSidePanelRefreshRunner,
@@ -24,6 +32,7 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  centeredTranscriptScrollTop,
   formatTranscriptProgress,
   formatTranscriptTimeRange,
   groupTranscriptCues,
@@ -51,6 +60,11 @@ import {
   createFullTranscriptDisplayBinding,
   transcriptGroupsFullyTranslated,
 } from "./core/full-transcript-display.js";
+import {
+  cachedFullTranscriptTranslations,
+  createFullTranscriptCacheLoader,
+  fullTranscriptCacheWithTranslations,
+} from "./core/full-transcript-cache.js";
 import {
   getBrowserTranslationTargetLanguage,
   prepareBrowserTranslationLanguagePack,
@@ -99,9 +113,12 @@ const elements = {
   fullTranscriptFontSizeIncrease: document.querySelector("#full-transcript-font-size-increase"),
   fullTranscriptList: document.querySelector("#full-transcript-list"),
   fullTranscriptEmpty: document.querySelector("#full-transcript-empty"),
+  timeline: document.querySelector(".timeline"),
   noteList: document.querySelector("#note-list"),
   emptyNotes: document.querySelector("#empty-notes"),
   noteSortButtons: document.querySelectorAll("[data-note-sort-order]"),
+  noteFontSizeDecrease: document.querySelector("#note-font-size-decrease"),
+  noteFontSizeIncrease: document.querySelector("#note-font-size-increase"),
   undoButton: document.querySelector("#undo-button"),
   redoButton: document.querySelector("#redo-button"),
   clearButton: document.querySelector("#clear-button"),
@@ -135,6 +152,13 @@ const elements = {
 
 const repository = new VideoNotesRepository();
 const assetUrls = createAssetUrlRegistry();
+const fullTranscriptCacheLoader = createFullTranscriptCacheLoader({
+  repository,
+  fetchTranscript: async () => (
+    await request({ type: "GET_FULL_YOUTUBE_TRANSCRIPT" })
+  ).transcript,
+  onCacheError: (error) => console.warn("读写完整字幕缓存失败", error),
+});
 
 let activeContext = null;
 let currentDraft = null;
@@ -167,6 +191,7 @@ let historyConfirmationController = null;
 let historyOperationController = null;
 let subtitleSettings = normalizeSubtitleSettings();
 let fullTranscript = null;
+let fullTranscriptCache = null;
 let fullTranscriptContextKey = "";
 let fullTranscriptGeneration = 0;
 let fullTranscriptLoading = false;
@@ -174,6 +199,7 @@ let fullTranscriptLocating = false;
 let fullTranscriptLocatedCueTimer = null;
 let fullTranscriptGroupSize = TRANSCRIPT_CUE_GROUP_SIZE;
 let fullTranscriptFontSize = TRANSCRIPT_FONT_SIZE;
+let noteFontSize = NOTE_FONT_SIZE;
 let fullTranscriptTranslationRunning = false;
 let fullTranscriptTranslationController = null;
 let browserTranscriptTranslationSession = null;
@@ -217,11 +243,24 @@ const sidepanelZoomBinding = createSidepanelZoomBinding({
   showToast,
 });
 
+const sidePanelViewPosition = createSidePanelViewPositionController({
+  storage: chrome.storage.local,
+  readPagePosition: () => window.scrollY,
+  restorePagePosition: (position) => window.scrollTo(0, position),
+  readTranscriptPosition: () => elements.fullTranscriptList.scrollTop,
+  restoreTranscriptPosition: (position) => {
+    elements.fullTranscriptList.scrollTop = position;
+  },
+  getTranscriptGroupSize: () => fullTranscriptGroupSize,
+  onError: (error) => console.warn("读写侧栏位置失败", error),
+});
+
 const sidePanelRefresh = createSidePanelRefreshController(() => {
   void refreshNow();
 }, {
   onContextEvent(message) {
     if (["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"].includes(message.type)) {
+      sidePanelViewPosition.prepareContentReload();
       historyContextToken += 1;
       closeStaleHistoryConfirmation();
       resetFullTranscript();
@@ -471,6 +510,7 @@ function resetFullTranscript({ hide = false } = {}) {
   cancelBrowserTranslationLanguagePackDownload();
   fullTranscriptGeneration += 1;
   fullTranscript = null;
+  fullTranscriptCache = null;
   fullTranscriptTranslations.clear();
   fullTranscriptLoading = false;
   fullTranscriptLocating = false;
@@ -522,13 +562,18 @@ function showLocatedFullTranscriptCue(index) {
   cue.setAttribute("aria-current", "true");
   const listBounds = elements.fullTranscriptList.getBoundingClientRect();
   const cueBounds = cue.getBoundingClientRect();
-  elements.fullTranscriptList.scrollTo({
-    top: elements.fullTranscriptList.scrollTop
-      + cueBounds.top
-      - listBounds.top
-      - ((listBounds.height - cueBounds.height) / 2),
-    behavior: "smooth",
+  const coordinateScale = elements.fullTranscriptList.clientHeight > 0
+    ? listBounds.height / elements.fullTranscriptList.clientHeight
+    : 1;
+  elements.fullTranscriptList.scrollTop = centeredTranscriptScrollTop({
+    currentScrollTop: elements.fullTranscriptList.scrollTop,
+    listTop: listBounds.top,
+    listHeight: listBounds.height,
+    cueTop: cueBounds.top,
+    cueHeight: cueBounds.height,
+    coordinateScale,
   });
+  sidePanelViewPosition.scheduleSave();
   fullTranscriptLocatedCueTimer = setTimeout(() => {
     cue.classList.remove("full-transcript-cue-located");
     cue.removeAttribute("aria-current");
@@ -581,6 +626,32 @@ function clearFullTranscriptTranslations() {
   fullTranscriptTranslations.clear();
 }
 
+function restoreFullTranscriptTranslations() {
+  clearFullTranscriptTranslations();
+  for (const [id, translation] of cachedFullTranscriptTranslations(fullTranscriptCache, {
+    targetLanguage: browserTranslationLanguagePackTarget,
+    groupSize: fullTranscriptGroupSize,
+  })) {
+    fullTranscriptTranslations.set(id, translation);
+  }
+}
+
+async function persistFullTranscriptTranslations(targetLanguage, groupSize) {
+  const cache = fullTranscriptCache;
+  const nextCache = fullTranscriptCacheWithTranslations(cache, {
+    targetLanguage,
+    groupSize,
+    translations: fullTranscriptTranslations,
+  });
+  if (!nextCache) return;
+  try {
+    await repository.putTranscriptCache(nextCache);
+    if (fullTranscriptCache === cache) fullTranscriptCache = nextCache;
+  } catch (error) {
+    console.warn("保存完整字幕译文缓存失败", error);
+  }
+}
+
 function fullTranscriptLoadedStatus() {
   if (!fullTranscript) return t("fullTranscriptWaiting");
   const groups = currentFullTranscriptGroups();
@@ -613,6 +684,26 @@ function syncFullTranscriptGroupButtons() {
   for (const button of elements.fullTranscriptGroupButtons) {
     button.checked = Number(button.value) === fullTranscriptGroupSize;
     button.disabled = fullTranscriptTranslationRunning;
+  }
+}
+
+function applyNoteFontSize(value) {
+  noteFontSize = normalizeNoteFontSize(value);
+  elements.timeline.style.setProperty("--note-font-size", `${noteFontSize}px`);
+  elements.noteFontSizeDecrease.disabled = noteFontSize <= NOTE_FONT_SIZE_MIN;
+  elements.noteFontSizeIncrease.disabled = noteFontSize >= NOTE_FONT_SIZE_MAX;
+}
+
+async function changeNoteFontSize(direction) {
+  const previous = noteFontSize;
+  const next = noteFontSizeAfterStep(previous, direction);
+  if (next === previous) return;
+  applyNoteFontSize(next);
+  try {
+    await chrome.storage.local.set({ noteFontSize });
+  } catch (error) {
+    applyNoteFontSize(previous);
+    showToast(error.message);
   }
 }
 
@@ -662,6 +753,7 @@ function syncFullTranscriptTranslateButton() {
 
 function renderFullTranscript() {
   const visibleCues = currentFullTranscriptGroups();
+  const scrollPosition = elements.fullTranscriptList.scrollTop;
   fullTranscriptDisplayBinding.setAvailable(
     !fullTranscriptTranslationRunning && transcriptGroupsFullyTranslated(visibleCues),
   );
@@ -698,6 +790,7 @@ function renderFullTranscript() {
     }
     elements.fullTranscriptList.append(item);
   }
+  elements.fullTranscriptList.scrollTop = scrollPosition;
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptEmpty.hidden = visibleCues.length > 0;
 }
@@ -1109,6 +1202,7 @@ async function translateFullTranscriptInBrowser() {
         renderFullTranscript();
       },
     });
+    await persistFullTranscriptTranslations(targetLanguage, groupSize);
     showToast(t("fullTranscriptTranslationComplete"));
   } catch (error) {
     if (!controller.signal.aborted) {
@@ -1159,7 +1253,7 @@ async function translateFullTranscript() {
   await translateFullTranscriptInBrowser();
 }
 
-async function loadFullTranscript() {
+async function loadFullTranscript({ force = false } = {}) {
   if (fullTranscriptLoading || !activeContext || activeContext.platform !== "youtube") return;
   cancelFullTranscriptTranslation();
   fullTranscriptLocating = false;
@@ -1169,6 +1263,7 @@ async function loadFullTranscript() {
   fullTranscriptContextKey = contextKey;
   fullTranscriptLoading = true;
   fullTranscript = null;
+  fullTranscriptCache = null;
   fullTranscriptTranslations.clear();
   syncLocalTranscriptNoteSource({ clear: true });
   setBrowserTranscriptTranslationState(globalThis.Translator ? "waiting" : "unsupported");
@@ -1183,7 +1278,11 @@ async function loadFullTranscript() {
   elements.fullTranscriptEmpty.hidden = false;
 
   try {
-    const response = await request({ type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
+    const response = await fullTranscriptCacheLoader.load({
+      sessionId: activeContext.sessionId,
+      videoId: activeContext.videoId,
+      force,
+    });
     if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
     if (!response.transcript?.ok || response.transcript.cues.length === 0) {
       const messageKey = transcriptFailureMessageKey(response.transcript);
@@ -1193,6 +1292,8 @@ async function loadFullTranscript() {
       return;
     }
     fullTranscript = response.transcript;
+    fullTranscriptCache = response.cache;
+    restoreFullTranscriptTranslations();
     syncLocalTranscriptNoteSource();
     renderBrowserTranslationLanguagePackSettings();
     void refreshBrowserTranslationLanguagePackAvailability();
@@ -1200,6 +1301,7 @@ async function loadFullTranscript() {
     syncFullTranscriptTranslateButton();
     elements.fullTranscriptRetry.disabled = false;
     renderFullTranscript();
+    void sidePanelViewPosition.restoreTranscript();
     void refreshBrowserTranscriptTranslationAvailability();
   } catch (error) {
     if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
@@ -1211,6 +1313,7 @@ async function loadFullTranscript() {
       fullTranscriptLoading = false;
       syncFullTranscriptTranslateButton();
       syncFullTranscriptLocateButton();
+      void sidePanelViewPosition.restorePage();
     }
   }
 }
@@ -1586,17 +1689,18 @@ refreshRunner = createSidePanelRefreshRunner({
   },
   apply({ nextWhisperStatus, response }) {
     whisperStatus = nextWhisperStatus;
+    if (!response.context) throw new Error(t("openSupportedVideo"));
     if (
       activeContext?.sessionId !== response.context?.sessionId
       || activeContextTabId !== sidePanelRefresh.tabId
     ) {
       historyContextToken += 1;
     }
+    void sidePanelViewPosition.activate(response.context.sessionId);
     activeContext = response.context;
     activeContextTabId = sidePanelRefresh.tabId;
     canUndo = response.history.canUndo;
     canRedo = response.history.canRedo;
-    if (!activeContext) throw new Error(t("openSupportedVideo"));
     elements.videoTitle.textContent = activeContext.title;
     elements.videoUrl.href = activeContext.canonicalUrl;
     elements.videoUrl.hidden = false;
@@ -1604,9 +1708,13 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
     syncFullTranscriptContext();
+    void sidePanelViewPosition.restorePage({
+      deferIfClamped: activeContext.platform === "youtube",
+    });
   },
   applyError(error) {
     if (activeContext || activeContextTabId !== null) historyContextToken += 1;
+    sidePanelViewPosition.deactivate();
     activeContext = null;
     activeContextTabId = null;
     canUndo = false;
@@ -1866,7 +1974,7 @@ elements.fullTranscriptLocate.addEventListener("click", () => {
   void locateFullTranscriptAtCurrentPosition();
 });
 elements.fullTranscriptRetry.addEventListener("click", () => {
-  void loadFullTranscript();
+  void loadFullTranscript({ force: true });
 });
 elements.fullTranscriptFontSizeDecrease.addEventListener("click", () => {
   void changeFullTranscriptFontSize(-1);
@@ -1874,6 +1982,15 @@ elements.fullTranscriptFontSizeDecrease.addEventListener("click", () => {
 elements.fullTranscriptFontSizeIncrease.addEventListener("click", () => {
   void changeFullTranscriptFontSize(1);
 });
+elements.noteFontSizeDecrease.addEventListener("click", () => {
+  void changeNoteFontSize(-1);
+});
+elements.noteFontSizeIncrease.addEventListener("click", () => {
+  void changeNoteFontSize(1);
+});
+elements.fullTranscriptList.addEventListener("scroll", () => {
+  sidePanelViewPosition.scheduleSave();
+}, { passive: true });
 elements.fullTranscriptList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-seconds]");
   if (!button) return;
@@ -1888,6 +2005,10 @@ elements.fullTranscriptList.addEventListener("click", (event) => {
     showToast(error.message);
   });
 });
+
+window.addEventListener("scroll", () => {
+  sidePanelViewPosition.scheduleSave();
+}, { passive: true });
 
 elements.voiceButton.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -1960,6 +2081,7 @@ elements.browserTranslationLanguagePackSelect.addEventListener("change", async (
   cancelBrowserTranslationLanguagePackDownload();
   cancelFullTranscriptTranslation();
   clearFullTranscriptTranslations();
+  restoreFullTranscriptTranslations();
   syncLocalTranscriptNoteSource();
   setBrowserTranscriptTranslationState("waiting");
   renderBrowserTranslationLanguagePackSettings();
@@ -1973,7 +2095,11 @@ elements.browserTranslationLanguagePackSelect.addEventListener("change", async (
     void refreshBrowserTranscriptTranslationAvailability();
   } catch (error) {
     browserTranslationLanguagePackTarget = previous;
+    restoreFullTranscriptTranslations();
+    syncLocalTranscriptNoteSource();
     renderBrowserTranslationLanguagePackSettings();
+    renderFullTranscript();
+    elements.fullTranscriptStatus.textContent = fullTranscriptLoadedStatus();
     void refreshBrowserTranslationLanguagePackAvailability();
     void refreshBrowserTranscriptTranslationAvailability();
     showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
@@ -1992,16 +2118,22 @@ for (const button of elements.fullTranscriptGroupButtons) {
       return;
     }
     const previous = fullTranscriptGroupSize;
+    sidePanelViewPosition.prepareTranscriptGroupChange();
     fullTranscriptGroupSize = normalizeTranscriptGroupSize(button.value);
+    restoreFullTranscriptTranslations();
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
+    void sidePanelViewPosition.restoreTranscript();
     syncLocalTranscriptNoteSource();
     try {
       await chrome.storage.local.set({ fullTranscriptGroupSize });
     } catch (error) {
+      sidePanelViewPosition.prepareTranscriptGroupChange();
       fullTranscriptGroupSize = previous;
+      restoreFullTranscriptTranslations();
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      void sidePanelViewPosition.restoreTranscript();
       syncLocalTranscriptNoteSource();
       showToast(error.message);
     }
@@ -2159,7 +2291,9 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  sidePanelRefresh.handleVisibilityChange(document.visibilityState === "visible");
+  const visible = document.visibilityState === "visible";
+  if (!visible) void sidePanelViewPosition.flush();
+  sidePanelRefresh.handleVisibilityChange(visible);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -2208,14 +2342,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const nextGroupSize = normalizeTranscriptGroupSize(changes.fullTranscriptGroupSize.newValue);
     if (nextGroupSize !== fullTranscriptGroupSize) {
       cancelFullTranscriptTranslation();
+      sidePanelViewPosition.prepareTranscriptGroupChange();
       fullTranscriptGroupSize = nextGroupSize;
+      restoreFullTranscriptTranslations();
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      void sidePanelViewPosition.restoreTranscript();
       syncLocalTranscriptNoteSource();
     }
   }
   if (area === "local" && changes.fullTranscriptFontSize) {
     applyFullTranscriptFontSize(changes.fullTranscriptFontSize.newValue);
+  }
+  if (area === "local" && changes.noteFontSize) {
+    applyNoteFontSize(changes.noteFontSize.newValue);
   }
   if (area === "local" && (
     changes.fullTranscriptShowOriginal
@@ -2241,6 +2381,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       cancelFullTranscriptTranslation();
       browserTranslationLanguagePackTarget = nextLanguage.id;
       clearFullTranscriptTranslations();
+      restoreFullTranscriptTranslations();
       syncLocalTranscriptNoteSource();
       setBrowserTranscriptTranslationState("waiting");
       renderBrowserTranslationLanguagePackSettings();
@@ -2253,6 +2394,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 window.addEventListener("pagehide", () => {
+  void sidePanelViewPosition.flush();
   ++renderGeneration;
   cancelBrowserTranslationLanguagePackDownload();
   cancelFullTranscriptTranslation();
@@ -2284,6 +2426,7 @@ syncSubtitleSettingsControls();
 const fullTranscriptSettings = await chrome.storage.local.get({
   fullTranscriptGroupSize: TRANSCRIPT_CUE_GROUP_SIZE,
   fullTranscriptFontSize: TRANSCRIPT_FONT_SIZE,
+  noteFontSize: NOTE_FONT_SIZE,
   fullTranscriptShowOriginal: true,
   fullTranscriptShowTranslation: true,
   fullTranscriptLanguagePackTarget: "zh-Hans",
@@ -2292,6 +2435,7 @@ const fullTranscriptSettings = await chrome.storage.local.get({
 fullTranscriptGroupSize = normalizeTranscriptGroupSize(fullTranscriptSettings.fullTranscriptGroupSize);
 syncFullTranscriptGroupButtons();
 applyFullTranscriptFontSize(fullTranscriptSettings.fullTranscriptFontSize);
+applyNoteFontSize(fullTranscriptSettings.noteFontSize);
 fullTranscriptDisplayBinding.sync({
   showOriginal: fullTranscriptSettings.fullTranscriptShowOriginal,
   showTranslation: fullTranscriptSettings.fullTranscriptShowTranslation,

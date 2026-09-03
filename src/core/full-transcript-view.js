@@ -46,6 +46,21 @@ export function transcriptGroupIndexAtTime(groups, seconds) {
   return groups.length - 1;
 }
 
+export function centeredTranscriptScrollTop({
+  currentScrollTop,
+  listTop,
+  listHeight,
+  cueTop,
+  cueHeight,
+  coordinateScale = 1,
+}) {
+  const scale = Number.isFinite(coordinateScale) && coordinateScale > 0
+    ? coordinateScale
+    : 1;
+  return currentScrollTop
+    + ((cueTop - listTop - ((listHeight - cueHeight) / 2)) / scale);
+}
+
 function formatTranscriptTime(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const hours = Math.floor(totalSeconds / 3600);

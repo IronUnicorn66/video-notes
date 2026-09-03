@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import * as sidePanelScope from "../src/core/sidepanel-scope.js";
 import {
   activeContextChangedMessage,
   createActiveTabActivationHandler,
+  createCurrentPageContextReader,
+  createExistingSidePanelOptionsConfigurator,
   createSidePanelContextResolver,
   createSidePanelRefreshController,
   contextChangedSenderTab,
@@ -21,19 +24,16 @@ test("后台标签激活处理器把浏览器窗口标识写入实际广播", as
     tabs: {
       async get(tabId) {
         calls.push(["get", tabId]);
-        return { id: tabId, windowId: 20, url: "https://www.youtube.com/watch?v=a" };
-      },
-    },
-    runtime: {
-      async sendMessage(message) {
-        calls.push(["send", message]);
+        return { id: tabId, url: "https://www.youtube.com/watch?v=course" };
       },
     },
     async configureSidePanelForTab(tab) {
       calls.push(["configure", tab.id]);
     },
-    onError(error) {
-      throw error;
+    runtime: {
+      async sendMessage(message) {
+        calls.push(["send", message]);
+      },
     },
   });
 
@@ -43,6 +43,29 @@ test("后台标签激活处理器把浏览器窗口标识写入实际广播", as
     ["configure", 3],
     ["send", { type: "ACTIVE_CONTEXT_CHANGED", tabId: 3, windowId: 20 }],
   ]);
+});
+
+test("普通网页返回空上下文且不发送页面请求", async () => {
+  const pageRequests = [];
+  let tab = { id: 9, url: "https://example.com/" };
+  const readCurrentPageContext = createCurrentPageContextReader({
+    async targetTab() {
+      return tab;
+    },
+    async sendPageContextRequest(tabId) {
+      pageRequests.push(tabId);
+      return { context: { sessionId: "youtube:a" } };
+    },
+  });
+
+  assert.equal(await readCurrentPageContext({ tabId: 9 }), null);
+  assert.deepEqual(pageRequests, []);
+
+  tab = { id: 7, url: "https://www.youtube.com/watch?v=a" };
+  assert.deepEqual(await readCurrentPageContext({ tabId: 7 }), {
+    sessionId: "youtube:a",
+  });
+  assert.deepEqual(pageRequests, [7]);
 });
 
 test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回退", async () => {
@@ -175,25 +198,56 @@ test("侧栏接收页面加载完成消息", () => {
   assert.equal(isSidePanelRefreshMessage({ type: "UNRELATED" }), false);
 });
 
-test("YouTube 和哔哩哔哩视频标签启用侧栏", () => {
-  assert.deepEqual(sidePanelOptionsForTab({ id: 7, url: "https://www.youtube.com/watch?v=abc123" }), {
+test("标签页侧栏只在受支持的视频页面启用", () => {
+  assert.deepEqual(sidePanelOptionsForTab({
+    id: 7,
+    url: "https://www.youtube.com/watch?v=course",
+  }), {
     tabId: 7,
     path: "sidepanel.html",
     enabled: true,
   });
-  assert.deepEqual(sidePanelOptionsForTab({ id: 8, url: "https://www.bilibili.com/video/BV1xx411c7mD?p=2" }), {
+  assert.deepEqual(sidePanelOptionsForTab({
+    id: 8,
+    url: "https://www.bilibili.com/video/BV1xx411c7mD",
+  }), {
     tabId: 8,
     path: "sidepanel.html",
     enabled: true,
   });
-});
-
-test("普通网页和无 URL 标签禁用侧栏", () => {
   assert.deepEqual(sidePanelOptionsForTab({ id: 9, url: "https://example.com/" }), {
     tabId: 9,
     enabled: false,
   });
-  assert.deepEqual(sidePanelOptionsForTab({ id: 10 }), { tabId: 10, enabled: false });
+});
+
+test("后台每次加载时按网址重新配置所有现有标签页", async () => {
+  assert.equal(typeof sidePanelScope.createExistingSidePanelOptionsConfigurator, "function");
+  const writes = [];
+  const configureExistingSidePanelOptions = createExistingSidePanelOptionsConfigurator({
+    tabs: {
+      async query(query) {
+        assert.deepEqual(query, {});
+        return [
+          { id: 1, url: "https://www.youtube.com/watch?v=course" },
+          { id: 2, url: "https://example.com/" },
+          { id: "invalid", url: "https://www.youtube.com/watch?v=ignored" },
+        ];
+      },
+    },
+    sidePanel: {
+      async setOptions(options) {
+        writes.push(options);
+      },
+    },
+  });
+
+  await configureExistingSidePanelOptions();
+
+  assert.deepEqual(writes, [
+    { tabId: 1, path: "sidepanel.html", enabled: true },
+    { tabId: 2, enabled: false },
+  ]);
 });
 
 test("没有数字 tabId 时拒绝配置", () => {
@@ -245,8 +299,13 @@ test("侧栏上下文按所属标签页隔离，并在重新可见时刷新自�
 
 test("活动课程标签切换时侧栏接管新标签并刷新", () => {
   let refreshedMessage = null;
+  const tabChanges = [];
   const panel = createSidePanelRefreshController((message) => {
     refreshedMessage = message;
+  }, {
+    onTabChanged(previousTabId, tabId) {
+      tabChanges.push([previousTabId, tabId]);
+    },
   });
   panel.setTabId(1, 10);
 
@@ -261,6 +320,7 @@ test("活动课程标签切换时侧栏接管新标签并刷新", () => {
     tabId: 2,
     windowId: 10,
   });
+  assert.deepEqual(tabChanges, [[1, 2]]);
 });
 
 test("两个窗口只让匹配窗口的侧栏接管活动标签", () => {

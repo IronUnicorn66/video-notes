@@ -29,13 +29,13 @@
       <header class="policy-header">
         <p class="eyebrow"><span></span>Privacy Policy</p>
         <h1>Video Notes privacy policy</h1>
-        <p>Effective date: September 1, 2026</p>
+        <p>Effective date: September 3, 2026</p>
       </header>
 
       <article class="policy-body">
         <section>
           <h2>Overview</h2>
-          <p>Video Notes creates timestamped personal notes while you watch YouTube and Bilibili lessons. At your request, a note can include a player screenshot, subtitles already rendered on the page, an original voice recording, and a local voice transcription. This policy explains what the extension processes, why it processes it, the permissions it uses, where information is stored, and how you can delete it.</p>
+          <p>Video Notes creates timestamped personal notes while you watch YouTube and Bilibili lessons. At your request, a note can include a player screenshot, player subtitles, an original voice recording, and a local voice transcription. This policy explains what the extension processes, why it processes it, the permissions it uses, where information is stored, and how you can delete it.</p>
         </section>
 
         <section>
@@ -43,26 +43,27 @@
           <ul>
             <li>The current video URL, title, site, video identifier, part number, and playback time.</li>
             <li>Your note text, subtitle edits, and undo or redo history.</li>
-            <li>Native subtitles or bilingual Immersive Translate subtitles already rendered on the current page.</li>
+            <li>Native subtitles or bilingual Immersive Translate subtitles already rendered on the current page, the native subtitle track for the current Bilibili part, plus loaded YouTube full transcripts and completed local full-transcript translations.</li>
             <li>The visible player image when you explicitly enable player screenshots.</li>
             <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
-            <li>Shortcut, subtitle window, whole-side-panel zoom, full-transcript group size, font size, original/translation display preference, timeline order, permission, language, and model settings.</li>
+            <li>Shortcut, subtitle window, whole-side-panel zoom, full-transcript group size, font size, original/translation display preference, per-video side-panel and transcript-list positions, timeline order, permission, language, and model settings.</li>
             <li>The transcript language, your selected target-language code, selected language pack, and browser language-pack status used for local browser translation.</li>
           </ul>
           <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
           <p>When complete YouTube transcript retrieval is restricted, the extension may briefly toggle the player captions control to capture the native caption response requested by the player, then immediately restore its prior state.</p>
+          <p>When lead-in subtitles are enabled, the extension asks the same-site API used by Bilibili's web player for the current video's subtitle-track metadata, then retrieves the selected native subtitle JSON from Bilibili's subtitle CDN. These requests carry only the video identifier, part identifier, and normal Bilibili login credentials; they do not contain notes, screenshots, recordings, or transcriptions. The result remains in the current page's memory for note creation and is not separately persisted.</p>
         </section>
 
         <section>
           <h2>Storage and processing location</h2>
-          <p>Notes, subtitles, screenshots, recordings, transcriptions, and video session information are stored in the extension’s IndexedDB. Whole-side-panel zoom, usable browser language codes, the selected language pack, and language-pair state are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs. Translations stay only in the current side-panel session and are not retained.</p>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, video session information, cached YouTube full transcripts, and completed full-transcript translations are stored in the extension’s IndexedDB. Completed translations are kept separately for each target language and 5, 10, or 20-cue grouping. Settings and per-video side-panel and group-specific transcript-list positions are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs.</p>
           <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
         </section>
 
         <section>
           <h2>Local full-transcript translation</h2>
           <p>Full transcripts use only the built-in desktop Edge or Chrome Translator API. Before translation, the extension locally groups transcript cues into paragraphs using sentence and clause punctuation, then sends each complete paragraph to the browser translator. The extension detects the source language from the full transcript track. The first release lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target. After the transcript loads, you can download the current source-to-target pack in advance and follow its progress. No size is shown before download; after the pack is ready, the interface shows an estimated 200 MiB footprint. Actual disk use depends on the browser and pack versions.</p>
-          <p>The translation session runs in the side-panel document, so transcript content and translations are processed locally and are not sent to the developer or a third-party translation service. The browser may connect to retrieve a language pack when you start its download; that request contains no transcript, note, screenshot, recording, or transcription content. Translation works offline afterward. Edge and Chrome manage their packs separately; the extension does not download, bundle, or sync a translation model.</p>
+          <p>The translation session runs in the side-panel document, so transcript content and translations are processed locally and are not sent to the developer or a third-party translation service. After every paragraph for the current target language and grouping is translated, the extension saves that completed set in its local transcript cache so it can be restored when you reopen the same video. Partially completed full-transcript translations are not persisted. The browser may connect to retrieve a language pack when you start its download; that request contains no transcript, note, screenshot, recording, or transcription content. Translation works offline afterward. Edge and Chrome manage their packs separately; the extension does not download, bundle, or sync a translation model.</p>
         </section>
 
         <section>
@@ -76,7 +77,7 @@
           <h2>Why each permission is used</h2>
           <ul>
             <li><strong>Storage:</strong> saves settings, permission state, model state, and your records locally.</li>
-            <li><strong>Active tab and scripting:</strong> reads video time and subtitles on supported lesson pages; when complete YouTube transcript retrieval is restricted, it may briefly toggle and restore player captions to capture the native response, and restores the packaged content script when the connection is interrupted.</li>
+            <li><strong>Active tab and scripting:</strong> reads video time and subtitles on supported lesson pages; when complete YouTube transcript retrieval is restricted, it may briefly toggle and restore player captions to capture the native response; on Bilibili, it makes a best-effort request for the current part's native subtitle track, which remains unavailable on some newer pages; and it restores the packaged content script when the connection is interrupted.</li>
             <li><strong>Side panel:</strong> provides note input, settings, and the timeline beside the video.</li>
             <li><strong>Offscreen document:</strong> maintains authorized recording, local transcription, and export generation.</li>
             <li><strong>Downloads:</strong> saves the ZIP you explicitly export.</li>
@@ -93,7 +94,7 @@
 
         <section>
           <h2>Retention and how to delete your data</h2>
-          <p>Video Notes retains video sessions and downloaded Whisper models so you can continue when you return to the same lesson. You can delete one note, clear every note for the current video, or clear extension data from the Edge or Chrome extension management page. Browser translation language packs are managed by the browser itself. Uninstalling the extension causes the browser to clear extension storage.</p>
+          <p>Video Notes retains video sessions, cached full transcripts, completed full-transcript translations, per-video reading positions, and downloaded Whisper models so you can continue when you return to the same lesson. Deleting one note or clearing the timeline removes those notes but does not remove the transcript cache or reading positions; Retry replaces the current video’s cache with a newly loaded transcript. You can clear all extension data from the Edge or Chrome extension management page, and uninstalling the extension also causes the browser to clear extension storage. Browser translation language packs are managed by the browser itself.</p>
           <p>Exporting a ZIP does not delete the browser session. You control ZIP files after they are saved to your Downloads folder.</p>
         </section>
 

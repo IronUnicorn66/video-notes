@@ -1,6 +1,6 @@
 {
   "name": "video-notes-edge",
-  "version": "1.0.25",
+  "version": "1.0.31",
   "private": true,
   "type": "module",
   "scripts": {

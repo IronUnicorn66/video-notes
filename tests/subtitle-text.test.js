@@ -87,12 +87,22 @@ test("沉浸式翻译字幕为空时回退到平台原生字幕", () => {
     ".imt-captions-text": [subtitleNode("", {
       children: { ".source-cue, .target-cue": [subtitleNode("   ")] },
     })],
-    ".bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle": [
+    ".bili-subtitle-x-subtitle-panel-text, .bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle": [
       subtitleNode("  哔哩哔哩原生字幕  "),
     ],
   });
 
   assert.equal(readRenderedSubtitleText(root, "bilibili"), "哔哩哔哩原生字幕");
+});
+
+test("读取 B 站新版播放器的原生字幕节点", () => {
+  const root = subtitleRoot({
+    ".bili-subtitle-x-subtitle-panel-text, .bpx-player-subtitle-panel-text, .bilibili-player-video-subtitle": [
+      subtitleNode("  新版 B 站字幕  "),
+    ],
+  });
+
+  assert.equal(readRenderedSubtitleText(root, "bilibili"), "新版 B 站字幕");
 });
 
 test("沉浸式翻译字幕不可见时回退到平台原生字幕", () => {

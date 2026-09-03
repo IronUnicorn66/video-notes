@@ -36,6 +36,8 @@ import {
   activeContextChangedMessage,
   contextChangedSenderTab,
   createActiveTabActivationHandler,
+  createCurrentPageContextReader,
+  createExistingSidePanelOptionsConfigurator,
   createSidePanelContextResolver,
   sidePanelMessageForTabUpdate,
   sidePanelOptionsForTab,
@@ -80,6 +82,14 @@ const handleActiveTabActivation = createActiveTabActivationHandler({
   configureSidePanelForTab,
   onError: logSidePanelConfigurationError,
 });
+const readCurrentPageContext = createCurrentPageContextReader({
+  targetTab: ({ sender, tabId }) => targetTab(sender, tabId),
+  sendPageContextRequest: (tabId) => sendToTab(tabId, { type: "GET_PAGE_CONTEXT" }),
+});
+const configureExistingSidePanelOptions = createExistingSidePanelOptionsConfigurator({
+  tabs: chrome.tabs,
+  sidePanel: chrome.sidePanel,
+});
 
 function logSidePanelConfigurationError(tab, error) {
   console.warn("配置标签页侧栏失败", tab?.id, error);
@@ -93,27 +103,20 @@ async function configureSidePanelForTab(tab) {
   }
 }
 
-async function configureExistingSidePanels() {
-  let tabs;
-  try {
-    tabs = await chrome.tabs.query({});
-  } catch (error) {
-    console.warn("查询现有标签页以配置侧栏失败", error);
-    return;
-  }
-  await Promise.all(tabs.map((tab) => configureSidePanelForTab(tab)));
-}
-
 function notifyActiveContextChanged(tabId, windowId) {
   const message = activeContextChangedMessage(tabId, windowId);
   if (!message) return;
   void chrome.runtime.sendMessage(message).catch(() => {});
 }
 
+void chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.warn("配置工具栏侧栏入口失败", error));
+void configureExistingSidePanelOptions();
+
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
     try {
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
       const settings = await chrome.storage.local.get([
         "shortcutCode",
         "whisperState",
@@ -128,20 +131,8 @@ chrome.runtime.onInstalled.addListener(() => {
         ).id,
       });
       await clearLegacyCloudTranslationSettings(chrome.storage.local);
-      await configureExistingSidePanels();
     } catch (error) {
-      console.warn("初始化侧栏失败", error);
-    }
-  })();
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  void (async () => {
-    try {
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-      await configureExistingSidePanels();
-    } catch (error) {
-      console.warn("启动时配置侧栏失败", error);
+      console.warn("初始化扩展设置失败", error);
     }
   })();
 });
@@ -695,9 +686,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 async function currentPageContext({ sender, tabId }) {
-  const tab = await targetTab(sender, tabId);
-  const response = await sendToTab(tab.id, { type: "GET_PAGE_CONTEXT" });
-  return response.context ?? null;
+  return readCurrentPageContext({ sender, tabId });
 }
 
 async function enableWhisper(modelId = DEFAULT_WHISPER_MODEL_ID) {

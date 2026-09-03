@@ -50,6 +50,18 @@ export function createActiveTabActivationHandler({
   };
 }
 
+export function createCurrentPageContextReader({
+  targetTab,
+  sendPageContextRequest,
+}) {
+  return async (request) => {
+    const tab = await targetTab(request);
+    if (!tab?.url || !parseVideoContext(tab.url)) return null;
+    const response = await sendPageContextRequest(tab.id);
+    return response?.context ?? null;
+  };
+}
+
 export function createSidePanelContextResolver({ runtime, tabs }) {
   return async (sender) => {
     const contexts = await runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
@@ -126,6 +138,7 @@ export function sidePanelRequestTabIdForSender(
 
 export function createSidePanelRefreshController(refresh, {
   onContextEvent = () => {},
+  onTabChanged = () => {},
   shouldRefresh = () => true,
   shouldDeferRefresh = () => false,
 } = {}) {
@@ -164,7 +177,9 @@ export function createSidePanelRefreshController(refresh, {
           || !validContextId(message.windowId)
           || message.windowId !== windowId
         ) return false;
+        const previousTabId = tabId;
         tabId = message.tabId;
+        if (tabId !== previousTabId) onTabChanged(previousTabId, tabId);
       }
       if (!Number.isInteger(tabId) || message?.tabId !== tabId) return false;
       refreshOrDefer(message);
@@ -194,4 +209,30 @@ export function sidePanelOptionsForTab(tab) {
   return supported
     ? { tabId: tab.id, path: "sidepanel.html", enabled: true }
     : { tabId: tab.id, enabled: false };
+}
+
+export function createExistingSidePanelOptionsConfigurator({
+  tabs,
+  sidePanel,
+  warn = console.warn,
+}) {
+  return async () => {
+    let openTabs;
+    try {
+      openTabs = await tabs.query({});
+    } catch (error) {
+      warn("查询现有标签页以配置侧栏失败", error);
+      return;
+    }
+
+    await Promise.all(openTabs
+      .filter((tab) => Number.isInteger(tab.id))
+      .map(async (tab) => {
+        try {
+          await sidePanel.setOptions(sidePanelOptionsForTab(tab));
+        } catch (error) {
+          warn("配置标签页侧栏失败", tab.id, error);
+        }
+      }));
+  };
 }

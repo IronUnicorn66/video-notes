@@ -8,15 +8,20 @@ import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
+import { BilibiliTranscriptSource } from "./core/bilibili-transcript.js";
 import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
 import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
-import { localTranscriptNoteContext } from "./core/local-transcript-note-context.js";
+import {
+  localTranscriptNoteContext,
+  preferredNoteSubtitleContext,
+} from "./core/local-transcript-note-context.js";
 import {
   readMediaTimeForVideoContext,
   seekMediaForVideoContext,
 } from "./core/video-command-context.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
+const bilibiliTranscriptSource = new BilibiliTranscriptSource();
 let currentMedia = null;
 let activeLease = null;
 let activeLeaseTimer = null;
@@ -161,6 +166,17 @@ function collectSubtitles() {
   );
 }
 
+function preferredSubtitleLanguages() {
+  return navigator.languages ?? [navigator.language];
+}
+
+async function loadBilibiliTranscriptNoteSource(context = getContext()) {
+  if (!subtitleCapture.enabled || context?.platform !== "bilibili") return null;
+  return bilibiliTranscriptSource.load(context, {
+    preferredLanguages: preferredSubtitleLanguages(),
+  });
+}
+
 function markerSnapshot(
   markerId,
   { deferPause = false, localTranscriptNoteSource: preferredSource } = {},
@@ -169,21 +185,28 @@ function markerSnapshot(
   const media = bindMedia();
   if (!context || !media) throw new Error("当前标签页没有受支持的视频");
   const seconds = Math.max(0, media.currentTime || 0);
+  const wasPlaying = !media.paused;
+  const rect = findPlayerElement(context, media).getBoundingClientRect();
+  const bilibiliSource = bilibiliTranscriptSource.get(context);
   const localSubtitles = localTranscriptNoteContext({
     context,
-    source: localTranscriptNoteSource,
-    preferredSource,
+    source: context.platform === "bilibili" ? bilibiliSource : localTranscriptNoteSource,
+    preferredSource: context.platform === "youtube" ? preferredSource : null,
     markerSeconds: seconds,
     windowSeconds: subtitleCapture.windowSeconds,
     enabled: subtitleCapture.enabled,
   });
-  const rect = findPlayerElement(context, media).getBoundingClientRect();
+  const subtitles = preferredNoteSubtitleContext({
+    platform: context.platform,
+    renderedText: subtitleCapture.before(seconds),
+    localSubtitles,
+  });
   const snapshot = {
     context,
     seconds,
     jumpUrl: buildJumpUrl(context, seconds),
-    subtitleContext: localSubtitles?.subtitleContext ?? subtitleCapture.before(seconds),
-    subtitleTranslation: localSubtitles?.subtitleTranslation ?? "",
+    subtitleContext: subtitles.subtitleContext,
+    subtitleTranslation: subtitles.subtitleTranslation,
     rect: {
       x: rect.left,
       y: rect.top,
@@ -192,7 +215,7 @@ function markerSnapshot(
     },
     viewport: { width: innerWidth, height: innerHeight },
   };
-  snapshot.wasPlaying = !media.paused;
+  snapshot.wasPlaying = wasPlaying;
   if (!deferPause) activateMarker(markerId, snapshot.wasPlaying);
   return snapshot;
 }
@@ -337,6 +360,7 @@ chrome.storage.local.get({
   shortcutCode = saved;
   pushToTalk.keyCode = saved;
   subtitleCapture.updateSettings({ subtitleEnabled, subtitleWindowSeconds });
+  if (subtitleEnabled) void loadBilibiliTranscriptNoteSource();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -360,6 +384,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (Object.keys(subtitleSettings).length > 0) {
     subtitleCapture.updateSettings(subtitleSettings);
+  }
+  if (changes.subtitleEnabled) {
+    if (changes.subtitleEnabled.newValue) void loadBilibiliTranscriptNoteSource();
+    else bilibiliTranscriptSource.clear();
   }
 });
 
@@ -456,9 +484,12 @@ setInterval(() => {
     currentUrl = location.href;
     if (activeLease) void releaseMarker(activeLease.markerId);
     subtitleCapture.clear();
+    bilibiliTranscriptSource.clear();
     localTranscriptNoteSource = null;
     localTranscriptNoteSourceRevision = 0;
-    chrome.runtime.sendMessage({ type: "CONTEXT_CHANGED", context: getContext() });
+    const context = getContext();
+    void loadBilibiliTranscriptNoteSource(context);
+    chrome.runtime.sendMessage({ type: "CONTEXT_CHANGED", context });
   }
 }, 400);
 

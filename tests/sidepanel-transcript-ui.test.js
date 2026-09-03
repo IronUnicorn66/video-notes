@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [html, css, source, background, content] = await Promise.all([
+const [html, css, source, background, content, transcriptCache] = await Promise.all([
   readFile(new URL("../src/sidepanel.html", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.css", import.meta.url), "utf8"),
   readFile(new URL("../src/sidepanel.js", import.meta.url), "utf8"),
   readFile(new URL("../src/background.js", import.meta.url), "utf8"),
   readFile(new URL("../src/content.js", import.meta.url), "utf8"),
+  readFile(new URL("../src/core/full-transcript-cache.js", import.meta.url), "utf8"),
 ]);
 
 test("侧栏提供可折叠的完整字幕、翻译和重试入口", () => {
@@ -38,6 +39,32 @@ test("完整字幕在 YouTube 上自动读取并按标签页发送跳转", () =>
     source,
     /\["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"\][\s\S]*resetFullTranscript\(\)/,
   );
+});
+
+test("同一视频优先恢复本地字幕与译文缓存，重试时强制重新采集", () => {
+  assert.match(source, /createFullTranscriptCacheLoader/);
+  assert.match(transcriptCache, /repository\.getTranscriptCache/);
+  assert.match(source, /cachedFullTranscriptTranslations/);
+  assert.match(source, /fullTranscriptCacheWithTranslations/);
+  assert.match(source, /await persistFullTranscriptTranslations\(/);
+  assert.match(
+    source,
+    /fullTranscriptRetry\.addEventListener\("click", \(\) => \{\s*void loadFullTranscript\(\{ force: true \}\);/s,
+  );
+});
+
+test("侧栏重开和切换合并档位后恢复完整字幕列表位置", () => {
+  assert.match(source, /readTranscriptPosition:\s*\(\)\s*=>\s*elements\.fullTranscriptList\.scrollTop/);
+  assert.match(
+    source,
+    /restoreTranscriptPosition:\s*\(position\)\s*=>\s*\{\s*elements\.fullTranscriptList\.scrollTop = position;/,
+  );
+  assert.match(
+    source,
+    /fullTranscriptList\.addEventListener\("scroll",[\s\S]*sidePanelViewPosition\.scheduleSave\(\)/,
+  );
+  assert.match(source, /sidePanelViewPosition\.prepareTranscriptGroupChange\(\)/);
+  assert.match(source, /renderFullTranscript\(\);\s*void sidePanelViewPosition\.restoreTranscript\(\);/);
 });
 
 test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
@@ -123,7 +150,7 @@ test("译文完成后在翻译和重试之间显示原文与译文选项", () =>
   assert.match(source, /if \(cue\.translation && displayPreference\.showTranslation\)/);
 });
 
-test("重试左侧提供按播放器进度定位字幕的按钮", () => {
+test("重试左侧的定位按钮直接跳到播放器当前字幕", () => {
   assert.match(
     html,
     /id="full-transcript-display-options"[\s\S]*id="full-transcript-locate"[\s\S]*id="full-transcript-retry"/,
@@ -132,7 +159,9 @@ test("重试左侧提供按播放器进度定位字幕的按钮", () => {
   assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-title="fullTranscriptLocateTitle"/);
   assert.match(html, /id="full-transcript-locate"[\s\S]*data-i18n-aria-label="fullTranscriptLocateTitle"/);
   assert.match(source, /type: "GET_VIDEO_POSITION"/);
-  assert.match(source, /fullTranscriptList\.scrollTo\(\{[\s\S]*behavior: "smooth"/);
+  assert.match(source, /centeredTranscriptScrollTop\(\{/);
+  assert.match(source, /listBounds\.height\s*\/\s*elements\.fullTranscriptList\.clientHeight/);
+  assert.doesNotMatch(source, /fullTranscriptList\.scrollTo\(\{[\s\S]*behavior: "smooth"/);
   assert.match(source, /full-transcript-cue-located/);
   assert.match(css, /\.full-transcript-cue-located\s*\{/);
   assert.match(background, /case "GET_VIDEO_POSITION"/);
@@ -180,16 +209,16 @@ test("侧栏只创建浏览器本地会话并支持提前下载语言包", () =>
 test("完整字幕加载结束后会重新启用翻译按钮", () => {
   assert.match(
     source,
-    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*syncFullTranscriptLocateButton\(\);\s*\}/s,
+    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*syncFullTranscriptLocateButton\(\);[\s\S]*\}/s,
   );
 });
 
-test("切换视频、重试和关闭侧栏会中断本地翻译并销毁文档会话", () => {
+test("切换视频、重新加载和关闭侧栏会中断本地翻译并销毁文档会话", () => {
   assert.match(
     source,
     /function cancelFullTranscriptTranslation\(\) \{[\s\S]*fullTranscriptTranslationController\?\.abort\(\);[\s\S]*destroyBrowserTranslationSession\(\);[\s\S]*\}/,
   );
-  assert.match(source, /async function loadFullTranscript\(\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
+  assert.match(source, /async function loadFullTranscript\([^)]*\) \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*cancelFullTranscriptTranslation\(\);/);
   assert.match(source, /session\.destroy\(\)/);
   assert.match(source, /untranslatedTranscriptSegments\(groups\)/);
@@ -215,14 +244,18 @@ test("当前完整字幕和译文同步给所有记笔记入口", () => {
   assert.match(source, /fullTranscriptTranslations\.set\(id, translation\);\s*syncLocalTranscriptNoteSource\(\)/);
   assert.match(background, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
   assert.match(content, /case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE"/);
+  assert.match(content, /new BilibiliTranscriptSource\(\)/);
+  assert.match(content, /bilibiliTranscriptSource\.get\(context\)/);
+  assert.doesNotMatch(content, /await loadBilibiliTranscriptNoteSource\(context\)/);
   assert.match(content, /localTranscriptNoteContext\(\{/);
-  assert.match(content, /localSubtitles\?\.subtitleContext \?\? subtitleCapture\.before\(seconds\)/);
-  assert.match(content, /subtitleTranslation: localSubtitles\?\.subtitleTranslation \?\? ""/);
+  assert.match(content, /preferredNoteSubtitleContext\(\{/);
+  assert.match(content, /renderedText: subtitleCapture\.before\(seconds\)/);
   assert.match(background, /subtitleTranslation: String\(snapshot\.subtitleTranslation \?\? ""\)\.trim\(\)/);
   assert.match(source, /type: "BEGIN_TYPED_NOTE",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
   assert.match(source, /type: "VOICE_START_REQUEST",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
   assert.match(background, /type: "PREPARE_MARKER",[\s\S]*localTranscriptNoteSource/);
-  assert.match(content, /source: localTranscriptNoteSource,\s*preferredSource/);
+  assert.match(content, /source: context\.platform === "bilibili" \? bilibiliSource : localTranscriptNoteSource/);
+  assert.match(content, /preferredSource: context\.platform === "youtube" \? preferredSource : null/);
 });
 
 test("笔记卡片将本地字幕原文与译文分块显示", () => {

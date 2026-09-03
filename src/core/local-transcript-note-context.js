@@ -1,5 +1,25 @@
 export const NOTE_SUBTITLE_MAX_CHARS = 500;
 
+export function preferredNoteSubtitleContext({
+  platform,
+  renderedText,
+  localSubtitles,
+} = {}) {
+  const rendered = String(renderedText ?? "").trim();
+  const localContext = String(localSubtitles?.subtitleContext ?? "").trim();
+  const localTranslation = String(localSubtitles?.subtitleTranslation ?? "").trim();
+  if (platform === "bilibili" && rendered) {
+    return { subtitleContext: rendered, subtitleTranslation: "" };
+  }
+  if (localContext) {
+    return {
+      subtitleContext: localContext,
+      subtitleTranslation: localTranslation,
+    };
+  }
+  return { subtitleContext: rendered, subtitleTranslation: "" };
+}
+
 function normalizedGroup(group) {
   const startMs = Number(group?.startMs);
   const endMs = Number(group?.endMs);
@@ -57,7 +77,7 @@ export function localTranscriptNoteContext({
   const limit = Number(maxChars);
   if (
     enabled !== true
-    || context?.platform !== "youtube"
+    || !["youtube", "bilibili"].includes(context?.platform)
     || !Number.isFinite(marker)
     || marker < 0
     || !Number.isFinite(window)

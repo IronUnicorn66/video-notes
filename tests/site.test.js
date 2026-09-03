@@ -26,7 +26,7 @@ test("双语主页按问题、用法和价值组织核心信息", async () => {
     assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.25\/video-notes-edge-1\.0\.25\.zip/,
+      /releases\/download\/v1\.0\.31\/video-notes-edge-1\.0\.31\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -62,10 +62,12 @@ test("隐私页覆盖本地存储、本地翻译、模型下载和删除", async
   assert.match(html, /自动识别源语言/);
   assert.match(html, /简体中文、英语、日语、韩语或西班牙语作为目标语言/);
   assert.match(html, /不会发送给扩展开发者或第三方翻译服务/);
+  assert.match(html, /按视频缓存的 YouTube 完整字幕和已完成全文译文/);
   assert.match(englishHtml, /Local full-transcript translation/);
   assert.match(englishHtml, /detects the source language/);
   assert.match(englishHtml, /choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target/);
   assert.match(englishHtml, /not sent to the developer or a third-party translation service/);
+  assert.match(englishHtml, /cached YouTube full transcripts, and completed full-transcript translations/);
   for (const page of [html, englishHtml]) {
     assert.doesNotMatch(page, /API Key|OpenAI|cloud backup|云端备用/);
   }

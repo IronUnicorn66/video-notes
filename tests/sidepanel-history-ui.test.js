@@ -14,6 +14,8 @@ test("历史工具栏提供撤销、反撤销和紧邻导出的清空按钮", ()
   assert.equal(occurrences(html, /id="undo-button"/g), 1);
   assert.equal(occurrences(html, /id="redo-button"/g), 1);
   assert.equal(occurrences(html, /id="clear-button"/g), 1);
+  assert.doesNotMatch(html, /id="undo-button"[^>]*data-i18n="undo"/);
+  assert.doesNotMatch(html, /id="redo-button"[^>]*data-i18n="redo"/);
   assert.match(
     html,
     /id="clear-button"[^>]*>清空<\/button>\s*<button id="export-button"/,
@@ -138,9 +140,62 @@ test("历史请求忙碌时同步禁用控件且快捷键只拦截可执行操�
   );
 });
 
-test("窄侧栏操作区可换行且危险操作使用克制红色样式", () => {
-  assert.match(css, /\.timeline-actions\s*\{[^}]*flex-wrap:\s*wrap/s);
+test("窄侧栏时间线标题与操作按钮保持单行对齐", () => {
+  assert.match(html, /<div class="section-row timeline-header">/);
+  assert.match(css, /#timeline-title\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(
+    css,
+    /\.timeline-header\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex-wrap:\s*nowrap/s,
+  );
+  assert.match(
+    css,
+    /\.timeline-actions\s*\{[^}]*display:\s*flex;[^}]*flex:\s*0\s+0\s+auto;[^}]*flex-wrap:\s*nowrap/s,
+  );
+  assert.match(
+    css,
+    /\.timeline-actions\s*>\s*button\s*\{[^}]*flex:\s*0\s+0\s+auto;[^}]*width:\s*auto/s,
+  );
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*480px\)[\s\S]*\.timeline-header\s*\{[^}]*gap:\s*1px/s,
+  );
   assert.match(css, /\.danger-button[\s\S]*border[^;]*#[0-9a-f]{6}/i);
   assert.match(css, /\.note-delete-button[\s\S]*color[^;]*#[0-9a-f]{6}/i);
   assert.match(css, /min-width:\s*320px/);
+});
+
+test("时间线标题和各组控件使用统一的垂直尺寸与居中方式", () => {
+  assert.match(
+    css,
+    /#timeline-title\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*height:\s*30px;[^}]*line-height:\s*1;/s,
+  );
+  assert.match(
+    css,
+    /\.note-font-size-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
+  );
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*480px\)[\s\S]*#timeline-title\s*\{[^}]*height:\s*22px;/s,
+  );
+});
+
+test("窄侧栏中的快速标记、时间线和设置卡片保持相同横向边界", () => {
+  assert.doesNotMatch(
+    css,
+    /@media\s*\(max-width:\s*480px\)[\s\S]*\.timeline\s*\{[^}]*(?:margin-(?:right|left):\s*-|margin:\s*[^;}]*-)/s,
+  );
+});
+
+test("侧栏重新打开后按视频恢复整页滚动位置", () => {
+  assert.match(
+    source,
+    /createSidePanelViewPositionController\(\{[\s\S]*readPagePosition:\s*\(\)\s*=>\s*window\.scrollY,[\s\S]*restorePagePosition:\s*\(position\)\s*=>\s*window\.scrollTo\(0, position\)/,
+  );
+  assert.match(source, /sidePanelViewPosition\.activate\(response\.context\.sessionId\)/);
+  assert.match(
+    source,
+    /sidePanelViewPosition\.restorePage\(\{\s*deferIfClamped: activeContext\.platform === "youtube",\s*\}\)/,
+  );
+  assert.match(source, /window\.addEventListener\("scroll",[\s\S]*sidePanelViewPosition\.scheduleSave\(\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*void sidePanelViewPosition\.flush\(\);/);
 });
