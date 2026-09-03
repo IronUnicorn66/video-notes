@@ -25,6 +25,7 @@ const common = {
 
 await Promise.all([
   build({ ...common, entryPoints: [resolve(root, "src/background.js")], outfile: resolve(output, "background.js") }),
+  build({ ...common, entryPoints: [resolve(root, "src/player-shortcuts.js")], outfile: resolve(output, "player-shortcuts.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/content.js")], outfile: resolve(output, "content.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/sidepanel.js")], outfile: resolve(output, "sidepanel.js") }),
   build({ ...common, entryPoints: [resolve(root, "src/microphone-permission.js")], outfile: resolve(output, "microphone-permission.js") }),

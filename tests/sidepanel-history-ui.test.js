@@ -130,8 +130,12 @@ test("历史请求忙碌时同步禁用控件且快捷键只拦截可执行操�
   assert.match(source, /elements\.redoButton\.disabled = controls\.redoDisabled/);
 
   const shortcutStart = source.indexOf('document.addEventListener("keydown"');
-  const shortcutEnd = source.indexOf("\n});", shortcutStart) + 4;
-  const shortcutSource = source.slice(shortcutStart, shortcutEnd);
+  const historyShortcutStart = source.indexOf(
+    "const operation = historyShortcut(event)",
+    shortcutStart,
+  );
+  const shortcutEnd = source.indexOf("\n});", historyShortcutStart) + 4;
+  const shortcutSource = source.slice(historyShortcutStart, shortcutEnd);
   assert.match(shortcutSource, /const operation = historyShortcut\(event\)/);
   assert.ok(
     shortcutSource.indexOf("canRunHistoryAction(operation)")

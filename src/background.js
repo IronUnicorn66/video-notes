@@ -45,6 +45,10 @@ import {
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
 import { clearLegacyCloudTranslationSettings } from "./core/local-only-migration.js";
+import {
+  isReservedVideoPlaybackCode,
+  normalizePushToTalkShortcut,
+} from "./core/video-playback-shortcuts.js";
 
 const repository = new VideoNotesRepository();
 const tabMessenger = createTabMessenger({
@@ -124,7 +128,7 @@ chrome.runtime.onInstalled.addListener(() => {
         "whisperModel",
       ]);
       await chrome.storage.local.set({
-        shortcutCode: settings.shortcutCode ?? "AltRight",
+        shortcutCode: normalizePushToTalkShortcut(settings.shortcutCode),
         whisperState: settings.whisperState ?? "disabled",
         whisperSelectedModel: getWhisperModel(
           settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
@@ -770,6 +774,17 @@ async function noteHistoryRequest(message, sender) {
   };
 }
 
+async function sidePanelTargetTab(sender, requestedTabId) {
+  const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
+  const tabId = sidePanelRequestTabIdForSender(
+    sender,
+    contexts,
+    fallbackTab?.id ?? context.tabId,
+    requestedTabId,
+  );
+  return chrome.tabs.get(tabId);
+}
+
 async function handleMessage(message, sender) {
   if (isNoteHistoryCommand(message.type)) {
     const request = await noteHistoryRequest(message, sender);
@@ -830,6 +845,19 @@ async function handleMessage(message, sender) {
         videoId: message.videoId,
       });
       return { seconds: response.seconds };
+    }
+    case "CONTROL_VIDEO_PLAYBACK": {
+      const tab = await sidePanelTargetTab(sender, message.tabId);
+      const response = await sendToTab(tab.id, {
+        type: "CONTROL_VIDEO_PLAYBACK",
+        command: message.command,
+        sessionId: message.sessionId,
+        videoId: message.videoId,
+      });
+      return {
+        seconds: response.seconds,
+        paused: response.paused,
+      };
     }
     case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE": {
       const tab = await targetTab(sender, message.tabId);
@@ -967,6 +995,9 @@ async function handleMessage(message, sender) {
         };
       }
     case "SET_SHORTCUT":
+      if (isReservedVideoPlaybackCode(message.code)) {
+        throw new Error("空格和左右方向键已保留用于视频播放");
+      }
       await chrome.storage.local.set({ shortcutCode: message.code });
       return { code: message.code };
     case "EXPORT_SESSION":

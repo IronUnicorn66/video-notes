@@ -81,6 +81,12 @@ import {
   readInterfaceLanguage,
   writeInterfaceLanguage,
 } from "./core/extension-language.js";
+import {
+  isReservedVideoPlaybackCode,
+  normalizePushToTalkShortcut,
+  playbackCommandForKeyEvent,
+  shouldExecutePlaybackCommand,
+} from "./core/video-playback-shortcuts.js";
 
 const interfaceLanguage = await readInterfaceLanguage(
   chrome.storage.local,
@@ -463,6 +469,7 @@ async function request(message) {
     "GET_ACTIVE_STATE",
     "GET_FULL_YOUTUBE_TRANSCRIPT",
     "GET_VIDEO_POSITION",
+    "CONTROL_VIDEO_PLAYBACK",
     "SEEK_VIDEO",
     "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
   ].includes(message.type)
@@ -2255,6 +2262,9 @@ elements.keyButton.addEventListener("keydown", async (event) => {
     return;
   }
   try {
+    if (isReservedVideoPlaybackCode(event.code)) {
+      throw new Error(t("shortcutReservedForPlayback"));
+    }
     await request({ type: "SET_SHORTCUT", code: event.code });
     elements.keyButton.textContent = shortcutLabel(event.code);
     showToast(t("shortcutChanged", { shortcut: shortcutLabel(event.code) }));
@@ -2266,6 +2276,26 @@ elements.keyButton.addEventListener("keydown", async (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  const playbackCommand = playbackCommandForKeyEvent(event);
+  if (
+    playbackCommand
+    && activeContext
+    && Number.isInteger(sidePanelRefresh.tabId)
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!shouldExecutePlaybackCommand(event, playbackCommand)) return;
+    void request({
+      type: "CONTROL_VIDEO_PLAYBACK",
+      command: playbackCommand,
+      sessionId: activeContext.sessionId,
+      videoId: activeContext.videoId,
+    }).catch((error) => {
+      showToast(localizeRuntimeMessage(interfaceLanguage, error.message));
+    });
+    return;
+  }
+
   const operation = historyShortcut(event);
   if (!operation || !canRunHistoryAction(operation)) return;
   event.preventDefault();
@@ -2282,6 +2312,16 @@ document.addEventListener("keydown", (event) => {
       tabId: sidePanelRefresh.tabId,
     });
   }
+});
+
+document.addEventListener("keyup", (event) => {
+  if (
+    !playbackCommandForKeyEvent(event)
+    || !activeContext
+    || !Number.isInteger(sidePanelRefresh.tabId)
+  ) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
 });
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -2314,7 +2354,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void renderWhisperStatus();
   }
   if (area === "local" && changes.shortcutCode?.newValue) {
-    elements.keyButton.textContent = shortcutLabel(changes.shortcutCode.newValue);
+    elements.keyButton.textContent = shortcutLabel(
+      normalizePushToTalkShortcut(changes.shortcutCode.newValue),
+    );
   }
   if (area === "local" && changes.noteSortOrder) {
     noteSortBinding.sync(changes.noteSortOrder.newValue);
@@ -2461,7 +2503,7 @@ void refreshBrowserTranslationLanguagePackAvailability();
 await initializeSidepanel({
   storage: chrome.storage,
   onShortcutCode: (shortcutCode) => {
-    elements.keyButton.textContent = shortcutLabel(shortcutCode);
+    elements.keyButton.textContent = shortcutLabel(normalizePushToTalkShortcut(shortcutCode));
   },
   noteSortBinding,
   sidepanelZoomBinding,

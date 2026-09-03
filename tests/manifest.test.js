@@ -39,7 +39,7 @@ const enMessages = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.32");
+  assert.equal(manifest.version, "1.0.33");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
@@ -329,12 +329,14 @@ test("所有本地执行代码入口都来自扩展包", async () => {
   });
   assert.doesNotMatch(serialized, /https?:\/\//);
   assert.match(serialized, /background\.js/);
+  assert.match(serialized, /player-shortcuts\.js/);
   assert.match(serialized, /content\.js/);
   assert.match(serialized, /sidepanel\.html/);
 
   const build = await readFile(new URL("../scripts/build-extension.mjs", import.meta.url), "utf8");
   for (const entry of [
     "background.js",
+    "player-shortcuts.js",
     "content.js",
     "sidepanel.js",
     "offscreen.js",
@@ -342,6 +344,17 @@ test("所有本地执行代码入口都来自扩展包", async () => {
   ]) {
     assert.ok(build.includes(`src/${entry}`));
   }
+});
+
+test("播放器快捷键在网站脚本前注入且普通内容脚本保持空闲时加载", () => {
+  const playerShortcuts = manifest.content_scripts.find((entry) => (
+    entry.js.includes("player-shortcuts.js")
+  ));
+  const content = manifest.content_scripts.find((entry) => entry.js.includes("content.js"));
+
+  assert.equal(playerShortcuts.run_at, "document_start");
+  assert.equal(content.run_at, "document_idle");
+  assert.deepEqual(playerShortcuts.matches, content.matches);
 });
 
 test("侧栏只在视频标签启用且不扩大网站访问权限", async () => {

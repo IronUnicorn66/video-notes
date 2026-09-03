@@ -19,6 +19,12 @@ import {
   readMediaTimeForVideoContext,
   seekMediaForVideoContext,
 } from "./core/video-command-context.js";
+import {
+  controlVideoPlayback,
+  findPrimaryVideo,
+  normalizePushToTalkShortcut,
+} from "./core/video-playback-shortcuts.js";
+import { installVideoPageShortcuts } from "./core/video-page-shortcuts.js";
 
 const subtitleCapture = new SubtitleCapture({ subtitleEnabled: false });
 const bilibiliTranscriptSource = new BilibiliTranscriptSource();
@@ -56,16 +62,17 @@ function getContext() {
   return parseVideoContext(location.href, videoTitle(preliminary.platform));
 }
 
-function visibleArea(element) {
-  const rect = element.getBoundingClientRect();
-  return Math.max(0, Math.min(innerWidth, rect.right) - Math.max(0, rect.left)) *
-    Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top));
+function findMedia() {
+  return findPrimaryVideo(document, { width: innerWidth, height: innerHeight });
 }
 
-function findMedia() {
-  const candidates = [...document.querySelectorAll("video")];
-  return candidates.sort((left, right) => visibleArea(right) - visibleArea(left))[0] ?? null;
-}
+installVideoPageShortcuts({
+  eventTarget: window,
+  root: document,
+  getContext,
+  getViewport: () => ({ width: innerWidth, height: innerHeight }),
+  onError: (error) => console.warn("视频笔记播放器快捷键执行失败", error),
+});
 
 function findPlayerElement(context, media) {
   if (context.platform === "youtube") {
@@ -357,8 +364,8 @@ chrome.storage.local.get({
   subtitleWindowSeconds,
 }) => {
   interfaceLanguage = resolveLanguage(savedLanguage, chrome.i18n.getUILanguage());
-  shortcutCode = saved;
-  pushToTalk.keyCode = saved;
+  shortcutCode = normalizePushToTalkShortcut(saved);
+  pushToTalk.keyCode = shortcutCode;
   subtitleCapture.updateSettings({ subtitleEnabled, subtitleWindowSeconds });
   if (subtitleEnabled) void loadBilibiliTranscriptNoteSource();
 });
@@ -372,7 +379,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     );
   }
   if (changes.shortcutCode?.newValue) {
-    shortcutCode = changes.shortcutCode.newValue;
+    shortcutCode = normalizePushToTalkShortcut(changes.shortcutCode.newValue);
     pushToTalk.keyCode = shortcutCode;
   }
   const subtitleSettings = {};
@@ -396,6 +403,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     "GET_PAGE_CONTEXT",
     "GET_FULL_YOUTUBE_TRANSCRIPT",
     "GET_VIDEO_POSITION",
+    "CONTROL_VIDEO_PLAYBACK",
     "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
     "SEEK_VIDEO",
     "PREPARE_MARKER",
@@ -437,6 +445,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
         return { seconds };
       }
+      case "CONTROL_VIDEO_PLAYBACK":
+        return controlVideoPlayback({
+          media: bindMedia(),
+          context: getContext(),
+          command: message.command,
+          expectedSessionId: message.sessionId,
+          expectedVideoId: message.videoId,
+        });
       case "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE":
         return { synced: syncLocalTranscriptNoteSource(message) };
       case "SEEK_VIDEO": {
