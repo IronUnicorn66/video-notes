@@ -12,6 +12,11 @@
 
 ![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
 
+## 1.0.35 更新
+
+- 完整字幕会按稳定阅读段保存进度；译文逐段出现、切换原文/译文显示或关闭重开侧栏后，仍能回到离开时的位置。
+- 在视频页或笔记侧栏中直接使用左右方向键前后跳转 5 秒、使用空格切换播放；文字输入区仍保留正常编辑行为。
+
 ## 核心能力
 
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
@@ -32,12 +37,12 @@
 
 ### Edge 商店
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.5。1.0.34 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.5。1.0.35 正在提交更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.34 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.34/video-notes-edge-1.0.34.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.34/video-notes-edge-1.0.34.zip.sha256)
+[下载视频笔记 1.0.35 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -79,8 +84,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.34.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.34.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.35.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.35.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。

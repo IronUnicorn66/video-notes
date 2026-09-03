@@ -1,9 +1,9 @@
 # 视频笔记 Edge 商店上架资料
 
 更新日期：2026-09-03
-版本：1.0.34
+版本：1.0.35
 
-本文件保存 Microsoft Partner Center 已发布产品的 1.0.34 更新资料。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
+本文件保存 Microsoft Partner Center 已发布产品的 1.0.35 更新资料。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
 
 ## 1. 基本信息
 
@@ -21,7 +21,7 @@
 - Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
 - 商店页面：https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj
 - 当前公开版本：1.0.5，2026-07-30 发布
-- 本次更新版本：1.0.34，待提交审核
+- 本次更新版本：1.0.35，待提交审核
 
 ## 2. 商店名称与说明
 
@@ -167,7 +167,7 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 ## 8. 发布包检查
 
 - ZIP 根目录直接包含 `manifest.json`。
-- Manifest V3 版本为 1.0.34，默认语言为 `zh_CN`。
+- Manifest V3 版本为 1.0.35，默认语言为 `zh_CN`。
 - ZIP 包含 `_locales/zh_CN/messages.json` 和 `_locales/en/messages.json`。
 - ZIP 不包含测试、开发文档、商店素材、Git 元数据或模型权重。
 - 包内没有远程 JavaScript 或动态代码加载器。
