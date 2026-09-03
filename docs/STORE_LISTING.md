@@ -20,7 +20,7 @@
 - Edge Store ID：`0RDCKGDTZD56`
 - Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
 - 商店页面：https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj
-- 当前公开版本：1.0.5，2026-07-30 发布
+- 当前公开版本：1.0.32，2026-09-03 发布
 - 本次更新版本：1.0.35，待提交审核
 
 ## 2. 商店名称与说明
