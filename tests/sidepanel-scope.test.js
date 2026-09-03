@@ -3,6 +3,7 @@ import test from "node:test";
 
 import * as sidePanelScope from "../src/core/sidepanel-scope.js";
 import {
+  activeSidePanelRequestTabId,
   activeContextChangedMessage,
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
@@ -167,6 +168,23 @@ test("侧栏页面请求只接纳原绑定或同窗口的当前活动标签页",
   assert.throws(
     () => sidePanelRequestTabIdForSender(sender, contexts, { id: 2, windowId: 10 }, 3),
     /侧栏所属标签页已变化/,
+  );
+});
+
+test("播放请求只接纳侧栏窗口内当前活动的标签页", () => {
+  const context = { tabId: 1, windowId: 10 };
+
+  assert.equal(
+    activeSidePanelRequestTabId(context, { id: 2, windowId: 10 }, 2),
+    2,
+  );
+  assert.throws(
+    () => activeSidePanelRequestTabId(context, { id: 2, windowId: 10 }, 1),
+    /侧栏所属标签页已变化/,
+  );
+  assert.throws(
+    () => activeSidePanelRequestTabId(context, { id: 2, windowId: 20 }, 2),
+    /无法确定侧栏所属标签页/,
   );
 });
 

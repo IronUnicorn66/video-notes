@@ -15,6 +15,7 @@
 ## 核心能力
 
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
+- 在视频页或笔记侧栏中直接使用无修饰的左右方向键前后跳转 5 秒、使用空格切换播放；文字输入区仍保留空格输入和光标移动。
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕；当前 YouTube 完整字幕已加载时，优先复用本地完整段落，选中范围全部翻译后同时保存对应译文。
 - 支持 YouTube、哔哩哔哩播放器实际渲染的原生字幕，以及沉浸式翻译呈现的双语字幕；哔哩哔哩还会尝试读取当前分 P 的原生字幕轨，但部分新版页面仍可能无法取得。
 - 对已暴露原生字幕轨道的 YouTube 视频显示完整字幕、覆盖范围、按完整句调整边界的 5/10/20 条合并阅读、独立字号调节、原文/译文显示选择、时间跳转和播放器当前进度定位；译文逐段出现或切换显示模式时保持当前阅读段。
@@ -22,7 +23,7 @@
 - 使用语言切换左侧的 `+`、`−` 按钮，以 10% 为一档在 75%–200% 之间调整整个侧栏大小。
 - 浏览器原生侧栏只在受支持的 YouTube 和哔哩哔哩视频标签启用，切到其他页面会自动隐藏；受 Edge 已知问题限制，返回此前打开过侧栏的课程标签后需要再次点击工具栏图标。
 - 使用 Edge/Chrome 内置 Translator API 在本机按完整句段落翻译字幕；自动识别字幕语言，首版可选择简体中文、英语、日语、韩语或西班牙语作为目标语言，并提前下载当前语言对。
-- 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放。
+- 按住右 Option/Alt 或侧栏按钮录音，松开后恢复播放；空格和左右方向键固定保留给视频控制。
 - Base、Small、Medium 三种 Whisper 模型均在浏览器本机运行。
 - 正序或倒序查看时间线，支持编辑、删除、清空、弯箭头撤销/反撤销，以及持久化的 10–24px 笔记字号调节。
 - 导出 ZIP，包含 Markdown、截图和原始录音。
@@ -31,12 +32,12 @@
 
 ### Edge 商店
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.5。1.0.33 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.5。1.0.34 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.33 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.33/video-notes-edge-1.0.33.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.33/video-notes-edge-1.0.33.zip.sha256)
+[下载视频笔记 1.0.34 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.34/video-notes-edge-1.0.34.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.34/video-notes-edge-1.0.34.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -78,8 +79,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.33.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.33.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.34.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.34.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。

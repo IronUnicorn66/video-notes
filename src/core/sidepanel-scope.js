@@ -145,6 +145,20 @@ export function sidePanelRequestTabIdForSender(
   return requestedTabId;
 }
 
+export function activeSidePanelRequestTabId(context, activeTab, requestedTabId) {
+  if (
+    !validContextId(context?.windowId)
+    || !validContextId(activeTab?.id)
+    || activeTab.windowId !== context.windowId
+  ) {
+    throw new Error("无法确定侧栏所属标签页");
+  }
+  if (!validContextId(requestedTabId) || requestedTabId !== activeTab.id) {
+    throw new Error("侧栏所属标签页已变化");
+  }
+  return requestedTabId;
+}
+
 export function createSidePanelRefreshController(refresh, {
   onContextEvent = () => {},
   onTabChanged = () => {},
