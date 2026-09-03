@@ -120,20 +120,43 @@ export function sidePanelTabIdForSender(sender, contexts, fallbackTabId = null) 
 export function sidePanelRequestTabIdForSender(
   sender,
   contexts,
-  fallbackTabId,
+  activeTab,
   requestedTabId,
 ) {
-  const tabId = sidePanelTabIdForSender(sender, contexts, fallbackTabId);
+  const context = sidePanelContextForSender(sender, contexts);
+  const boundTabId = context.tabId;
+  const activeTabMatchesWindow = validContextId(activeTab?.id)
+    && (context.windowId === null || activeTab.windowId === context.windowId);
 
-  if (tabId === null) {
+  if (boundTabId === null && !activeTabMatchesWindow) {
     throw new Error("无法确定侧栏所属标签页");
   }
 
-  if (!Number.isInteger(requestedTabId) || requestedTabId !== tabId) {
+  if (
+    !validContextId(requestedTabId)
+    || (
+      requestedTabId !== boundTabId
+      && (!activeTabMatchesWindow || requestedTabId !== activeTab.id)
+    )
+  ) {
     throw new Error("侧栏所属标签页已变化");
   }
 
-  return tabId;
+  return requestedTabId;
+}
+
+export function activeSidePanelRequestTabId(context, activeTab, requestedTabId) {
+  if (
+    !validContextId(context?.windowId)
+    || !validContextId(activeTab?.id)
+    || activeTab.windowId !== context.windowId
+  ) {
+    throw new Error("无法确定侧栏所属标签页");
+  }
+  if (!validContextId(requestedTabId) || requestedTabId !== activeTab.id) {
+    throw new Error("侧栏所属标签页已变化");
+  }
+  return requestedTabId;
 }
 
 export function createSidePanelRefreshController(refresh, {

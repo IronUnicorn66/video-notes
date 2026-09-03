@@ -33,6 +33,7 @@ import {
   isMicrophonePermissionError,
 } from "./core/media-permissions.js";
 import {
+  activeSidePanelRequestTabId,
   activeContextChangedMessage,
   contextChangedSenderTab,
   createActiveTabActivationHandler,
@@ -42,6 +43,7 @@ import {
   sidePanelMessageForTabUpdate,
   sidePanelOptionsForTab,
   sidePanelRequestTabIdForSender,
+  sidePanelTabIdForSender,
 } from "./core/sidepanel-scope.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
 import { clearLegacyCloudTranslationSettings } from "./core/local-only-migration.js";
@@ -763,26 +765,28 @@ async function noteHistoryRequest(message, sender) {
   }
 
   const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
+  const boundTabId = sidePanelTabIdForSender(sender, contexts);
+  const [activeTab] = fallbackTab
+    ? [fallbackTab]
+    : boundTabId === message.tabId
+      ? []
+      : await chrome.tabs.query({ active: true, windowId: context.windowId });
   return {
     sender,
     tabId: sidePanelRequestTabIdForSender(
       sender,
       contexts,
-      fallbackTab?.id ?? context.tabId,
+      activeTab,
       message.tabId,
     ),
   };
 }
 
 async function sidePanelTargetTab(sender, requestedTabId) {
-  const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
-  const tabId = sidePanelRequestTabIdForSender(
-    sender,
-    contexts,
-    fallbackTab?.id ?? context.tabId,
-    requestedTabId,
-  );
-  return chrome.tabs.get(tabId);
+  const { context } = await resolveSidePanelContext(sender);
+  const [activeTab] = await chrome.tabs.query({ active: true, windowId: context.windowId });
+  activeSidePanelRequestTabId(context, activeTab, requestedTabId);
+  return activeTab;
 }
 
 async function handleMessage(message, sender) {

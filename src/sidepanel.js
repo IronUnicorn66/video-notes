@@ -32,6 +32,7 @@ import {
 import { normalizeSubtitleSettings } from "./core/subtitle-capture.js";
 import { subtitleBlockState } from "./core/subtitle-view.js";
 import {
+  anchoredTranscriptScrollTop,
   centeredTranscriptScrollTop,
   formatTranscriptProgress,
   formatTranscriptTimeRange,
@@ -44,6 +45,7 @@ import {
   TRANSCRIPT_FONT_SIZE_MIN,
   transcriptFontSizeAfterStep,
   transcriptGroupIndexAtTime,
+  transcriptReadingAnchor,
   transcriptCoverage,
   transcriptFailureMessageKey,
 } from "./core/full-transcript-view.js";
@@ -257,6 +259,11 @@ const sidePanelViewPosition = createSidePanelViewPositionController({
   restoreTranscriptPosition: (position) => {
     elements.fullTranscriptList.scrollTop = position;
   },
+  readTranscriptAnchor: captureFullTranscriptReadingAnchor,
+  restoreTranscriptAnchor: (anchor, fallbackPosition) => restoreFullTranscriptReadingAnchor(
+    anchor,
+    fallbackPosition,
+  ),
   getTranscriptGroupSize: () => fullTranscriptGroupSize,
   onError: (error) => console.warn("读写侧栏位置失败", error),
 });
@@ -758,9 +765,51 @@ function syncFullTranscriptTranslateButton() {
   }
 }
 
+function captureFullTranscriptReadingAnchor() {
+  const listBounds = elements.fullTranscriptList.getBoundingClientRect();
+  return transcriptReadingAnchor({
+    listTop: listBounds.top,
+    listHeight: listBounds.height,
+    cues: Array.from(elements.fullTranscriptList.children, (cue) => {
+      const bounds = cue.getBoundingClientRect();
+      return {
+        id: cue.dataset.transcriptGroupId ?? "",
+        top: bounds.top,
+        height: bounds.height,
+      };
+    }),
+  });
+}
+
+function restoreFullTranscriptReadingAnchor(anchor, fallbackPosition) {
+  elements.fullTranscriptList.scrollTop = fallbackPosition;
+  if (!anchor) return false;
+  const cue = Array.from(elements.fullTranscriptList.children).find(
+    (item) => item.dataset.transcriptGroupId === anchor.id,
+  );
+  if (!cue) return false;
+
+  const listBounds = elements.fullTranscriptList.getBoundingClientRect();
+  const cueBounds = cue.getBoundingClientRect();
+  const coordinateScale = elements.fullTranscriptList.clientHeight > 0
+    ? listBounds.height / elements.fullTranscriptList.clientHeight
+    : 1;
+  elements.fullTranscriptList.scrollTop = anchoredTranscriptScrollTop({
+    currentScrollTop: elements.fullTranscriptList.scrollTop,
+    previousViewportOffset: anchor.viewportOffset,
+    nextViewportOffset: cueBounds.top - listBounds.top,
+    coordinateScale,
+    maxScrollTop: elements.fullTranscriptList.scrollHeight
+      - elements.fullTranscriptList.clientHeight,
+  });
+  sidePanelViewPosition.scheduleSave();
+  return true;
+}
+
 function renderFullTranscript() {
   const visibleCues = currentFullTranscriptGroups();
   const scrollPosition = elements.fullTranscriptList.scrollTop;
+  const readingAnchor = captureFullTranscriptReadingAnchor();
   fullTranscriptDisplayBinding.setAvailable(
     !fullTranscriptTranslationRunning && transcriptGroupsFullyTranslated(visibleCues),
   );
@@ -770,6 +819,7 @@ function renderFullTranscript() {
   for (const cue of visibleCues) {
     const item = document.createElement("li");
     item.className = "full-transcript-cue";
+    item.dataset.transcriptGroupId = cue.id;
     const timestamp = formatTranscriptTimeRange(cue);
     const time = document.createElement("button");
     time.className = "full-transcript-time";
@@ -797,7 +847,7 @@ function renderFullTranscript() {
     }
     elements.fullTranscriptList.append(item);
   }
-  elements.fullTranscriptList.scrollTop = scrollPosition;
+  restoreFullTranscriptReadingAnchor(readingAnchor, scrollPosition);
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptEmpty.hidden = visibleCues.length > 0;
 }
@@ -1694,16 +1744,23 @@ refreshRunner = createSidePanelRefreshRunner({
       .catch(() => whisperStatus);
     return { nextWhisperStatus, response };
   },
-  apply({ nextWhisperStatus, response }) {
-    whisperStatus = nextWhisperStatus;
+  async apply({ nextWhisperStatus, response }, isCurrent) {
     if (!response.context) throw new Error(t("openSupportedVideo"));
+    const contextToken = historyContextToken;
+    const tabId = sidePanelRefresh.tabId;
+    await sidePanelViewPosition.activate(response.context.sessionId);
+    if (
+      !isCurrent()
+      || historyContextToken !== contextToken
+      || sidePanelRefresh.tabId !== tabId
+    ) return;
+    whisperStatus = nextWhisperStatus;
     if (
       activeContext?.sessionId !== response.context?.sessionId
       || activeContextTabId !== sidePanelRefresh.tabId
     ) {
       historyContextToken += 1;
     }
-    void sidePanelViewPosition.activate(response.context.sessionId);
     activeContext = response.context;
     activeContextTabId = sidePanelRefresh.tabId;
     canUndo = response.history.canUndo;

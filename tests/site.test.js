@@ -27,7 +27,7 @@ test("双语主页按首屏、用法和当前功能组织核心信息", async ()
     assert.match(html, /microsoftedge\.microsoft\.com\/addons\/detail\/cndejflmchbjejlflldlmfplcadnpjkj/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.33\/video-notes-edge-1\.0\.33\.zip/,
+      /releases\/download\/v1\.0\.34\/video-notes-edge-1\.0\.34\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
