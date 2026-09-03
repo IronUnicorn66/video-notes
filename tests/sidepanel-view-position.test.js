@@ -19,14 +19,31 @@ function createHarness(storage, {
   page = 0,
   transcript = 0,
   groupSize = 5,
+  transcriptAnchor = null,
+  transcriptAnchorPositions = {},
 } = {}) {
-  const state = { page, transcript, groupSize };
+  const state = {
+    page,
+    transcript,
+    groupSize,
+    transcriptAnchor,
+    transcriptAnchorPositions,
+    restoredTranscriptAnchor: null,
+  };
   const controller = createSidePanelViewPositionController({
     storage,
     readPagePosition: () => state.page,
     restorePagePosition: (position) => { state.page = position; },
     readTranscriptPosition: () => state.transcript,
     restoreTranscriptPosition: (position) => { state.transcript = position; },
+    readTranscriptAnchor: () => state.transcriptAnchor,
+    restoreTranscriptAnchor: (anchor) => {
+      state.restoredTranscriptAnchor = anchor;
+      const position = state.transcriptAnchorPositions[anchor?.id];
+      if (!Number.isFinite(position)) return false;
+      state.transcript = position;
+      return true;
+    },
     getTranscriptGroupSize: () => state.groupSize,
   });
   return { controller, state };
@@ -49,6 +66,50 @@ test("侧栏文档销毁后按视频恢复页面和完整字幕位置", async ()
 
   assert.equal(reopened.state.page, 684);
   assert.equal(reopened.state.transcript, 326);
+});
+
+test("译文改变段落高度后按字幕段锚点恢复阅读位置", async () => {
+  const storage = createStorageArea();
+  const first = createHarness(storage, {
+    transcript: 1600,
+    transcriptAnchor: { id: "95:100", viewportOffset: 118 },
+  });
+  await first.controller.activate("youtube:course-a");
+  await first.controller.restoreTranscript();
+  first.state.transcript = 1600;
+  first.state.transcriptAnchor = { id: "95:100", viewportOffset: 118 };
+  await first.controller.flush();
+
+  const reopened = createHarness(storage, {
+    transcriptAnchorPositions: { "95:100": 3040 },
+  });
+  await reopened.controller.activate("youtube:course-a");
+  await reopened.controller.restoreTranscript();
+
+  assert.deepEqual(reopened.state.restoredTranscriptAnchor, {
+    id: "95:100",
+    viewportOffset: 118,
+  });
+  assert.equal(reopened.state.transcript, 3040);
+});
+
+test("保存的字幕段锚点不存在时回退到像素位置", async () => {
+  const storage = createStorageArea();
+  const first = createHarness(storage, {
+    transcript: 1600,
+    transcriptAnchor: { id: "95:100", viewportOffset: 118 },
+  });
+  await first.controller.activate("youtube:course-a");
+  await first.controller.restoreTranscript();
+  first.state.transcript = 1600;
+  first.state.transcriptAnchor = { id: "95:100", viewportOffset: 118 };
+  await first.controller.flush();
+
+  const reopened = createHarness(storage);
+  await reopened.controller.activate("youtube:course-a");
+  await reopened.controller.restoreTranscript();
+
+  assert.equal(reopened.state.transcript, 1600);
 });
 
 test("完整字幕位置按视频和合并档位分别恢复", async () => {

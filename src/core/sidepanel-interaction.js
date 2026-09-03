@@ -198,7 +198,8 @@ export function createSidePanelRefreshRunner({
         defer();
         return false;
       }
-      apply(value);
+      await apply(value, () => currentGeneration === generation);
+      if (currentGeneration !== generation) return false;
       markApplied();
       return true;
     } catch (error) {

@@ -17,8 +17,8 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note. When the current YouTube transcript is already loaded, notes reuse its complete local paragraphs and include the matching local translation when the selected range is fully translated.
 - Reads native subtitles actually rendered by YouTube and Bilibili, plus bilingual subtitles rendered by Immersive Translate. It also attempts to retrieve the current Bilibili part's native track, but this remains unavailable on some newer pages.
-- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, original/translation display choices, timestamp jumps, and current-playback-position locating.
-- Caches a loaded YouTube transcript, each completed target-language/group-size translation, and the side-panel/transcript reading positions locally, so reopening the same video resumes where you left off without another transcript request. Retry always refreshes the source.
+- For YouTube videos with available native captions, shows the full transcript locally with its coverage range, sentence-aware 5, 10, or 20-cue grouping targets, independent font-size controls, original/translation display choices, timestamp jumps, current-playback-position locating, and a stable reading position while translations appear or display modes change.
+- Caches a loaded YouTube transcript, each completed target-language/group-size translation, and the side-panel/transcript reading positions locally. Transcript progress is restored by the same stable passage rather than pixels alone, so translation height changes do not move a reopened view backward. Retry always refreshes the source.
 - Adjusts the whole side panel from 75% to 200% with the `+` and `−` buttons beside the language selector, in 10% steps.
 - Enables the browser side panel only on supported YouTube and Bilibili video tabs. Switching to another page hides it; because of a known Edge issue, returning to a previously open course tab requires selecting the toolbar icon again.
 - Translates sentence-aware transcript paragraphs locally with the built-in Edge/Chrome Translator API. It detects the transcript language automatically and lets you choose Simplified Chinese, English, Japanese, Korean, or Spanish as the target, with advance download and visible progress for the current language pair.
@@ -31,12 +31,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.5. Version 1.0.32 is being prepared for an update review; until it is approved, you can install the matching GitHub Release package.
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.5. Version 1.0.33 is being prepared for an update review; until it is approved, you can install the matching GitHub Release package.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.32 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.32/video-notes-edge-1.0.32.zip.sha256)
+[Download Video Notes 1.0.33 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.33/video-notes-edge-1.0.33.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.33/video-notes-edge-1.0.33.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -78,8 +78,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.32.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.32.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.33.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.33.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.

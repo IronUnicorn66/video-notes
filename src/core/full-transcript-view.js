@@ -61,6 +61,76 @@ export function centeredTranscriptScrollTop({
     + ((cueTop - listTop - ((listHeight - cueHeight) / 2)) / scale);
 }
 
+export function transcriptReadingAnchor({
+  listTop,
+  listHeight,
+  cues,
+}) {
+  if (
+    !Number.isFinite(listTop)
+    || !Number.isFinite(listHeight)
+    || listHeight <= 0
+    || !Array.isArray(cues)
+  ) return null;
+
+  const listBottom = listTop + listHeight;
+  const listCenter = listTop + (listHeight / 2);
+  let closest = null;
+  for (const cue of cues) {
+    if (
+      typeof cue?.id !== "string"
+      || !cue.id
+      || !Number.isFinite(cue.top)
+      || !Number.isFinite(cue.height)
+      || cue.height <= 0
+      || cue.top + cue.height <= listTop
+      || cue.top >= listBottom
+    ) continue;
+
+    const cueBottom = cue.top + cue.height;
+    const distance = listCenter < cue.top
+      ? cue.top - listCenter
+      : listCenter > cueBottom
+        ? listCenter - cueBottom
+        : 0;
+    if (!closest || distance < closest.distance) {
+      closest = {
+        distance,
+        id: cue.id,
+        viewportOffset: cue.top - listTop,
+      };
+    }
+  }
+  return closest
+    ? { id: closest.id, viewportOffset: closest.viewportOffset }
+    : null;
+}
+
+export function anchoredTranscriptScrollTop({
+  currentScrollTop,
+  previousViewportOffset,
+  nextViewportOffset,
+  coordinateScale = 1,
+  maxScrollTop = Number.POSITIVE_INFINITY,
+}) {
+  const current = Number.isFinite(currentScrollTop)
+    ? Math.max(0, currentScrollTop)
+    : 0;
+  const maximum = Number.isFinite(maxScrollTop)
+    ? Math.max(0, maxScrollTop)
+    : Number.POSITIVE_INFINITY;
+  if (
+    !Number.isFinite(previousViewportOffset)
+    || !Number.isFinite(nextViewportOffset)
+  ) return Math.min(current, maximum);
+
+  const scale = Number.isFinite(coordinateScale) && coordinateScale > 0
+    ? coordinateScale
+    : 1;
+  const next = current + ((nextViewportOffset - previousViewportOffset) / scale);
+  return Math.min(maximum, Math.max(0, next));
+}
+
 function formatTranscriptTime(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const hours = Math.floor(totalSeconds / 3600);

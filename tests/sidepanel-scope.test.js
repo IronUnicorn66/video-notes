@@ -143,19 +143,31 @@ test("活动标签广播同时携带标签页和窗口标识", () => {
   assert.equal(activeContextChangedMessage(7, -1), null);
 });
 
-test("侧栏历史请求拒绝已经切换前的旧标签页标识", () => {
+test("侧栏页面请求只接纳原绑定或同窗口的当前活动标签页", () => {
   const sender = { documentId: "panel-a" };
   const contexts = [{
     contextType: "SIDE_PANEL",
     documentId: "panel-a",
-    tabId: 2,
+    tabId: 1,
+    windowId: 10,
   }];
 
+  assert.equal(
+    sidePanelRequestTabIdForSender(sender, contexts, { id: 2, windowId: 10 }, 1),
+    1,
+  );
+  assert.equal(
+    sidePanelRequestTabIdForSender(sender, contexts, { id: 2, windowId: 10 }, 2),
+    2,
+  );
   assert.throws(
-    () => sidePanelRequestTabIdForSender(sender, contexts, 2, 1),
+    () => sidePanelRequestTabIdForSender(sender, contexts, { id: 2, windowId: 20 }, 2),
     /侧栏所属标签页已变化/,
   );
-  assert.equal(sidePanelRequestTabIdForSender(sender, contexts, 2, 2), 2);
+  assert.throws(
+    () => sidePanelRequestTabIdForSender(sender, contexts, { id: 2, windowId: 10 }, 3),
+    /侧栏所属标签页已变化/,
+  );
 });
 
 test("标签页加载完成后通知已打开侧栏重试当前页面", () => {
