@@ -53,6 +53,20 @@ test("同一视频优先恢复本地字幕与译文缓存，重试时强制重�
   );
 });
 
+test("侧栏重开和切换合并档位后恢复完整字幕列表位置", () => {
+  assert.match(source, /readTranscriptPosition:\s*\(\)\s*=>\s*elements\.fullTranscriptList\.scrollTop/);
+  assert.match(
+    source,
+    /restoreTranscriptPosition:\s*\(position\)\s*=>\s*\{\s*elements\.fullTranscriptList\.scrollTop = position;/,
+  );
+  assert.match(
+    source,
+    /fullTranscriptList\.addEventListener\("scroll",[\s\S]*sidePanelViewPosition\.scheduleSave\(\)/,
+  );
+  assert.match(source, /sidePanelViewPosition\.prepareTranscriptGroupChange\(\)/);
+  assert.match(source, /renderFullTranscript\(\);\s*void sidePanelViewPosition\.restoreTranscript\(\);/);
+});
+
 test("完整字幕工具栏将分组和操作控件保持在同一行", () => {
   assert.match(css, /\.full-transcript-list\s*\{[^}]*max-height:/s);
   assert.match(css, /\.full-transcript-toolbar\s*\{[^}]*display:\s*flex/s);
@@ -195,7 +209,7 @@ test("侧栏只创建浏览器本地会话并支持提前下载语言包", () =>
 test("完整字幕加载结束后会重新启用翻译按钮", () => {
   assert.match(
     source,
-    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*syncFullTranscriptLocateButton\(\);\s*\}/s,
+    /if \(generation === fullTranscriptGeneration\) \{\s*fullTranscriptLoading = false;\s*syncFullTranscriptTranslateButton\(\);\s*syncFullTranscriptLocateButton\(\);[\s\S]*\}/s,
   );
 });
 

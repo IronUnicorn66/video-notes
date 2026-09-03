@@ -29,7 +29,7 @@
       <header class="policy-header">
         <p class="eyebrow"><span></span>Privacy Policy</p>
         <h1>Video Notes privacy policy</h1>
-        <p>Effective date: September 1, 2026</p>
+        <p>Effective date: September 3, 2026</p>
       </header>
 
       <article class="policy-body">
@@ -46,7 +46,7 @@
             <li>Native subtitles or bilingual Immersive Translate subtitles already rendered on the current page, plus loaded YouTube full transcripts and completed local full-transcript translations.</li>
             <li>The visible player image when you explicitly enable player screenshots.</li>
             <li>Microphone audio recorded while you hold the talk control, plus local Whisper transcription results.</li>
-            <li>Shortcut, subtitle window, whole-side-panel zoom, full-transcript group size, font size, original/translation display preference, timeline order, permission, language, and model settings.</li>
+            <li>Shortcut, subtitle window, whole-side-panel zoom, full-transcript group size, font size, original/translation display preference, per-video side-panel and transcript-list positions, timeline order, permission, language, and model settings.</li>
             <li>The transcript language, your selected target-language code, selected language pack, and browser language-pack status used for local browser translation.</li>
           </ul>
           <p>The extension does not build a background browsing history or read unrelated website content to create notes.</p>
@@ -55,7 +55,7 @@
 
         <section>
           <h2>Storage and processing location</h2>
-          <p>Notes, subtitles, screenshots, recordings, transcriptions, video session information, cached YouTube full transcripts, and completed full-transcript translations are stored in the extension’s IndexedDB. Completed translations are kept separately for each target language and 5, 10, or 20-cue grouping. Whole-side-panel zoom, usable browser language codes, the selected language pack, and language-pair state are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs.</p>
+          <p>Notes, subtitles, screenshots, recordings, transcriptions, video session information, cached YouTube full transcripts, and completed full-transcript translations are stored in the extension’s IndexedDB. Completed translations are kept separately for each target language and 5, 10, or 20-cue grouping. Settings and per-video side-panel and group-specific transcript-list positions are stored in local extension storage. Whisper weights are stored in Cache Storage. Edge and Chrome manage their own browser translation language packs.</p>
           <p>Video Notes has no developer-operated server. It does not upload your notes, subtitles, screenshots, recordings, transcriptions, or video visit history to the developer. It has no account system, advertising, or analytics, and it does not sell, rent, or share your data.</p>
         </section>
 
@@ -93,7 +93,7 @@
 
         <section>
           <h2>Retention and how to delete your data</h2>
-          <p>Video Notes retains video sessions, cached full transcripts, completed full-transcript translations, and downloaded Whisper models so you can continue when you return to the same lesson. Deleting one note or clearing the timeline removes those notes but does not remove the transcript cache; Retry replaces the current video’s cache with a newly loaded transcript. You can clear all extension data from the Edge or Chrome extension management page, and uninstalling the extension also causes the browser to clear extension storage. Browser translation language packs are managed by the browser itself.</p>
+          <p>Video Notes retains video sessions, cached full transcripts, completed full-transcript translations, per-video reading positions, and downloaded Whisper models so you can continue when you return to the same lesson. Deleting one note or clearing the timeline removes those notes but does not remove the transcript cache or reading positions; Retry replaces the current video’s cache with a newly loaded transcript. You can clear all extension data from the Edge or Chrome extension management page, and uninstalling the extension also causes the browser to clear extension storage. Browser translation language packs are managed by the browser itself.</p>
           <p>Exporting a ZIP does not delete the browser session. You control ZIP files after they are saved to your Downloads folder.</p>
         </section>
 

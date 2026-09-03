@@ -7,7 +7,6 @@ import {
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
   createExistingSidePanelOptionsConfigurator,
-  createSidePanelScrollMemory,
   createSidePanelContextResolver,
   createSidePanelRefreshController,
   contextChangedSenderTab,
@@ -322,36 +321,6 @@ test("活动课程标签切换时侧栏接管新标签并刷新", () => {
     windowId: 10,
   });
   assert.deepEqual(tabChanges, [[1, 2]]);
-});
-
-test("切换标签页后恢复各自的侧栏滚动位置", () => {
-  let currentPosition = 0;
-  const restoredPositions = [];
-  const scrollMemory = createSidePanelScrollMemory({
-    readPosition: () => currentPosition,
-    restorePosition(position) {
-      restoredPositions.push(position);
-      currentPosition = position;
-    },
-  });
-
-  assert.equal(scrollMemory.activateTab(1), true);
-  assert.equal(scrollMemory.restoreTab(1), true);
-  assert.deepEqual(restoredPositions, [0]);
-
-  currentPosition = 480;
-  assert.equal(scrollMemory.activateTab(2), true);
-  assert.equal(scrollMemory.restoreTab(2), true);
-  assert.deepEqual(restoredPositions, [0, 0]);
-
-  currentPosition = 120;
-  assert.equal(scrollMemory.activateTab(1), true);
-  assert.equal(scrollMemory.restoreTab(1), true);
-  assert.deepEqual(restoredPositions, [0, 0, 480]);
-
-  assert.equal(scrollMemory.activateTab(1), false);
-  assert.equal(scrollMemory.restoreTab(2), false);
-  assert.deepEqual(restoredPositions, [0, 0, 480]);
 });
 
 test("两个窗口只让匹配窗口的侧栏接管活动标签", () => {

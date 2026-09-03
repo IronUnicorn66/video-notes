@@ -22,9 +22,9 @@ import {
 import { VideoNotesRepository } from "./core/storage.js";
 import {
   createSidePanelRefreshController,
-  createSidePanelScrollMemory,
   isSidePanelRefreshMessage,
 } from "./core/sidepanel-scope.js";
+import { createSidePanelViewPositionController } from "./core/sidepanel-view-position.js";
 import {
   createSidePanelInlineEditController,
   createSidePanelRefreshRunner,
@@ -243,9 +243,16 @@ const sidepanelZoomBinding = createSidepanelZoomBinding({
   showToast,
 });
 
-const sidePanelScrollMemory = createSidePanelScrollMemory({
-  readPosition: () => window.scrollY,
-  restorePosition: (position) => window.scrollTo(0, position),
+const sidePanelViewPosition = createSidePanelViewPositionController({
+  storage: chrome.storage.local,
+  readPagePosition: () => window.scrollY,
+  restorePagePosition: (position) => window.scrollTo(0, position),
+  readTranscriptPosition: () => elements.fullTranscriptList.scrollTop,
+  restoreTranscriptPosition: (position) => {
+    elements.fullTranscriptList.scrollTop = position;
+  },
+  getTranscriptGroupSize: () => fullTranscriptGroupSize,
+  onError: (error) => console.warn("读写侧栏位置失败", error),
 });
 
 const sidePanelRefresh = createSidePanelRefreshController(() => {
@@ -253,14 +260,12 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
 }, {
   onContextEvent(message) {
     if (["ACTIVE_CONTEXT_CHANGED", "TAB_LOAD_COMPLETE"].includes(message.type)) {
+      sidePanelViewPosition.prepareContentReload();
       historyContextToken += 1;
       closeStaleHistoryConfirmation();
       resetFullTranscript();
     }
     if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
-  },
-  onTabChanged(_previousTabId, tabId) {
-    sidePanelScrollMemory.activateTab(tabId);
   },
   shouldRefresh(message) {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
@@ -568,6 +573,7 @@ function showLocatedFullTranscriptCue(index) {
     cueHeight: cueBounds.height,
     coordinateScale,
   });
+  sidePanelViewPosition.scheduleSave();
   fullTranscriptLocatedCueTimer = setTimeout(() => {
     cue.classList.remove("full-transcript-cue-located");
     cue.removeAttribute("aria-current");
@@ -747,6 +753,7 @@ function syncFullTranscriptTranslateButton() {
 
 function renderFullTranscript() {
   const visibleCues = currentFullTranscriptGroups();
+  const scrollPosition = elements.fullTranscriptList.scrollTop;
   fullTranscriptDisplayBinding.setAvailable(
     !fullTranscriptTranslationRunning && transcriptGroupsFullyTranslated(visibleCues),
   );
@@ -783,6 +790,7 @@ function renderFullTranscript() {
     }
     elements.fullTranscriptList.append(item);
   }
+  elements.fullTranscriptList.scrollTop = scrollPosition;
   elements.fullTranscriptEmpty.textContent = t("fullTranscriptWaiting");
   elements.fullTranscriptEmpty.hidden = visibleCues.length > 0;
 }
@@ -1293,6 +1301,7 @@ async function loadFullTranscript({ force = false } = {}) {
     syncFullTranscriptTranslateButton();
     elements.fullTranscriptRetry.disabled = false;
     renderFullTranscript();
+    void sidePanelViewPosition.restoreTranscript();
     void refreshBrowserTranscriptTranslationAvailability();
   } catch (error) {
     if (generation !== fullTranscriptGeneration || contextKey !== fullTranscriptContextKey) return;
@@ -1304,6 +1313,7 @@ async function loadFullTranscript({ force = false } = {}) {
       fullTranscriptLoading = false;
       syncFullTranscriptTranslateButton();
       syncFullTranscriptLocateButton();
+      void sidePanelViewPosition.restorePage();
     }
   }
 }
@@ -1679,17 +1689,18 @@ refreshRunner = createSidePanelRefreshRunner({
   },
   apply({ nextWhisperStatus, response }) {
     whisperStatus = nextWhisperStatus;
+    if (!response.context) throw new Error(t("openSupportedVideo"));
     if (
       activeContext?.sessionId !== response.context?.sessionId
       || activeContextTabId !== sidePanelRefresh.tabId
     ) {
       historyContextToken += 1;
     }
+    void sidePanelViewPosition.activate(response.context.sessionId);
     activeContext = response.context;
     activeContextTabId = sidePanelRefresh.tabId;
     canUndo = response.history.canUndo;
     canRedo = response.history.canRedo;
-    if (!activeContext) throw new Error(t("openSupportedVideo"));
     elements.videoTitle.textContent = activeContext.title;
     elements.videoUrl.href = activeContext.canonicalUrl;
     elements.videoUrl.hidden = false;
@@ -1697,10 +1708,13 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.voiceButton.disabled = false;
     renderNotes(response.notes);
     syncFullTranscriptContext();
-    sidePanelScrollMemory.restoreTab(sidePanelRefresh.tabId);
+    void sidePanelViewPosition.restorePage({
+      deferIfClamped: activeContext.platform === "youtube",
+    });
   },
   applyError(error) {
     if (activeContext || activeContextTabId !== null) historyContextToken += 1;
+    sidePanelViewPosition.deactivate();
     activeContext = null;
     activeContextTabId = null;
     canUndo = false;
@@ -1712,7 +1726,6 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.exportButton.disabled = true;
     renderNotes([]);
     resetFullTranscript({ hide: true });
-    sidePanelScrollMemory.restoreTab(sidePanelRefresh.tabId);
   },
   isBlocked: () => inlineEditController.blocked,
   defer() {
@@ -1975,6 +1988,9 @@ elements.noteFontSizeDecrease.addEventListener("click", () => {
 elements.noteFontSizeIncrease.addEventListener("click", () => {
   void changeNoteFontSize(1);
 });
+elements.fullTranscriptList.addEventListener("scroll", () => {
+  sidePanelViewPosition.scheduleSave();
+}, { passive: true });
 elements.fullTranscriptList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-seconds]");
   if (!button) return;
@@ -1989,6 +2005,10 @@ elements.fullTranscriptList.addEventListener("click", (event) => {
     showToast(error.message);
   });
 });
+
+window.addEventListener("scroll", () => {
+  sidePanelViewPosition.scheduleSave();
+}, { passive: true });
 
 elements.voiceButton.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -2098,18 +2118,22 @@ for (const button of elements.fullTranscriptGroupButtons) {
       return;
     }
     const previous = fullTranscriptGroupSize;
+    sidePanelViewPosition.prepareTranscriptGroupChange();
     fullTranscriptGroupSize = normalizeTranscriptGroupSize(button.value);
     restoreFullTranscriptTranslations();
     syncFullTranscriptGroupButtons();
     renderFullTranscript();
+    void sidePanelViewPosition.restoreTranscript();
     syncLocalTranscriptNoteSource();
     try {
       await chrome.storage.local.set({ fullTranscriptGroupSize });
     } catch (error) {
+      sidePanelViewPosition.prepareTranscriptGroupChange();
       fullTranscriptGroupSize = previous;
       restoreFullTranscriptTranslations();
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      void sidePanelViewPosition.restoreTranscript();
       syncLocalTranscriptNoteSource();
       showToast(error.message);
     }
@@ -2267,7 +2291,9 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  sidePanelRefresh.handleVisibilityChange(document.visibilityState === "visible");
+  const visible = document.visibilityState === "visible";
+  if (!visible) void sidePanelViewPosition.flush();
+  sidePanelRefresh.handleVisibilityChange(visible);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -2316,10 +2342,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const nextGroupSize = normalizeTranscriptGroupSize(changes.fullTranscriptGroupSize.newValue);
     if (nextGroupSize !== fullTranscriptGroupSize) {
       cancelFullTranscriptTranslation();
+      sidePanelViewPosition.prepareTranscriptGroupChange();
       fullTranscriptGroupSize = nextGroupSize;
       restoreFullTranscriptTranslations();
       syncFullTranscriptGroupButtons();
       renderFullTranscript();
+      void sidePanelViewPosition.restoreTranscript();
       syncLocalTranscriptNoteSource();
     }
   }
@@ -2366,6 +2394,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 window.addEventListener("pagehide", () => {
+  void sidePanelViewPosition.flush();
   ++renderGeneration;
   cancelBrowserTranslationLanguagePackDownload();
   cancelFullTranscriptTranslation();
@@ -2439,7 +2468,6 @@ await initializeSidepanel({
   setPanelContext: async () => {
     const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
     sidePanelRefresh.setTabId(panelContext.tabId, panelContext.windowId);
-    sidePanelScrollMemory.activateTab(panelContext.tabId);
   },
   refresh,
   renderWhisperStatus,

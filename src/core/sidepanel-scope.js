@@ -62,37 +62,6 @@ export function createCurrentPageContextReader({
   };
 }
 
-export function createSidePanelScrollMemory({
-  readPosition,
-  restorePosition,
-}) {
-  const positions = new Map();
-  let activeTabId = null;
-  let pendingRestoreTabId = null;
-
-  function normalizedPosition(value) {
-    return Number.isFinite(value) && value > 0 ? value : 0;
-  }
-
-  return {
-    activateTab(tabId) {
-      if (!validContextId(tabId) || tabId === activeTabId) return false;
-      if (activeTabId !== null) {
-        positions.set(activeTabId, normalizedPosition(readPosition()));
-      }
-      activeTabId = tabId;
-      pendingRestoreTabId = tabId;
-      return true;
-    },
-    restoreTab(tabId) {
-      if (tabId !== activeTabId || tabId !== pendingRestoreTabId) return false;
-      pendingRestoreTabId = null;
-      restorePosition(positions.get(tabId) ?? 0);
-      return true;
-    },
-  };
-}
-
 export function createSidePanelContextResolver({ runtime, tabs }) {
   return async (sender) => {
     const contexts = await runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });

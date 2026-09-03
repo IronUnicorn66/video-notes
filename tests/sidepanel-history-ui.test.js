@@ -164,18 +164,16 @@ test("窄侧栏时间线标题与操作按钮保持单行对齐", () => {
   assert.match(css, /min-width:\s*320px/);
 });
 
-test("课程标签切换后恢复各自的侧栏滚动位置", () => {
+test("侧栏重新打开后按视频恢复整页滚动位置", () => {
   assert.match(
     source,
-    /createSidePanelScrollMemory\(\{[\s\S]*readPosition:\s*\(\)\s*=>\s*window\.scrollY,[\s\S]*restorePosition:\s*\(position\)\s*=>\s*window\.scrollTo\(0, position\)/,
+    /createSidePanelViewPositionController\(\{[\s\S]*readPagePosition:\s*\(\)\s*=>\s*window\.scrollY,[\s\S]*restorePagePosition:\s*\(position\)\s*=>\s*window\.scrollTo\(0, position\)/,
   );
+  assert.match(source, /sidePanelViewPosition\.activate\(response\.context\.sessionId\)/);
   assert.match(
     source,
-    /onTabChanged\(_previousTabId, tabId\)\s*\{\s*sidePanelScrollMemory\.activateTab\(tabId\)/,
+    /sidePanelViewPosition\.restorePage\(\{\s*deferIfClamped: activeContext\.platform === "youtube",\s*\}\)/,
   );
-  assert.equal(occurrences(source, /sidePanelScrollMemory\.restoreTab\(/g), 2);
-  assert.match(
-    source,
-    /sidePanelRefresh\.setTabId\(panelContext\.tabId, panelContext\.windowId\);\s*sidePanelScrollMemory\.activateTab\(panelContext\.tabId\)/,
-  );
+  assert.match(source, /window\.addEventListener\("scroll",[\s\S]*sidePanelViewPosition\.scheduleSave\(\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*void sidePanelViewPosition\.flush\(\);/);
 });
