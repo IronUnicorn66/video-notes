@@ -8,18 +8,19 @@
 
 <p align="center">Read and locally translate transcripts while capturing timestamps, screenshots, voice, and your own thoughts beside a lesson.</p>
 
-Video Notes is an open-source extension for desktop Microsoft Edge and Google Chrome. It keeps a side panel visible beside YouTube and Bilibili videos, putting full-transcript reading, local browser translation, typed notes, player screenshots, local voice transcription, and Markdown export in one flow.
+Video Notes is an open-source extension for desktop Microsoft Edge and Google Chrome. It can stay beside YouTube and Bilibili videos as a side panel or open in a separate window, putting full-transcript reading, local browser translation, typed notes, player screenshots, local voice transcription, and Markdown export in one flow.
 
 ![Video Notes side panel](store-assets/edge/screenshot-1-note-en.png)
 
-## What’s new in 1.0.35
+## What’s new in 1.0.36
 
-- Full-transcript progress is anchored to a stable passage, so incremental translations, source/translation display changes, and reopening the side panel keep you where you left off.
-- Use Left/Right Arrow to seek 5 seconds and Space to toggle playback from the video page or side panel, while text fields retain their normal editing behavior.
+- A new **Separate window** control opens the complete Video Notes interface in a persistent, resizable window; repeated clicks reuse that window.
+- The separate window stays bound to the video it was opened from and keeps typed and voice notes, screenshots, transcript translation, playback controls, history, settings, and export consistent with the side panel.
 
 ## What it does
 
 - Pauses the video when you focus the quick-note editor, then saves and resumes when you move focus away.
+- Works in the browser side panel or a resizable separate window. Starting a note reactivates a bound video that was moved into the background so pausing and screenshots still target the right page.
 - Keeps unmodified Left/Right Arrow and Space controls available from the video page or side panel: seek 5 seconds backward/forward or toggle playback. Text editors keep normal spaces and caret movement.
 - Stores the video timestamp, an optional player screenshot, and the previous 5, 10, 20, or 30 seconds of subtitles with each note. When the current YouTube transcript is already loaded, notes reuse its complete local paragraphs and include the matching local translation when the selected range is fully translated.
 - Reads native subtitles actually rendered by YouTube and Bilibili, plus bilingual subtitles rendered by Immersive Translate. It also attempts to retrieve the current Bilibili part's native track, but this remains unavailable on some newer pages.
@@ -37,12 +38,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.32. Version 1.0.35 is being submitted for update review; until it is approved, you can install the matching GitHub Release package.
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.32. Version 1.0.36 is being prepared for update review; until it is approved, you can install the matching GitHub Release package.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.35 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip.sha256)
+[Download Video Notes 1.0.36 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.36/video-notes-edge-1.0.36.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.36/video-notes-edge-1.0.36.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -55,7 +56,7 @@ Preview builds require manual updates. Download the new release into the same fo
 ## Use
 
 1. Open a standard YouTube video or a Bilibili BV video, then select Video Notes in the Edge toolbar.
-2. Select the quick-note editor, type your thought, and move focus away. You can also press `Cmd/Ctrl + Enter` to save or `Esc` to cancel.
+2. Keep using the side panel or select **Separate window** at the top. Select the quick-note editor, type your thought, and move focus away; you can also press `Cmd/Ctrl + Enter` to save or `Esc` to cancel.
 3. Open **Settings** to enable player screenshots, microphone access, lead-in subtitles, or download a local translation language pack in advance.
 4. Hold Right Option/Alt or **Hold to talk** when you want to add a voice note.
 5. Select and download a pinned Whisper model for local transcription. After the download, transcription can run offline.
@@ -84,8 +85,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.35.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.35.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.36.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.36.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.

@@ -35,6 +35,7 @@ import {
 import {
   activeSidePanelRequestTabId,
   activeContextChangedMessage,
+  activateStandaloneTargetTab,
   contextChangedSenderTab,
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
@@ -44,7 +45,9 @@ import {
   sidePanelOptionsForTab,
   sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
+  standalonePanelRequestTabId,
 } from "./core/sidepanel-scope.js";
+import { createStandaloneWindowManager } from "./core/standalone-window.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
 import { clearLegacyCloudTranslationSettings } from "./core/local-only-migration.js";
 import {
@@ -68,6 +71,7 @@ let offscreenCreationPromise = null;
 let voiceStartPromise = null;
 let voiceStopPromise = null;
 let activeVoiceNote = null;
+let activeVoiceOwner = null;
 let whisperRecoveryPromise = Promise.resolve();
 let microphonePermissionPagePromise = null;
 let microphonePermissionTabId = null;
@@ -78,10 +82,19 @@ const noteHistoryCommandRouter = createNoteHistoryCommandRouter({
   getCurrentContext: currentPageContext,
   onTypedNoteCommitted: releaseMarker,
 });
+const panelUrl = chrome.runtime.getURL("sidepanel.html");
 const resolveSidePanelContext = createSidePanelContextResolver({
   runtime: chrome.runtime,
   tabs: chrome.tabs,
+  panelUrl,
 });
+const standaloneWindowManager = createStandaloneWindowManager({
+  panelUrl,
+  runtime: chrome.runtime,
+  tabs: chrome.tabs,
+  windows: chrome.windows,
+});
+const ACTIVE_VOICE_OWNER_KEY = "activeVoiceOwner";
 const handleActiveTabActivation = createActiveTabActivationHandler({
   runtime: chrome.runtime,
   tabs: chrome.tabs,
@@ -154,6 +167,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const refreshMessage = sidePanelMessageForTabUpdate(tabId, changeInfo, tab);
   if (refreshMessage) {
     void chrome.runtime.sendMessage(refreshMessage).catch(() => {});
+  } else if (changeInfo.status === "complete") {
+    void chrome.runtime.sendMessage({ type: "BOUND_TAB_CHANGED", tabId }).catch(() => {});
   }
 });
 
@@ -167,7 +182,28 @@ async function activeSupportedTab() {
   return tab;
 }
 
-async function targetTab(sender, requestedTabId) {
+function isPanelSender(sender) {
+  try {
+    const senderUrl = new URL(sender?.url);
+    const expected = new URL(panelUrl);
+    return senderUrl.protocol === expected.protocol
+      && senderUrl.host === expected.host
+      && senderUrl.pathname === expected.pathname;
+  } catch {
+    return false;
+  }
+}
+
+async function targetTab(sender, requestedTabId, {
+  activateStandalone = false,
+  requireActiveSidePanel = false,
+} = {}) {
+  if (isPanelSender(sender)) {
+    return sidePanelTargetTab(sender, requestedTabId, {
+      activateStandalone,
+      requireActiveSidePanel,
+    });
+  }
   if (sender.tab?.id) return sender.tab;
   if (Number.isInteger(requestedTabId)) return chrome.tabs.get(requestedTabId);
   return activeSupportedTab();
@@ -197,7 +233,11 @@ async function openMicrophonePermissionPage(returnTab) {
         }
         return { tabId: existing.tabId };
       }
-      const tab = await chrome.tabs.create({ url, active: true });
+      const tab = await chrome.tabs.create({
+        url,
+        active: true,
+        windowId: returnTab.windowId,
+      });
       microphonePermissionTabId = tab.id ?? null;
       return tab;
     })().finally(() => {
@@ -541,11 +581,32 @@ async function releaseStudySoundHold(note, shouldResumeMain) {
   }
 }
 
-async function startVoice(tab, localTranscriptNoteSource) {
+async function currentVoiceOwner() {
+  if (activeVoiceOwner) return activeVoiceOwner;
+  const stored = await chrome.storage.session.get(ACTIVE_VOICE_OWNER_KEY);
+  const owner = stored[ACTIVE_VOICE_OWNER_KEY];
+  if (!Number.isInteger(owner?.tabId)) return null;
+  activeVoiceOwner = owner;
+  return owner;
+}
+
+async function clearVoiceOwner() {
+  activeVoiceOwner = null;
+  await chrome.storage.session.remove(ACTIVE_VOICE_OWNER_KEY);
+}
+
+async function startVoice(tab, localTranscriptNoteSource, ownerDocumentId = null) {
   if (voiceStartPromise || voiceStopPromise) throw new Error("录音正在启动或保存，请稍候");
-  voiceStartPromise = startVoiceUnlocked(tab, localTranscriptNoteSource);
+  activeVoiceOwner = { documentId: ownerDocumentId, tabId: tab.id };
+  voiceStartPromise = (async () => {
+    await chrome.storage.session.set({ [ACTIVE_VOICE_OWNER_KEY]: activeVoiceOwner });
+    return startVoiceUnlocked(tab, localTranscriptNoteSource);
+  })();
   try {
     return await voiceStartPromise;
+  } catch (error) {
+    if (!activeVoiceNote) await clearVoiceOwner().catch(() => {});
+    throw error;
   } finally {
     voiceStartPromise = null;
   }
@@ -602,6 +663,7 @@ async function startVoiceUnlocked(tab, localTranscriptNoteSource) {
     if (state.recording) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
     if (noteId) await cancelNote(noteId, preparedNote);
     activeVoiceNote = null;
+    await clearVoiceOwner().catch(() => {});
     if (permissionError) await openMicrophonePermissionPage(tab).catch(() => {});
     throw new Error(friendlyMicrophoneError(error));
   }
@@ -635,12 +697,18 @@ async function stopVoiceUnlocked(reason) {
       await finishVoiceUi(savedNote);
     }
     activeVoiceNote = null;
+    await clearVoiceOwner().catch(() => {});
     throw error;
   }
   const note = await repository.getNote(result.noteId);
-  if (!note) throw new Error("录音对应的标记已丢失");
+  if (!note) {
+    activeVoiceNote = null;
+    await clearVoiceOwner().catch(() => {});
+    throw new Error("录音对应的标记已丢失");
+  }
   await releaseMarker(note, true);
   activeVoiceNote = null;
+  await clearVoiceOwner().catch(() => {});
   await finishVoiceUi(note);
 
   if (result.whisperReady) {
@@ -670,6 +738,7 @@ async function finishVoiceUi(note) {
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  void chrome.runtime.sendMessage({ type: "BOUND_TAB_REMOVED", tabId }).catch(() => {});
   void (async () => {
     const exists = await chrome.offscreen.hasDocument();
     const recording = exists
@@ -688,6 +757,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     if (recording?.starting) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
     await cancelNote(note.id, note);
     activeVoiceNote = null;
+    await clearVoiceOwner().catch(() => {});
   })().catch(() => {});
 });
 
@@ -751,48 +821,102 @@ async function selectWhisperModelCore(modelId) {
   return sendToOffscreen({ type: "SELECT_WHISPER_MODEL", modelId });
 }
 
-const PAGE_SCOPED_NOTE_HISTORY_COMMANDS = new Set([
-  "GET_ACTIVE_STATE",
+const NOTE_MUTATION_COMMANDS = new Set([
+  "COMMIT_TYPED_NOTE",
+  "UPDATE_NOTE_BODY",
+  "UPDATE_NOTE_SUBTITLE",
   "DELETE_NOTE",
   "CLEAR_SESSION_NOTES",
   "UNDO_NOTE_ACTION",
   "REDO_NOTE_ACTION",
 ]);
+const NOTE_ID_MUTATION_COMMANDS = new Set([
+  "COMMIT_TYPED_NOTE",
+  "UPDATE_NOTE_BODY",
+  "UPDATE_NOTE_SUBTITLE",
+  "DELETE_NOTE",
+]);
 
 async function noteHistoryRequest(message, sender) {
-  if (!PAGE_SCOPED_NOTE_HISTORY_COMMANDS.has(message.type)) {
+  if (!isPanelSender(sender)) {
     return { sender, tabId: message.tabId };
   }
 
   const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
-  const boundTabId = sidePanelTabIdForSender(sender, contexts);
-  const [activeTab] = fallbackTab
-    ? [fallbackTab]
-    : boundTabId === message.tabId
-      ? []
-      : await chrome.tabs.query({ active: true, windowId: context.windowId });
-  return {
-    sender,
-    tabId: sidePanelRequestTabIdForSender(
+  let tabId;
+  if (context.mode === "standalone") {
+    const tab = await sidePanelTargetTab(sender, message.tabId, {
+      requireActiveSidePanel: false,
+    });
+    tabId = tab.id;
+  } else {
+    const boundTabId = sidePanelTabIdForSender(sender, contexts);
+    const [activeTab] = fallbackTab
+      ? [fallbackTab]
+      : boundTabId === message.tabId
+        ? []
+        : await chrome.tabs.query({ active: true, windowId: context.windowId });
+    tabId = sidePanelRequestTabIdForSender(
       sender,
       contexts,
       activeTab,
       message.tabId,
-    ),
-  };
+    );
+  }
+  if (NOTE_ID_MUTATION_COMMANDS.has(message.type)) {
+    const note = await repository.getNote(message.noteId);
+    if (Number.isInteger(note?.tabId) && note.tabId !== tabId) {
+      throw new Error("标记不属于当前标签页");
+    }
+  }
+  return { sender, tabId };
 }
 
-async function sidePanelTargetTab(sender, requestedTabId) {
-  const { context } = await resolveSidePanelContext(sender);
+async function sidePanelTargetTab(sender, requestedTabId, {
+  activateStandalone = false,
+  requireActiveSidePanel = true,
+} = {}) {
+  const { context, contexts, fallbackTab } = await resolveSidePanelContext(sender);
+  if (context.mode === "standalone") {
+    standalonePanelRequestTabId(context, requestedTabId);
+    let target;
+    try {
+      target = fallbackTab ?? await chrome.tabs.get(context.tabId);
+    } catch {
+      throw new Error("原视频标签页已关闭");
+    }
+    return activateStandalone
+      ? activateStandaloneTargetTab(chrome.tabs, context, target)
+      : target;
+  }
+
   const [activeTab] = await chrome.tabs.query({ active: true, windowId: context.windowId });
-  activeSidePanelRequestTabId(context, activeTab, requestedTabId);
-  return activeTab;
+  if (requireActiveSidePanel) {
+    activeSidePanelRequestTabId(context, activeTab, requestedTabId);
+    return activeTab;
+  }
+  const targetTabId = sidePanelRequestTabIdForSender(
+    sender,
+    contexts,
+    activeTab,
+    requestedTabId,
+  );
+  if (fallbackTab?.id === targetTabId) return fallbackTab;
+  if (activeTab?.id === targetTabId) return activeTab;
+  return chrome.tabs.get(targetTabId);
 }
 
 async function handleMessage(message, sender) {
   if (isNoteHistoryCommand(message.type)) {
     const request = await noteHistoryRequest(message, sender);
-    return noteHistoryCommandRouter(message, request);
+    const result = await noteHistoryCommandRouter(message, request);
+    if (NOTE_MUTATION_COMMANDS.has(message.type) && Number.isInteger(request.tabId)) {
+      void chrome.runtime.sendMessage({
+        type: "NOTES_CHANGED",
+        tabId: request.tabId,
+      }).catch(() => {});
+    }
+    return result;
   }
   switch (message.type) {
     case "OFFSCREEN_STORAGE_GET":
@@ -818,6 +942,40 @@ async function handleMessage(message, sender) {
     case "GET_SIDEPANEL_CONTEXT": {
       const { context } = await resolveSidePanelContext(sender);
       return context;
+    }
+    case "GET_VOICE_STATE": {
+      const tab = await sidePanelTargetTab(sender, message.tabId, {
+        requireActiveSidePanel: false,
+      });
+      if (!await chrome.offscreen.hasDocument()) {
+        return { recording: false, noteId: null };
+      }
+      const recordingState = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
+      const note = recordingState.noteId
+        ? await repository.getNote(recordingState.noteId)
+        : null;
+      return {
+        recording: Boolean(recordingState.recording && note?.tabId === tab.id),
+        noteId: note?.tabId === tab.id ? recordingState.noteId : null,
+      };
+    }
+    case "OPEN_STANDALONE_WINDOW": {
+      const tab = await sidePanelTargetTab(sender, message.tabId, {
+        requireActiveSidePanel: false,
+      });
+      const voiceOwner = await currentVoiceOwner();
+      if (voiceOwner && voiceOwner.tabId !== tab.id) {
+        throw new Error("请先结束当前录音，再切换独立窗口的视频");
+      }
+      return standaloneWindowManager.open(tab);
+    }
+    case "FOCUS_BOUND_VIDEO": {
+      const tab = await sidePanelTargetTab(sender, message.tabId, {
+        requireActiveSidePanel: false,
+      });
+      await chrome.tabs.update(tab.id, { active: true });
+      await chrome.windows.update(tab.windowId, { focused: true });
+      return {};
     }
     case "GET_FULL_YOUTUBE_TRANSCRIPT": {
       const tab = await targetTab(sender, message.tabId);
@@ -885,20 +1043,36 @@ async function handleMessage(message, sender) {
       return { seconds: response.seconds };
     }
     case "BEGIN_TYPED_NOTE": {
-      const tab = await targetTab(sender);
+      const tab = await targetTab(sender, message.tabId, {
+        activateStandalone: true,
+        requireActiveSidePanel: true,
+      });
       return beginMarker(tab, "typed", {
         localTranscriptNoteSource: message.localTranscriptNoteSource,
       });
     }
-    case "CANCEL_NOTE":
+    case "CANCEL_NOTE": {
+      if (isPanelSender(sender)) {
+        const tab = await sidePanelTargetTab(sender, message.tabId, {
+          requireActiveSidePanel: false,
+        });
+        const note = await repository.getNote(message.noteId);
+        if (Number.isInteger(note?.tabId) && note.tabId !== tab.id) {
+          throw new Error("标记不属于当前标签页");
+        }
+      }
       await cancelNote(message.noteId);
       return {};
+    }
     case "VOICE_START_REQUEST": {
-      const tab = await targetTab(sender);
-      return startVoice(tab, message.localTranscriptNoteSource);
+      const tab = await targetTab(sender, message.tabId, {
+        activateStandalone: true,
+        requireActiveSidePanel: true,
+      });
+      return startVoice(tab, message.localTranscriptNoteSource, sender.documentId ?? null);
     }
     case "OPEN_MICROPHONE_PERMISSION_PAGE": {
-      const tab = await targetTab(sender);
+      const tab = await targetTab(sender, message.tabId);
       return openMicrophonePermissionPage(tab);
     }
     case "MICROPHONE_PERMISSION_GRANTED":
@@ -906,9 +1080,38 @@ async function handleMessage(message, sender) {
         throw new Error("麦克风授权完成消息来源无效");
       }
       return microphoneNavigation.returnToSource();
-    case "VOICE_STOP_REQUEST":
+    case "VOICE_STOP_REQUEST": {
+      const voiceOwner = await currentVoiceOwner();
+      if (isPanelSender(sender)) {
+        const tab = await sidePanelTargetTab(sender, message.tabId, {
+          requireActiveSidePanel: false,
+        });
+        if (voiceOwner && voiceOwner.tabId !== tab.id) {
+          throw new Error("录音不属于当前标签页");
+        }
+      }
+      if (
+        voiceOwner?.documentId
+        && sender.documentId !== voiceOwner.documentId
+      ) {
+        throw new Error("录音由另一个界面控制");
+      }
       return stopVoice(message.reason);
+    }
     case "CANCEL_PENDING_VOICE": {
+      const voiceOwner = await currentVoiceOwner();
+      if (isPanelSender(sender)) {
+        const tab = await sidePanelTargetTab(sender, message.tabId, {
+          requireActiveSidePanel: false,
+        });
+        if (voiceOwner && voiceOwner.tabId !== tab.id) {
+          return { ignored: true };
+        }
+      }
+      if (
+        voiceOwner?.documentId
+        && sender.documentId !== voiceOwner.documentId
+      ) return { ignored: true };
       cancelPendingVoice = true;
       const state = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
       if (state.recording) await stopVoice(message.reason ?? "sidepanel-closed");

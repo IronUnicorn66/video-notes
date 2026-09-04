@@ -1,4 +1,5 @@
 import { parseVideoContext } from "./site-adapter.js";
+import { standaloneTabIdFromUrl } from "./standalone-window.js";
 
 export function contextChangedSenderTab(sender) {
   return Number.isInteger(sender?.tab?.id) ? sender.tab : null;
@@ -62,8 +63,27 @@ export function createCurrentPageContextReader({
   };
 }
 
-export function createSidePanelContextResolver({ runtime, tabs }) {
+export function createSidePanelContextResolver({ runtime, tabs, panelUrl = "" }) {
   return async (sender) => {
+    const standaloneTabId = standaloneTabIdFromUrl(sender?.url, panelUrl);
+    if (standaloneTabId !== null) {
+      let targetTab = null;
+      try {
+        targetTab = await tabs.get(standaloneTabId);
+      } catch {
+        // 独立窗口保留原绑定，以便原标签关闭后显示明确的不可用状态。
+      }
+      return {
+        context: {
+          mode: "standalone",
+          tabId: standaloneTabId,
+          windowId: validContextId(targetTab?.windowId) ? targetTab.windowId : null,
+        },
+        contexts: [],
+        fallbackTab: targetTab,
+      };
+    }
+
     const contexts = await runtime.getContexts({ contextTypes: ["SIDE_PANEL"] });
     let context = sidePanelContextForSender(sender, contexts);
     let fallbackTab = null;
@@ -80,7 +100,11 @@ export function createSidePanelContextResolver({ runtime, tabs }) {
     if (context.tabId === null || context.windowId === null) {
       throw new Error("无法确定侧栏所属标签页");
     }
-    return { context, contexts, fallbackTab };
+    return {
+      context: { mode: "sidepanel", ...context },
+      contexts,
+      fallbackTab,
+    };
   };
 }
 
@@ -100,6 +124,9 @@ export function sidePanelMessageForTabUpdate(tabId, changeInfo, tab) {
 export function isSidePanelRefreshMessage(message) {
   return [
     "ACTIVE_CONTEXT_CHANGED",
+    "BOUND_TAB_CHANGED",
+    "BOUND_TAB_REMOVED",
+    "NOTES_CHANGED",
     "TAB_LOAD_COMPLETE",
     "NOTE_TRANSCRIBED",
     "VOICE_STATE_CHANGED",
@@ -159,6 +186,28 @@ export function activeSidePanelRequestTabId(context, activeTab, requestedTabId) 
   return requestedTabId;
 }
 
+export function standalonePanelRequestTabId(context, requestedTabId) {
+  if (
+    context?.mode !== "standalone"
+    || !validContextId(context.tabId)
+    || !validContextId(requestedTabId)
+    || requestedTabId !== context.tabId
+  ) {
+    throw new Error("独立窗口绑定的视频已变化");
+  }
+  return requestedTabId;
+}
+
+export async function activateStandaloneTargetTab(tabs, context, targetTab) {
+  if (context?.mode !== "standalone") return targetTab;
+  if (!validContextId(targetTab?.id) || !validContextId(targetTab?.windowId)) {
+    throw new Error("原视频标签页已关闭");
+  }
+  const [activeTab] = await tabs.query({ active: true, windowId: targetTab.windowId });
+  if (activeTab?.id === targetTab.id) return targetTab;
+  return tabs.update(targetTab.id, { active: true });
+}
+
 export function createSidePanelRefreshController(refresh, {
   onContextEvent = () => {},
   onTabChanged = () => {},
@@ -167,6 +216,7 @@ export function createSidePanelRefreshController(refresh, {
 } = {}) {
   let tabId = null;
   let windowId = null;
+  let mode = "sidepanel";
   let deferredMessage = null;
 
   function refreshOrDefer(message) {
@@ -187,6 +237,14 @@ export function createSidePanelRefreshController(refresh, {
     get windowId() {
       return windowId;
     },
+    get mode() {
+      return mode;
+    },
+    setContext(context) {
+      mode = context?.mode === "standalone" ? "standalone" : "sidepanel";
+      tabId = validContextId(context?.tabId) ? context.tabId : null;
+      windowId = validContextId(context?.windowId) ? context.windowId : null;
+    },
     setTabId(value, ownerWindowId) {
       tabId = validContextId(value) ? value : null;
       if (arguments.length > 1) {
@@ -195,6 +253,11 @@ export function createSidePanelRefreshController(refresh, {
     },
     handleContextChanged(message) {
       if (message?.type === "ACTIVE_CONTEXT_CHANGED") {
+        if (mode === "standalone") {
+          if (!Number.isInteger(tabId) || message.tabId !== tabId) return false;
+          refreshOrDefer(message);
+          return true;
+        }
         if (
           !validContextId(message.tabId)
           || !validContextId(message.windowId)

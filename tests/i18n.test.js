@@ -80,6 +80,12 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
   assert.equal(translate("en", "fullTranscriptTranslation"), "Translation");
   assert.equal(translate("zh_CN", "fullTranscriptLocate"), "定位");
   assert.equal(translate("en", "fullTranscriptLocateTitle"), "Locate the transcript at the current playback position");
+  assert.equal(translate("zh_CN", "standaloneWindowHint"), "在可调整大小的独立窗口中打开");
+  assert.equal(translate("en", "standaloneWindowTitle"), "Separate window · Video Notes");
+  assert.equal(
+    localizeRuntimeMessage("en", "录音由另一个界面控制"),
+    "The recording is controlled by another view",
+  );
   assert.equal(translate("zh_CN", "markdownSubtitleOriginal"), "原文");
   assert.equal(translate("en", "markdownSubtitleTranslation"), "Translation");
   assert.equal(localizeRuntimeMessage("zh_CN", "录音启动失败"), "录音启动失败");
