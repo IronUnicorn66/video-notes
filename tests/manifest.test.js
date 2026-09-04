@@ -39,7 +39,7 @@ const enMessages = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.35");
+  assert.equal(manifest.version, "1.0.36");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
@@ -222,8 +222,9 @@ test("后台和隐藏页通过历史提交边界保存笔记", async () => {
 
   assert.match(
     messageHandler,
-    /if \(isNoteHistoryCommand\(message\.type\)\) \{\s+const request = await noteHistoryRequest\(message, sender\);\s+return noteHistoryCommandRouter\(message, request\)/,
+    /if \(isNoteHistoryCommand\(message\.type\)\) \{\s+const request = await noteHistoryRequest\(message, sender\);\s+const result = await noteHistoryCommandRouter\(message, request\)/,
   );
+  assert.match(messageHandler, /type: "NOTES_CHANGED",\s+tabId: request\.tabId/);
   assert.match(background, /sidePanelRequestTabIdForSender/);
   assert.match(voiceStop, /repository\.commitSavedNote\(note\.id/);
   assert.doesNotMatch(voiceSuccess, /repository\.putNote\(/);
@@ -506,6 +507,15 @@ test("录音启动权限失败时先释放资源再打开授权页", async () =>
       < failureCleanup.lastIndexOf("openMicrophonePermissionPage"),
   );
   assert.match(failureCleanup, /openMicrophonePermissionPage\(tab\)\.catch/);
+});
+
+test("录音发起方保存在会话存储中以隔离侧栏与独立窗口", async () => {
+  const background = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
+  assert.match(background, /const ACTIVE_VOICE_OWNER_KEY = "activeVoiceOwner"/);
+  assert.match(background, /chrome\.storage\.session\.set\(\{ \[ACTIVE_VOICE_OWNER_KEY\]: activeVoiceOwner \}\)/);
+  assert.match(background, /chrome\.storage\.session\.get\(ACTIVE_VOICE_OWNER_KEY\)/);
+  assert.match(background, /sender\.documentId !== voiceOwner\.documentId/);
+  assert.match(background, /chrome\.storage\.session\.remove\(ACTIVE_VOICE_OWNER_KEY\)/);
 });
 
 test("麦克风授权成功后返回发起授权的网课标签", async () => {

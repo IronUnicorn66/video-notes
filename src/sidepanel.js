@@ -103,6 +103,7 @@ const elements = {
   sidepanelZoomDecrease: document.querySelector("#sidepanel-zoom-decrease"),
   videoTitle: document.querySelector("#video-title"),
   videoUrl: document.querySelector("#video-url"),
+  standaloneWindowButton: document.querySelector("#standalone-window-button"),
   input: document.querySelector("#note-input"),
   markerTime: document.querySelector("#marker-time"),
   voiceButton: document.querySelector("#voice-button"),
@@ -175,6 +176,7 @@ let typedDraftSaving = false;
 let isComposing = false;
 let commitAfterComposition = false;
 let recording = false;
+let ownedVoiceNoteId = null;
 let voiceStarting = false;
 let voiceStopping = false;
 let pendingVoiceStopReason = null;
@@ -223,6 +225,7 @@ let browserTranslationLanguagePackGeneration = 0;
 const fullTranscriptTranslations = new Map();
 const browserTranscriptTranslationPairs = new Map();
 let localTranscriptNoteSourceRevision = Date.now() * 1000;
+let panelMode = "sidepanel";
 
 const fullTranscriptDisplayBinding = createFullTranscriptDisplayBinding({
   group: elements.fullTranscriptDisplayOptions,
@@ -278,7 +281,9 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
       closeStaleHistoryConfirmation();
       resetFullTranscript();
     }
-    if (message.type === "VOICE_STATE_CHANGED") setRecordingUi(message.recording);
+    if (message.type === "VOICE_STATE_CHANGED") {
+      setRecordingUi(message.recording, message.noteId);
+    }
   },
   shouldRefresh(message) {
     return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
@@ -471,15 +476,33 @@ function formatTranscriptionTime(createdAt) {
   });
 }
 
+const PAGE_SCOPED_REQUESTS = new Set([
+  "GET_ACTIVE_STATE",
+  "GET_FULL_YOUTUBE_TRANSCRIPT",
+  "GET_VIDEO_POSITION",
+  "CONTROL_VIDEO_PLAYBACK",
+  "SEEK_VIDEO",
+  "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
+  "BEGIN_TYPED_NOTE",
+  "CANCEL_NOTE",
+  "VOICE_START_REQUEST",
+  "VOICE_STOP_REQUEST",
+  "CANCEL_PENDING_VOICE",
+  "GET_VOICE_STATE",
+  "OPEN_MICROPHONE_PERMISSION_PAGE",
+  "OPEN_STANDALONE_WINDOW",
+  "FOCUS_BOUND_VIDEO",
+  "COMMIT_TYPED_NOTE",
+  "UPDATE_NOTE_BODY",
+  "UPDATE_NOTE_SUBTITLE",
+  "DELETE_NOTE",
+  "CLEAR_SESSION_NOTES",
+  "UNDO_NOTE_ACTION",
+  "REDO_NOTE_ACTION",
+]);
+
 async function request(message) {
-  const payload = [
-    "GET_ACTIVE_STATE",
-    "GET_FULL_YOUTUBE_TRANSCRIPT",
-    "GET_VIDEO_POSITION",
-    "CONTROL_VIDEO_PLAYBACK",
-    "SEEK_VIDEO",
-    "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
-  ].includes(message.type)
+  const payload = PAGE_SCOPED_REQUESTS.has(message.type)
     && Number.isInteger(sidePanelRefresh.tabId)
     ? { ...message, tabId: sidePanelRefresh.tabId }
     : message;
@@ -1769,7 +1792,8 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.videoUrl.href = activeContext.canonicalUrl;
     elements.videoUrl.hidden = false;
     elements.input.disabled = false;
-    elements.voiceButton.disabled = false;
+    elements.standaloneWindowButton.disabled = false;
+    syncVoiceButtonAvailability();
     renderNotes(response.notes);
     syncFullTranscriptContext();
     void sidePanelViewPosition.restorePage({
@@ -1786,7 +1810,8 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.videoTitle.textContent = localizeRuntimeMessage(interfaceLanguage, error.message);
     elements.videoUrl.hidden = true;
     elements.input.disabled = true;
-    elements.voiceButton.disabled = true;
+    elements.standaloneWindowButton.disabled = true;
+    syncVoiceButtonAvailability();
     elements.exportButton.disabled = true;
     renderNotes([]);
     resetFullTranscript({ hide: true });
@@ -1859,15 +1884,28 @@ async function cancelTypedDraft() {
   }
 }
 
-function setRecordingUi(active) {
+function syncVoiceButtonAvailability() {
+  elements.voiceButton.disabled = !activeContext
+    || voiceStarting
+    || voiceStopping
+    || (recording && !ownedVoiceNoteId);
+}
+
+function setRecordingUi(active, noteId = null) {
   recording = active;
+  if (!active) ownedVoiceNoteId = null;
   syncHistoryControls();
+  syncVoiceButtonAvailability();
   elements.recordingStatus.hidden = !active;
   elements.voiceButton.classList.toggle("is-recording", active);
   elements.voiceLabel.textContent = active ? t("releaseToStop") : t("holdToTalk");
   clearInterval(recordingInterval);
   clearTimeout(recordingTimeout);
   if (!active) return;
+  if (!ownedVoiceNoteId || ownedVoiceNoteId !== noteId) {
+    elements.recordingTimer.textContent = "--:--";
+    return;
+  }
   recordingStartedAt = Date.now();
   const update = () => {
     const seconds = Math.floor((Date.now() - recordingStartedAt) / 1000);
@@ -1881,6 +1919,7 @@ function setRecordingUi(active) {
 async function startVoice() {
   if (recording || voiceStarting || !activeContext) return;
   voiceStarting = true;
+  syncVoiceButtonAvailability();
   syncHistoryControls();
   try {
     if (!microphoneReady) {
@@ -1889,11 +1928,13 @@ async function startVoice() {
       showToast(t("completeMicrophonePermission"));
       return;
     }
-    await request({
+    const response = await request({
       type: "VOICE_START_REQUEST",
       localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
     });
-    setRecordingUi(true);
+    if (response.canceled) return;
+    ownedVoiceNoteId = response.note.id;
+    setRecordingUi(true, response.note.id);
     if (pendingVoiceStopReason) {
       const reason = pendingVoiceStopReason;
       pendingVoiceStopReason = null;
@@ -1904,18 +1945,20 @@ async function startVoice() {
     showToast(error.message);
   } finally {
     voiceStarting = false;
+    syncVoiceButtonAvailability();
     syncHistoryControls();
   }
 }
 
 async function stopVoice(reason = "button-release") {
-  if (voiceStarting && !recording) {
+  if (voiceStarting && !ownedVoiceNoteId) {
     pendingVoiceStopReason = reason;
     return;
   }
-  if (!recording) return;
+  if (!recording || !ownedVoiceNoteId) return;
   setRecordingUi(false);
   voiceStopping = true;
+  syncVoiceButtonAvailability();
   syncHistoryControls();
   try {
     await request({ type: "VOICE_STOP_REQUEST", reason });
@@ -1924,6 +1967,7 @@ async function stopVoice(reason = "button-release") {
     showToast(error.message);
   } finally {
     voiceStopping = false;
+    syncVoiceButtonAvailability();
     syncHistoryControls();
   }
 }
@@ -1994,6 +2038,27 @@ for (const button of elements.languageButtons) {
     location.reload();
   });
 }
+
+elements.standaloneWindowButton.addEventListener("click", async () => {
+  if (!activeContext || panelMode === "standalone") return;
+  elements.standaloneWindowButton.disabled = true;
+  try {
+    await request({ type: "OPEN_STANDALONE_WINDOW" });
+    showToast(t("standaloneWindowOpened"));
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    elements.standaloneWindowButton.disabled = !activeContext;
+  }
+});
+
+elements.videoUrl.addEventListener("click", (event) => {
+  if (panelMode !== "standalone") return;
+  event.preventDefault();
+  void request({ type: "FOCUS_BOUND_VIDEO" }).catch((error) => {
+    showToast(error.message);
+  });
+});
 
 elements.input.addEventListener("focus", () => void beginTypedDraft());
 elements.input.addEventListener("input", autoGrow);
@@ -2501,13 +2566,13 @@ window.addEventListener("pagehide", () => {
   closeScreenshotDialog();
   stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();
-  if (recording || voiceStarting) {
-    void chrome.runtime.sendMessage({ type: "CANCEL_PENDING_VOICE", reason: "sidepanel-closed" });
+  if (ownedVoiceNoteId || voiceStarting) {
+    void request({ type: "CANCEL_PENDING_VOICE", reason: "sidepanel-closed" });
   }
   if (currentDraft) {
-    void chrome.runtime.sendMessage({ type: "CANCEL_NOTE", noteId: currentDraft.id });
+    void request({ type: "CANCEL_NOTE", noteId: currentDraft.id });
   } else if (draftPromise) {
-    void draftPromise.then((response) => chrome.runtime.sendMessage({
+    void draftPromise.then((response) => request({
       type: "CANCEL_NOTE",
       noteId: response.note.id,
     })).catch(() => {});
@@ -2566,7 +2631,16 @@ await initializeSidepanel({
   sidepanelZoomBinding,
   setPanelContext: async () => {
     const panelContext = await request({ type: "GET_SIDEPANEL_CONTEXT" });
-    sidePanelRefresh.setTabId(panelContext.tabId, panelContext.windowId);
+    sidePanelRefresh.setContext(panelContext);
+    panelMode = panelContext.mode;
+    if (panelContext.mode === "standalone") {
+      elements.standaloneWindowButton.hidden = true;
+      elements.videoUrl.removeAttribute("target");
+      document.title = t("standaloneWindowTitle");
+      document.documentElement.dataset.panelMode = "standalone";
+    }
+    const voiceState = await request({ type: "GET_VOICE_STATE" }).catch(() => null);
+    if (voiceState) setRecordingUi(voiceState.recording, voiceState.noteId);
   },
   refresh,
   renderWhisperStatus,

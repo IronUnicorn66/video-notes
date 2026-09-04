@@ -10,6 +10,43 @@ function occurrences(text, pattern) {
   return [...text.matchAll(pattern)].length;
 }
 
+test("侧栏标题区提供独立窗口入口且独立模式不会递归显示入口", () => {
+  assert.equal(occurrences(html, /id="standalone-window-button"/g), 1);
+  assert.match(html, /data-i18n="openStandaloneWindow"[^>]*>独立窗口 ↗<\/button>/);
+  assert.match(html, /data-i18n-title="standaloneWindowHint"/);
+  assert.match(html, /data-i18n-aria-label="standaloneWindowHint"/);
+  assert.match(source, /type: "OPEN_STANDALONE_WINDOW"/);
+  assert.match(source, /panelContext\.mode === "standalone"/);
+  assert.match(source, /elements\.standaloneWindowButton\.hidden = true/);
+  assert.match(css, /\.video-header-actions\s*\{[^}]*display:\s*flex/s);
+});
+
+test("页面相关请求统一携带当前绑定标签页", () => {
+  for (const type of [
+    "GET_ACTIVE_STATE",
+    "BEGIN_TYPED_NOTE",
+    "CANCEL_NOTE",
+    "VOICE_START_REQUEST",
+    "VOICE_STOP_REQUEST",
+    "CANCEL_PENDING_VOICE",
+    "OPEN_MICROPHONE_PERMISSION_PAGE",
+    "CONTROL_VIDEO_PLAYBACK",
+  ]) {
+    assert.match(source, new RegExp(`"${type}"`));
+  }
+  assert.match(source, /PAGE_SCOPED_REQUESTS/);
+  assert.match(source, /\{ \.\.\.message, tabId: sidePanelRefresh\.tabId \}/);
+});
+
+test("关闭界面只取消由本界面发起的录音", () => {
+  assert.match(source, /ownedVoiceNoteId/);
+  assert.match(
+    source,
+    /if \(ownedVoiceNoteId \|\| voiceStarting\)[\s\S]*CANCEL_PENDING_VOICE/,
+  );
+  assert.doesNotMatch(source, /if \(recording \|\| voiceStarting\)/);
+});
+
 test("历史工具栏提供撤销、反撤销和紧邻导出的清空按钮", () => {
   assert.equal(occurrences(html, /id="undo-button"/g), 1);
   assert.equal(occurrences(html, /id="redo-button"/g), 1);

@@ -4,6 +4,7 @@ import test from "node:test";
 import * as sidePanelScope from "../src/core/sidepanel-scope.js";
 import {
   activeSidePanelRequestTabId,
+  activateStandaloneTargetTab,
   activeContextChangedMessage,
   createActiveTabActivationHandler,
   createCurrentPageContextReader,
@@ -17,6 +18,7 @@ import {
   sidePanelRequestTabIdForSender,
   sidePanelTabIdForSender,
   sidePanelOptionsForTab,
+  standalonePanelRequestTabId,
 } from "../src/core/sidepanel-scope.js";
 
 test("后台标签激活处理器把浏览器窗口标识写入实际广播", async () => {
@@ -98,6 +100,7 @@ test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回
     { contextType: "SIDE_PANEL", documentId: "panel-b", tabId: 2, windowId: 20 },
   ];
   assert.deepEqual((await resolveContext({ documentId: "panel-b" })).context, {
+    mode: "sidepanel",
     tabId: 2,
     windowId: 20,
   });
@@ -112,6 +115,7 @@ test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回
     windowId: 10,
   }];
   assert.deepEqual((await resolveContext({ documentId: "panel-a" })).context, {
+    mode: "sidepanel",
     tabId: 17,
     windowId: 10,
   });
@@ -127,6 +131,7 @@ test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回
     windowId: -1,
   }];
   assert.deepEqual((await resolveContext({ documentId: "edge-panel" })).context, {
+    mode: "sidepanel",
     tabId: 27,
     windowId: 20,
   });
@@ -134,6 +139,46 @@ test("后台侧栏解析器按 sender 窗口查询并只在 Edge 全缺失时回
     ["contexts", { contextTypes: ["SIDE_PANEL"] }],
     ["query", { active: true, lastFocusedWindow: true }],
   ]);
+});
+
+test("独立窗口从自身地址锁定原视频标签且允许原标签暂时关闭", async () => {
+  const panelUrl = "chrome-extension://extension-id/sidepanel.html";
+  let targetTab = {
+    id: 17,
+    windowId: 10,
+    url: "https://www.youtube.com/watch?v=course",
+  };
+  const resolveContext = createSidePanelContextResolver({
+    panelUrl,
+    runtime: {
+      async getContexts() {
+        throw new Error("独立窗口不应查询原生侧栏上下文");
+      },
+    },
+    tabs: {
+      async get(tabId) {
+        if (!targetTab || tabId !== targetTab.id) throw new Error("No tab");
+        return targetTab;
+      },
+    },
+  });
+  const sender = {
+    url: `${panelUrl}?mode=standalone&tabId=17`,
+    tab: { id: 99, windowId: 90 },
+  };
+
+  assert.deepEqual((await resolveContext(sender)).context, {
+    mode: "standalone",
+    tabId: 17,
+    windowId: 10,
+  });
+
+  targetTab = null;
+  assert.deepEqual((await resolveContext(sender)).context, {
+    mode: "standalone",
+    tabId: 17,
+    windowId: null,
+  });
 });
 
 test("活动标签广播同时携带标签页和窗口标识", () => {
@@ -188,6 +233,39 @@ test("播放请求只接纳侧栏窗口内当前活动的标签页", () => {
   );
 });
 
+test("独立窗口请求只接纳锁定的原视频标签页", () => {
+  const context = { mode: "standalone", tabId: 7, windowId: 10 };
+  assert.equal(standalonePanelRequestTabId(context, 7), 7);
+  assert.throws(
+    () => standalonePanelRequestTabId(context, 8),
+    /独立窗口绑定的视频已变化/,
+  );
+});
+
+test("独立窗口记笔记前只激活原视频标签且不聚焦主窗口", async () => {
+  const calls = [];
+  const tabs = {
+    async query(query) {
+      calls.push(["query", query]);
+      return [{ id: 8, windowId: 10 }];
+    },
+    async update(tabId, options) {
+      calls.push(["update", tabId, options]);
+      return { id: tabId, windowId: 10 };
+    },
+  };
+  const result = await activateStandaloneTargetTab(
+    tabs,
+    { mode: "standalone", tabId: 7, windowId: 10 },
+    { id: 7, windowId: 10 },
+  );
+  assert.deepEqual(result, { id: 7, windowId: 10 });
+  assert.deepEqual(calls, [
+    ["query", { active: true, windowId: 10 }],
+    ["update", 7, { active: true }],
+  ]);
+});
+
 test("标签页加载完成后通知已打开侧栏重试当前页面", () => {
   assert.deepEqual(
     sidePanelMessageForTabUpdate(7, { status: "complete" }, {
@@ -225,6 +303,8 @@ test("标签页加载完成后通知已打开侧栏重试当前页面", () => {
 
 test("侧栏接收页面加载完成消息", () => {
   assert.equal(isSidePanelRefreshMessage({ type: "TAB_LOAD_COMPLETE" }), true);
+  assert.equal(isSidePanelRefreshMessage({ type: "BOUND_TAB_CHANGED" }), true);
+  assert.equal(isSidePanelRefreshMessage({ type: "BOUND_TAB_REMOVED" }), true);
   assert.equal(isSidePanelRefreshMessage({ type: "UNRELATED" }), false);
 });
 
@@ -351,6 +431,22 @@ test("活动课程标签切换时侧栏接管新标签并刷新", () => {
     windowId: 10,
   });
   assert.deepEqual(tabChanges, [[1, 2]]);
+});
+
+test("独立窗口忽略其他活动标签并保持锁定目标", () => {
+  let refreshes = 0;
+  const panel = createSidePanelRefreshController(() => { refreshes += 1; });
+  panel.setContext({ mode: "standalone", tabId: 1, windowId: 10 });
+
+  assert.equal(panel.handleContextChanged({
+    type: "ACTIVE_CONTEXT_CHANGED",
+    tabId: 2,
+    windowId: 10,
+  }), false);
+  assert.equal(panel.tabId, 1);
+  assert.equal(refreshes, 0);
+  assert.equal(panel.handleContextChanged({ type: "TAB_LOAD_COMPLETE", tabId: 1 }), true);
+  assert.equal(refreshes, 1);
 });
 
 test("两个窗口只让匹配窗口的侧栏接管活动标签", () => {

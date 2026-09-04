@@ -44,7 +44,20 @@
           </div>
         </div>
         <h1 id="video-title" data-i18n="waitingForVideo">等待打开视频…</h1>
-        <a id="video-url" class="video-url" href="#" target="_blank" hidden data-i18n="openOriginalVideo">打开原视频</a>
+        <div class="video-header-actions">
+          <a id="video-url" class="video-url" href="#" target="_blank" hidden data-i18n="openOriginalVideo">打开原视频</a>
+          <button
+            id="standalone-window-button"
+            class="standalone-window-button"
+            type="button"
+            data-i18n="openStandaloneWindow"
+            data-i18n-title="standaloneWindowHint"
+            data-i18n-aria-label="standaloneWindowHint"
+            title="在可调整大小的独立窗口中打开"
+            aria-label="在可调整大小的独立窗口中打开"
+            disabled
+          >独立窗口 ↗</button>
+        </div>
       </header>
 
       <section class="composer" aria-labelledby="composer-title">

@@ -8,18 +8,19 @@
 
 <p align="center">在课程旁阅读与本地翻译字幕，快速留下时点、截图、语音和自己的想法。</p>
 
-视频笔记是一款面向桌面版 Microsoft Edge 和 Google Chrome 的开源扩展。它在 YouTube 和哔哩哔哩视频旁提供持续可见的侧栏，让完整字幕阅读、浏览器本地翻译、文字记录、播放器截图、本地语音转写和 Markdown 导出保持在同一条流程里。
+视频笔记是一款面向桌面版 Microsoft Edge 和 Google Chrome 的开源扩展。它可以在 YouTube 和哔哩哔哩视频旁显示侧栏，也可以弹出独立窗口，让完整字幕阅读、浏览器本地翻译、文字记录、播放器截图、本地语音转写和 Markdown 导出保持在同一条流程里。
 
 ![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
 
-## 1.0.35 更新
+## 1.0.36 更新
 
-- 完整字幕会按稳定阅读段保存进度；译文逐段出现、切换原文/译文显示或关闭重开侧栏后，仍能回到离开时的位置。
-- 在视频页或笔记侧栏中直接使用左右方向键前后跳转 5 秒、使用空格切换播放；文字输入区仍保留正常编辑行为。
+- 侧栏顶部新增“独立窗口”入口，可以弹出并长期保留完整的视频笔记界面；重复点击会复用同一个窗口。
+- 独立窗口锁定打开时的视频标签，文字、语音、截图、字幕翻译、播放控制、历史操作、设置和导出都与侧栏一致。
 
 ## 核心能力
 
 - 点击快速标记输入框时暂停视频，移开焦点后自动保存并续播。
+- 可以使用浏览器原生侧栏，也可以点击“独立窗口”弹出可调整大小的独立界面；原视频暂时切到后台时，开始记笔记会自动重新激活它，以保证暂停和截图正确。
 - 在视频页或笔记侧栏中直接使用无修饰的左右方向键前后跳转 5 秒、使用空格切换播放；文字输入区仍保留空格输入和光标移动。
 - 每条笔记保存视频时点、播放器截图和可配置的标记前 5、10、20 或 30 秒字幕；当前 YouTube 完整字幕已加载时，优先复用本地完整段落，选中范围全部翻译后同时保存对应译文。
 - 支持 YouTube、哔哩哔哩播放器实际渲染的原生字幕，以及沉浸式翻译呈现的双语字幕；哔哩哔哩还会尝试读取当前分 P 的原生字幕轨，但部分新版页面仍可能无法取得。
@@ -37,12 +38,12 @@
 
 ### Edge 商店
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.32。1.0.35 正在提交更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.32。1.0.36 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.35 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.35/video-notes-edge-1.0.35.zip.sha256)
+[下载视频笔记 1.0.36 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.36/video-notes-edge-1.0.36.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.36/video-notes-edge-1.0.36.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -55,7 +56,7 @@
 ## 使用方法
 
 1. 打开 YouTube 普通视频页或哔哩哔哩 BV 视频页，点击工具栏中的“视频笔记”。
-2. 点击快速标记输入框，输入想法后移开焦点；也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
+2. 保持侧栏使用，或点击顶部“独立窗口”弹出单独界面；点击快速标记输入框，输入想法后移开焦点，也可以按 `Cmd/Ctrl + Enter` 保存，按 `Esc` 取消。
 3. 在“设置”中按需启用播放器截图、麦克风、前置字幕，或提前下载本地翻译语言包。
 4. 需要语音记录时，按住右 Option/Alt 或“按住说话”按钮。
 5. 需要本地转写时，选择并下载固定的 Whisper 模型；下载完成后可离线转写。
@@ -84,8 +85,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.35.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.35.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.36.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.36.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。
