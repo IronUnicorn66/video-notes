@@ -1,9 +1,9 @@
 # 视频笔记 Edge 商店上架资料
 
 更新日期：2026-09-04
-版本：1.0.36
+版本：1.0.37
 
-本文件保存 Microsoft Partner Center 的 1.0.36 更新资料。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
+本文件保存 Microsoft Partner Center 的 1.0.37 更新资料。提交前应再次核对发布 ZIP、实际权限、公开页面和产品能力。
 
 ## 1. 基本信息
 
@@ -21,7 +21,7 @@
 - Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
 - 商店页面：https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj
 - 当前公开版本：1.0.32，2026-09-03 发布
-- 本次更新版本：1.0.36，待提交审核
+- 本次更新版本：1.0.37，待提交审核
 
 ## 2. 商店名称与说明
 
@@ -145,6 +145,7 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 - 截图 3：`store-assets/edge/screenshot-3-export.png`，1280 × 800。
 
 图片使用产品界面示意和中性课程内容，不包含真实账号、个人笔记或第三方品牌 Logo。
+新版品牌图标使用暖米棕、石墨黑、象牙白与少量低饱和金，以三个视频片段汇聚为一张图文笔记表达产品核心流程；扩展图标、官网、商店图标与小型宣传图保持一致。
 
 ## 7. 审核步骤
 
@@ -170,11 +171,11 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 ## 8. 发布包检查
 
 - ZIP 根目录直接包含 `manifest.json`。
-- Manifest V3 版本为 1.0.36，默认语言为 `zh_CN`。
+- Manifest V3 版本为 1.0.37，默认语言为 `zh_CN`。
 - ZIP 包含 `_locales/zh_CN/messages.json` 和 `_locales/en/messages.json`。
 - ZIP 不包含测试、开发文档、商店素材、Git 元数据或模型权重。
 - 包内没有远程 JavaScript 或动态代码加载器。
-- 全量自动化测试、构建和 ZIP 完整性校验均通过；此前已在 Edge 150 完成加载与字幕烟测、在 Edge 152 确认本地翻译语言包下载进度与播放器当前进度定位。本批次新增锁定视频标签且可复用的独立窗口，并让侧栏与独立窗口共享笔记和录音状态；其余人工路径和限制见 `docs/ACCEPTANCE.md`。
+- 全量自动化测试、构建和 ZIP 完整性校验均通过；此前已在 Edge 150 完成加载与字幕烟测、在 Edge 152 确认本地翻译语言包下载进度与播放器当前进度定位。本批次统一更新扩展、官网与商店品牌图标，独立窗口、侧栏及其他产品行为保持不变；其余人工路径和限制见 `docs/ACCEPTANCE.md`。
 - 主页、隐私政策和支持页面可公开读取并返回 HTTP 200；提交 GitHub Issue 需要登录 GitHub。
 
 ## 9. 官方参考
