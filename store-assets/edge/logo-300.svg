@@ -2,13 +2,13 @@
   <rect width="300" height="300" rx="64" fill="#f7f3ea"/>
   <g transform="translate(24 24) scale(1.96875)">
     <rect width="128" height="128" rx="28" fill="#dccdb8"/>
-    <rect x="8" y="25" width="112" height="78" rx="24" fill="#34363b"/>
-    <path d="M64 30c-11 12-11 23 0 34 11 11 10 24-4 34" fill="none" stroke="#a9824d" stroke-linecap="round" stroke-width="7"/>
-    <path d="M26 44c0-4 4-6 7-4l24 18c3 2 3 6 0 8L33 84c-3 2-7 0-7-4Z" fill="#f7f3ea"/>
-    <rect x="75" y="35" width="34" height="27" rx="7" fill="#f7f3ea"/>
-    <circle cx="101" cy="42" r="3.5" fill="#a9824d"/>
-    <path d="m79 57 9-11 7 8 5-5 6 8Z" fill="#34363b"/>
-    <path d="M77 75c8-3 18 3 30-1" fill="none" stroke="#f7f3ea" stroke-linecap="round" stroke-width="5.5"/>
-    <path d="M79 88c9 3 18-3 27 0" fill="none" stroke="#f7f3ea" stroke-linecap="round" stroke-width="5.5"/>
+    <rect x="10" y="14" width="108" height="100" rx="22" fill="#34363b"/>
+    <path d="M56 14h6l11 50-11 50h-6l11-50Z" fill="#a9824d"/>
+    <path d="m24 41 30 23-30 23Z" fill="#f7f3ea"/>
+    <rect x="77" y="29" width="31" height="27" rx="6" fill="#f7f3ea"/>
+    <circle cx="101" cy="36" r="3.5" fill="#a9824d"/>
+    <path d="m81 52 8-10 6 7 5-5 6 8Z" fill="#34363b"/>
+    <rect x="77" y="70" width="31" height="6" rx="3" fill="#f7f3ea"/>
+    <rect x="77" y="85" width="31" height="6" rx="3" fill="#f7f3ea"/>
   </g>
 </svg>

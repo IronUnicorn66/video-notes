@@ -14,7 +14,7 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ## What’s new in 1.0.37
 
-- Introduces a new brand icon: one video frame flows through a curved transition into a structured note with a screenshot and text, optimized for small browser-toolbar sizes.
+- Introduces a new brand icon: one video frame passes through a gold chevron seam into a structured note with a screenshot and text, optimized for small browser-toolbar sizes.
 - Uses the new mark consistently across the extension toolbar, project documentation, product site, Edge store icon, and promotional artwork.
 
 ## What it does
