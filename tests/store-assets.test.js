@@ -63,7 +63,7 @@ test('Edge 商店 SVG 源文件可复现且不嵌入外部资源', async () => {
   }
 });
 
-test('商店品牌素材使用新版视频帧汇聚标识', async () => {
+test('商店品牌素材使用新版视频转图文笔记标识', async () => {
   for (const filename of ['logo-300.svg', 'promo-440x280.svg']) {
     const svg = await readFile(path.join(assetRoot, filename), 'utf8');
     assert.match(svg, /#dccdb8/);
