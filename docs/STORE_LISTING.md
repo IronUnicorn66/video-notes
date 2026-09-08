@@ -21,7 +21,7 @@
 - Edge CRX ID：`cndejflmchbjejlflldlmfplcadnpjkj`
 - 商店页面：https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj
 - 当前公开版本：1.0.32，2026-09-03 发布
-- 本次更新版本：1.0.39，待提交审核
+- 本次更新版本：1.0.39，待用户手动上传与提交审核
 
 ## 2. 商店名称与说明
 
@@ -176,10 +176,25 @@ Edge 的可见页面截图接口要求 `<all_urls>` 或一次临时 `activeTab` 
 - ZIP 不包含测试、开发文档、商店素材、Git 元数据或模型权重。
 - 包内没有远程 JavaScript 或动态代码加载器。
 - 笔记时间支持同一视频原地定位并保留播放状态；原页面不可用时回退打开带时间的链接，B 站分 P 独立校验。导出 Markdown 的时间链接及 Cmd/Ctrl 点击、中键行为继续保留。
-- 本批次修复同一视频重新打开后旧笔记无法删除或编辑的问题，已保存笔记按当前视频会话校验，未完成草稿仍绑定原标签页；删除确认、撤销和附件恢复继续保留。自动检查结果、待用户实机验收路径和限制见 `docs/ACCEPTANCE.md`。
+- 本批次修复同一视频重新打开后旧笔记无法删除或编辑的问题，已保存笔记按当前视频会话校验，未完成草稿仍绑定原标签页；删除确认、撤销和附件恢复继续保留。用户已于 2026-09-08 确认 PR #16 / 1.0.39 实机验证通过；自动检查结果、回归清单和既有限制见 `docs/ACCEPTANCE.md`。
 - 主页、隐私政策和支持页面可公开读取并返回 HTTP 200；提交 GitHub Issue 需要登录 GitHub。
 
-## 9. 官方参考
+## 9. 本次更新说明与手动提交
+
+### 可填写的更新说明
+
+修复重新打开同一视频后，旧笔记无法删除或编辑的问题。点击笔记时间可直接定位当前视频并保留播放或暂停状态；原页面不可用时打开带时间的新标签页。侧栏与独立窗口均支持，导出的 Markdown 时间链接保持可用。无新增权限或依赖。
+
+### 上传资料与步骤
+
+1. 在 Partner Center 打开上方 Product ID 对应的现有产品。
+2. 上传 `artifacts/video-notes-edge-1.0.39.zip`，确认解析出的版本为 `1.0.39`；校验文件为同目录下的 `video-notes-edge-1.0.39.zip.sha256`。
+3. 按需使用本文件的更新说明、现有中英文商店说明及第 7 节审核步骤；权限、隐私政策与数据处理范围未变。
+4. 保存后由用户提交审核，记录提交时间和 Partner Center 状态。本记录当前为“待用户手动提交”，未将准备完成视作已提交或商店已更新。
+
+本次审核重点：保存测试笔记后关闭视频标签，再打开同一视频，分别验证侧栏与独立窗口中的删除、撤销、编辑和时间定位；从导出 Markdown 打开时间链接。既有 B 站部分页面字幕读取限制继续适用。
+
+## 10. 官方参考
 
 - [发布 Microsoft Edge 扩展](https://learn.microsoft.com/microsoft-edge/extensions/publish/publish-extension)
 - [更新 Microsoft Edge 扩展](https://learn.microsoft.com/microsoft-edge/extensions/update/update-extension)
