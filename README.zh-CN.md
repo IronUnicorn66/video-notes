@@ -12,10 +12,11 @@
 
 ![视频笔记侧栏示意](store-assets/edge/screenshot-1-note.png)
 
-## 1.0.37 更新
+## 1.0.39 更新
 
-- 启用全新品牌图标：一个视频画面经金色折线切口转化为带截图和正文的结构化笔记，并针对浏览器工具栏小尺寸显示重新优化。
-- 扩展工具栏、项目文档、产品官网、Edge 商店图标和宣传图统一使用新标识。
+- 点击笔记时间时，同一视频直接定位到标记处，保留播放或暂停状态；原页面不可用时打开带时间的新标签页。导出的 Markdown 保留外部视频链接，Cmd/Ctrl 点击和中键仍使用浏览器原有行为。
+- 修复重新打开同一视频后，旧笔记能显示却无法删除或编辑的问题；侧栏和独立窗口均按视频识别已保存笔记。
+- 删除仍需确认并可撤销恢复，包含截图等附件；未完成草稿继续绑定创建时的标签页。
 
 ## 核心能力
 
@@ -38,12 +39,12 @@
 
 ### Edge 商店
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.32。1.0.37 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) 当前公开版本为 1.0.32。1.0.39 正在准备更新审核；商店完成更新前，可以安装同一份 GitHub Release 发布包。
 
 ### GitHub Release 测试版
 
-[下载视频笔记 1.0.37 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.37/video-notes-edge-1.0.37.zip)
-· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.37/video-notes-edge-1.0.37.zip.sha256)
+[下载视频笔记 1.0.39 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.39/video-notes-edge-1.0.39.zip)
+· [SHA-256 校验文件](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.39/video-notes-edge-1.0.39.zip.sha256)
 
 1. 下载 ZIP 并解压到固定目录。
 2. 在 Edge 地址栏打开 `edge://extensions/`，或在 Chrome 打开 `chrome://extensions/`。
@@ -85,8 +86,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.37.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.37.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.39.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.39.zip.sha256
 ```
 
 构建完成后，在 `edge://extensions/` 或 `chrome://extensions/` 中加载本项目的 `dist` 目录。

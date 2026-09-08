@@ -39,7 +39,7 @@ const enMessages = JSON.parse(
 );
 
 test("发布版本在 Manifest、包元数据和锁文件中保持一致", () => {
-  assert.equal(manifest.version, "1.0.37");
+  assert.equal(manifest.version, "1.0.39");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
@@ -469,8 +469,10 @@ test("首次麦克风授权从普通扩展页发起", async () => {
   const build = await readFile(new URL("../scripts/build-extension.mjs", import.meta.url), "utf8");
 
   assert.doesNotMatch(sidepanel, /navigator\.mediaDevices\.getUserMedia/);
-  assert.doesNotMatch(sidepanel, /chrome\.tabs\.create/);
-  assert.match(sidepanel, /OPEN_MICROPHONE_PERMISSION_PAGE/);
+  const permissionEntry = sidepanel.match(/async function openMicrophonePermissionPage\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(permissionEntry, "侧栏必须保留麦克风授权入口");
+  assert.doesNotMatch(permissionEntry, /chrome\.tabs\.create/);
+  assert.match(permissionEntry, /request\(\{ type: "OPEN_MICROPHONE_PERMISSION_PAGE" \}\)/);
   assert.match(permissionHtml, /id="grant-microphone-button"/);
   assert.match(permissionSource, /navigator\.mediaDevices\.getUserMedia/);
   assert.match(build, /microphone-permission\.html/);

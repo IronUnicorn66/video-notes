@@ -865,8 +865,16 @@ async function noteHistoryRequest(message, sender) {
   }
   if (NOTE_ID_MUTATION_COMMANDS.has(message.type)) {
     const note = await repository.getNote(message.noteId);
-    if (Number.isInteger(note?.tabId) && note.tabId !== tabId) {
-      throw new Error("标记不属于当前标签页");
+    if (message.type === "COMMIT_TYPED_NOTE") {
+      if (Number.isInteger(note?.tabId) && note.tabId !== tabId) {
+        throw new Error("标记不属于当前标签页");
+      }
+    } else {
+      // 已保存笔记按视频共享，创建时的标签页可能已经关闭或被浏览器重新编号。
+      const pageContext = await currentPageContext({ sender, tabId });
+      if (!note || !pageContext || note.sessionId !== pageContext.sessionId) {
+        throw new Error("标记不属于当前页面会话");
+      }
     }
   }
   return { sender, tabId };

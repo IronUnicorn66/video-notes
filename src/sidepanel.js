@@ -1560,6 +1560,32 @@ function renderNotes(notes, order = noteSortBinding.order) {
     time.href = note.jumpUrl;
     time.target = "_blank";
     time.textContent = formatTimestamp(note.seconds);
+    time.addEventListener("click", async (event) => {
+      if (
+        event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+        || !activeContext
+        || note.sessionId !== activeContext.sessionId
+        || !Number.isInteger(sidePanelRefresh.tabId)
+        || activeContextTabId !== sidePanelRefresh.tabId
+      ) return;
+
+      event.preventDefault();
+      try {
+        await request({
+          type: "SEEK_VIDEO",
+          seconds: note.seconds,
+          sessionId: note.sessionId,
+          videoId: activeContext.videoId,
+        });
+      } catch {
+        // 点击后原页可能已导航或关闭；内容脚本会校验视频会话再定位。
+        await chrome.tabs.create({ url: note.jumpUrl }).catch((error) => {
+          showToast(error.message);
+        });
+      }
+    });
     const kind = document.createElement("span");
     kind.className = "note-kind";
     kind.textContent = note.inputType === "voice" ? t("voiceNote") : t("textNote");

@@ -12,10 +12,11 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ![Video Notes side panel](store-assets/edge/screenshot-1-note-en.png)
 
-## What’s new in 1.0.37
+## What’s new in 1.0.39
 
-- Introduces a new brand icon: one video frame passes through a gold chevron seam into a structured note with a screenshot and text, optimized for small browser-toolbar sizes.
-- Uses the new mark consistently across the extension toolbar, project documentation, product site, Edge store icon, and promotional artwork.
+- Clicking a note timestamp seeks within the same video while preserving playback or pause state. If the original page is unavailable, it opens the timestamp link in a new tab. Exported Markdown keeps external video links, and Cmd/Ctrl-click or middle-click retains normal browser behavior.
+- Fixes saved notes being visible but impossible to delete or edit after reopening the same video in another tab, in both the side panel and standalone window.
+- Deletion still requires confirmation and supports Undo with attachments preserved; unfinished drafts remain bound to their original tab.
 
 ## What it does
 
@@ -38,12 +39,12 @@ Video Notes is an open-source extension for desktop Microsoft Edge and Google Ch
 
 ### Microsoft Edge Add-ons
 
-[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.32. Version 1.0.37 is being prepared for update review; until it is approved, you can install the matching GitHub Release package.
+[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cndejflmchbjejlflldlmfplcadnpjkj) currently serves version 1.0.32. Version 1.0.39 is being prepared for update review; until it is approved, you can install the matching GitHub Release package.
 
 ### GitHub Release preview
 
-[Download Video Notes 1.0.37 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.37/video-notes-edge-1.0.37.zip)
-· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.37/video-notes-edge-1.0.37.zip.sha256)
+[Download Video Notes 1.0.39 ZIP](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.39/video-notes-edge-1.0.39.zip)
+· [SHA-256 checksum](https://github.com/IronUnicorn66/video-notes/releases/download/v1.0.39/video-notes-edge-1.0.39.zip.sha256)
 
 1. Download the ZIP and extract it to a permanent folder.
 2. Open `edge://extensions/` in Edge or `chrome://extensions/` in Chrome.
@@ -85,8 +86,8 @@ npm install
 npm test
 npm run build
 npm run package
-unzip -t artifacts/video-notes-edge-1.0.37.zip
-cd artifacts && shasum -a 256 -c video-notes-edge-1.0.37.zip.sha256
+unzip -t artifacts/video-notes-edge-1.0.39.zip
+cd artifacts && shasum -a 256 -c video-notes-edge-1.0.39.zip.sha256
 ```
 
 After building, load the project’s `dist` directory from `edge://extensions/` or `chrome://extensions/`.
