@@ -74,15 +74,6 @@
         ></textarea>
         <div class="composer-hint">
           <span data-i18n="composerHint">⌘/Ctrl + Enter 保存 · Esc 取消</span>
-          <button id="voice-button" class="voice-button" type="button" disabled>
-            <span class="voice-dot"></span>
-            <span id="voice-button-label" data-i18n="holdToTalk">按住说话</span>
-          </button>
-        </div>
-        <div id="recording-status" class="recording-status" hidden>
-          <span class="recording-pulse"></span>
-          <span data-i18n="recording">录音中</span>
-          <span id="recording-timer">00:00</span>
         </div>
       </section>
 
@@ -279,13 +270,6 @@
             <button id="screenshot-permission-button" class="secondary-button" type="button" data-i18n="enable">启用</button>
           </div>
           <div class="setting-row">
-            <div>
-              <strong data-i18n="microphone">麦克风</strong>
-              <p id="microphone-permission-detail" data-i18n="permissionChecking">正在检查权限…</p>
-            </div>
-            <button id="microphone-permission-button" class="secondary-button" type="button" data-i18n="authorize">授权</button>
-          </div>
-          <div class="setting-row">
             <div class="subtitle-setting">
               <label for="subtitle-enabled">
                 <input id="subtitle-enabled" type="checkbox" checked />
@@ -320,24 +304,7 @@
               <p class="browser-translation-language-pack-note" data-i18n="fullTranscriptLanguagePackManagedByEdge">由 Edge 下载和管理，下载后可离线使用。</p>
             </div>
           </div>
-          <div class="setting-row">
-            <div class="whisper-setting">
-              <strong data-i18n="localWhisper">本地 Whisper</strong>
-              <p id="whisper-detail" data-i18n="whisperInitial">尚未启用。首次下载约 57 MiB。</p>
-              <label for="whisper-model-select" data-i18n="transcriptionModel">转写模型</label>
-              <select id="whisper-model-select"></select>
-              <p id="whisper-model-warning" hidden></p>
-            </div>
-            <button id="whisper-model-action" class="secondary-button" type="button" data-i18n="downloadAndUse">下载并使用</button>
-          </div>
-          <div class="setting-row">
-            <div>
-              <strong data-i18n="holdToTalkKey">按住说话键</strong>
-              <p data-i18n="shortcutDescription">仅在视频页面且光标不在输入控件中生效。</p>
-            </div>
-            <button id="key-button" class="key-button" type="button">右 Option / Alt</button>
-          </div>
-          <p class="privacy-note" data-i18n="privacyNote">录音、截图、笔记、转写和浏览器本地译文都保存在本机。截图权限只用于视频播放器；本地模型仅在首次使用相应功能时下载。</p>
+          <p class="privacy-note" data-i18n="privacyNote">截图、笔记、字幕和浏览器本地译文保存在本机。可使用系统语音输入法输入文字；扩展不使用麦克风。</p>
         </div>
       </details>
 

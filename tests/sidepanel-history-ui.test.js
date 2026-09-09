@@ -26,25 +26,12 @@ test("页面相关请求统一携带当前绑定标签页", () => {
     "GET_ACTIVE_STATE",
     "BEGIN_TYPED_NOTE",
     "CANCEL_NOTE",
-    "VOICE_START_REQUEST",
-    "VOICE_STOP_REQUEST",
-    "CANCEL_PENDING_VOICE",
-    "OPEN_MICROPHONE_PERMISSION_PAGE",
     "CONTROL_VIDEO_PLAYBACK",
   ]) {
     assert.match(source, new RegExp(`"${type}"`));
   }
   assert.match(source, /PAGE_SCOPED_REQUESTS/);
   assert.match(source, /\{ \.\.\.message, tabId: sidePanelRefresh\.tabId \}/);
-});
-
-test("关闭界面只取消由本界面发起的录音", () => {
-  assert.match(source, /ownedVoiceNoteId/);
-  assert.match(
-    source,
-    /if \(ownedVoiceNoteId \|\| voiceStarting\)[\s\S]*CANCEL_PENDING_VOICE/,
-  );
-  assert.doesNotMatch(source, /if \(recording \|\| voiceStarting\)/);
 });
 
 test("历史工具栏提供撤销、反撤销和紧邻导出的清空按钮", () => {
@@ -137,7 +124,6 @@ test("活动状态驱动历史控件且所有会话历史请求携带侧栏标�
   assert.match(source, /historyControlState\(\{/);
   assert.match(source, /blocked: historyInteractionBlocked\(\)/);
   assert.match(source, /\|\| typedDraftSaving/);
-  assert.match(source, /\|\| voiceStopping/);
   assert.match(source, /pending: historyOperationController\.pending/);
   assert.match(
     source,

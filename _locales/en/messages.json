@@ -3,7 +3,7 @@
     "message": "Video Notes"
   },
   "extensionDescription": {
-    "message": "Read and locally translate YouTube and Bilibili transcripts, capture notes by text or voice, and export Markdown with screenshots."
+    "message": "Read and locally translate YouTube and Bilibili subtitles, capture notes and screenshots, and export original timed transcripts."
   },
   "actionTitle": {
     "message": "Open Video Notes"

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA01Ixrd7V62YRHdphM+lTLfIic66oEdvB2IePl6jVFpo0JQ41Klsbf1uQQa+SsM9UunM5r6Iu3Zkm54zLMNHkJ3IVU2U0INIF+xOUgM+nLT2T3fyjVR0dC+ZbIZl+4HWSu7aSecT3t8VXDW9rnmtqNBtEqV2ohIkRqRpofTRl3ArbZVOqzr+oxKYeczWVnGOxG24RDDGYrMh+2hQC2gY7dfnshIrACBh+XKtaNVBiyAfY/s00dqnVtsGI4ojSTB9V/1cfQj3QLn/ihQCmrQpO2rYPLI5+0mvQoyN10YAYG36yiBgXL0iWAPhv2sodmFG8ERh1eeWPJ6YGyUWJRc5y5wIDAQAB",
   "name": "__MSG_extensionName__",
-  "version": "1.0.39",
+  "version": "1.0.41",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_CN",
   "homepage_url": "https://ironunicorn66.github.io/video-notes/",
@@ -27,10 +27,7 @@
     "https://bilibili.com/*"
   ],
   "optional_host_permissions": [
-    "<all_urls>",
-    "https://huggingface.co/*",
-    "https://cdn-lfs.hf.co/*",
-    "https://*.xethub.hf.co/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
@@ -54,7 +51,9 @@
         "https://www.bilibili.com/video/*",
         "https://bilibili.com/video/*"
       ],
-      "js": ["player-shortcuts.js"],
+      "js": [
+        "player-shortcuts.js"
+      ],
       "run_at": "document_start"
     },
     {
@@ -64,17 +63,13 @@
         "https://www.bilibili.com/video/*",
         "https://bilibili.com/video/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self'"
-  },
-  "cross_origin_embedder_policy": {
-    "value": "require-corp"
-  },
-  "cross_origin_opener_policy": {
-    "value": "same-origin"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

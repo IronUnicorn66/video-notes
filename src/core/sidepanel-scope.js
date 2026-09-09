@@ -129,7 +129,6 @@ export function isSidePanelRefreshMessage(message) {
     "NOTES_CHANGED",
     "TAB_LOAD_COMPLETE",
     "NOTE_TRANSCRIBED",
-    "VOICE_STATE_CHANGED",
   ].includes(message?.type);
 }
 

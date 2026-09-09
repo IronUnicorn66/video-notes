@@ -34,10 +34,6 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
     "Authorize microphone access in the side panel settings first",
   );
   assert.equal(
-    localizeRuntimeMessage("en", "模型下载失败（HTTP 503）"),
-    "Model download failed (HTTP 503)",
-  );
-  assert.equal(
     localizeRuntimeMessage("en", "转写失败：网络已断开"),
     "Transcription failed: The network connection was lost",
   );
@@ -52,14 +48,6 @@ test("英文界面翻译后台与核心模块返回的用户提示", () => {
   assert.equal(
     localizeRuntimeMessage("en", "转写失败：原始录音已丢失"),
     "Transcription failed: The original recording is missing",
-  );
-  assert.equal(
-    localizeRuntimeMessage("en", "模型分块长度异常：期望 100，收到 50"),
-    "Invalid model chunk length: expected 100, received 50",
-  );
-  assert.equal(
-    localizeRuntimeMessage("en", "内置模型模型 SHA-256 校验失败"),
-    "Bundled model: Model SHA-256 verification failed",
   );
   assert.equal(
     localizeRuntimeMessage("en", "当前浏览器不支持本地翻译"),

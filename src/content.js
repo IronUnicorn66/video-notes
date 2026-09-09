@@ -4,13 +4,11 @@ import {
   markPlaybackIntervention,
   releasePlaybackLease,
 } from "./core/playback-lease.js";
-import { PushToTalkController, isEditableTarget } from "./core/push-to-talk.js";
 import { buildJumpUrl, parseVideoContext } from "./core/site-adapter.js";
 import { SubtitleCapture } from "./core/subtitle-capture.js";
 import { readRenderedSubtitleText } from "./core/subtitle-text.js";
 import { BilibiliTranscriptSource } from "./core/bilibili-transcript.js";
 import { readYoutubeFullTranscript } from "./core/youtube-full-transcript.js";
-import { localizeRuntimeMessage, resolveLanguage, translate } from "./core/i18n.js";
 import {
   localTranscriptNoteContext,
   preferredNoteSubtitleContext,
@@ -22,7 +20,6 @@ import {
 import {
   controlVideoPlayback,
   findPrimaryVideo,
-  normalizePushToTalkShortcut,
 } from "./core/video-playback-shortcuts.js";
 import { installVideoPageShortcuts } from "./core/video-page-shortcuts.js";
 
@@ -33,14 +30,8 @@ let activeLease = null;
 let activeLeaseTimer = null;
 let expectedPlaybackEvent = null;
 let currentUrl = location.href;
-let recordingOverlay = null;
-let shortcutError = null;
-let shortcutErrorTimer = null;
-let shortcutCode = "AltRight";
 let localTranscriptNoteSource = null;
 let localTranscriptNoteSourceRevision = 0;
-let interfaceLanguage = resolveLanguage(undefined, chrome.i18n.getUILanguage());
-const t = (key, variables) => translate(interfaceLanguage, key, variables);
 
 function videoTitle(platform) {
   if (platform === "youtube") {
@@ -253,135 +244,21 @@ function syncLocalTranscriptNoteSource(message) {
   return true;
 }
 
-function showRecordingOverlay() {
-  if (!document.fullscreenElement || recordingOverlay) return;
-  recordingOverlay = document.createElement("div");
-  recordingOverlay.textContent = t("contentRecording");
-  Object.assign(recordingOverlay.style, {
-    position: "fixed",
-    top: "18px",
-    left: "50%",
-    zIndex: "2147483647",
-    transform: "translateX(-50%)",
-    padding: "7px 12px",
-    borderRadius: "999px",
-    color: "#fff",
-    background: "rgba(157, 39, 32, .88)",
-    font: "600 13px -apple-system, BlinkMacSystemFont, sans-serif",
-    pointerEvents: "none",
-  });
-  (document.fullscreenElement ?? document.documentElement).append(recordingOverlay);
-}
-
-function hideRecordingOverlay() {
-  recordingOverlay?.remove();
-  recordingOverlay = null;
-}
-
-function hideShortcutError() {
-  clearTimeout(shortcutErrorTimer);
-  shortcutError?.remove();
-  shortcutError = null;
-}
-
-function showShortcutError(message) {
-  hideShortcutError();
-  shortcutError = document.createElement("div");
-  shortcutError.setAttribute("role", "status");
-  shortcutError.textContent = t("contentErrorPrefix", {
-    message: localizeRuntimeMessage(interfaceLanguage, message),
-  });
-  Object.assign(shortcutError.style, {
-    position: "fixed",
-    right: "18px",
-    bottom: "18px",
-    zIndex: "2147483647",
-    maxWidth: "360px",
-    padding: "10px 13px",
-    borderRadius: "10px",
-    color: "#fff",
-    background: "rgba(36, 42, 39, .94)",
-    boxShadow: "0 8px 28px rgba(0, 0, 0, .24)",
-    font: "500 13px/1.45 -apple-system, BlinkMacSystemFont, sans-serif",
-    pointerEvents: "none",
-  });
-  (document.fullscreenElement ?? document.documentElement).append(shortcutError);
-  shortcutErrorTimer = setTimeout(hideShortcutError, 4200);
-}
-
-const pushToTalk = new PushToTalkController({
-  keyCode: shortcutCode,
-  onStart: async () => {
-    hideShortcutError();
-    const response = await chrome.runtime.sendMessage({ type: "VOICE_START_REQUEST" });
-    if (!response?.ok) throw new Error(response?.error ?? t("recordingStartFailed"));
-    if (response.canceled) throw new Error(t("recordingCanceled"));
-    showRecordingOverlay();
-  },
-  onStop: async (reason) => {
-    hideRecordingOverlay();
-    const response = await chrome.runtime.sendMessage({ type: "VOICE_STOP_REQUEST", reason });
-    if (!response?.ok) console.warn("视频笔记停止录音失败", response?.error);
-  },
-});
-
-function matchesShortcut(event) {
-  return event.code === shortcutCode && !isEditableTarget(event.target);
-}
-
-window.addEventListener("keydown", (event) => {
-  if (!matchesShortcut(event) || event.repeat) return;
-  event.preventDefault();
-  void pushToTalk.keyDown(event).catch((error) => {
-    hideRecordingOverlay();
-    showShortcutError(error.message);
-    console.warn("视频笔记录音启动失败", error);
-  });
-}, true);
-
-window.addEventListener("keyup", (event) => {
-  if (event.code !== shortcutCode) return;
-  event.preventDefault();
-  void pushToTalk.keyUp(event);
-}, true);
-
-window.addEventListener("blur", () => void pushToTalk.forceStop("window-blur"));
-window.addEventListener("pagehide", () => void pushToTalk.forceStop("pagehide"));
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) void pushToTalk.forceStop("tab-hidden");
-});
 document.addEventListener("pointerdown", onPlayerPointerDown, true);
 
 chrome.storage.local.get({
-  interfaceLanguage: undefined,
-  shortcutCode: "AltRight",
   subtitleEnabled: true,
   subtitleWindowSeconds: 20,
 }).then(({
-  shortcutCode: saved,
-  interfaceLanguage: savedLanguage,
   subtitleEnabled,
   subtitleWindowSeconds,
 }) => {
-  interfaceLanguage = resolveLanguage(savedLanguage, chrome.i18n.getUILanguage());
-  shortcutCode = normalizePushToTalkShortcut(saved);
-  pushToTalk.keyCode = shortcutCode;
   subtitleCapture.updateSettings({ subtitleEnabled, subtitleWindowSeconds });
   if (subtitleEnabled) void loadBilibiliTranscriptNoteSource();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (changes.interfaceLanguage) {
-    interfaceLanguage = resolveLanguage(
-      changes.interfaceLanguage.newValue,
-      chrome.i18n.getUILanguage(),
-    );
-  }
-  if (changes.shortcutCode?.newValue) {
-    shortcutCode = normalizePushToTalkShortcut(changes.shortcutCode.newValue);
-    pushToTalk.keyCode = shortcutCode;
-  }
   const subtitleSettings = {};
   if (changes.subtitleEnabled) {
     subtitleSettings.subtitleEnabled = changes.subtitleEnabled.newValue;
@@ -410,7 +287,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     "ACTIVATE_MARKER",
     "GET_MARKER_RESUME_ELIGIBILITY",
     "RELEASE_MARKER",
-    "FORCE_STOP_RECORDING",
   ].includes(message.type)) {
     return false;
   }
@@ -480,9 +356,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             allowResume: message.allowResume !== false,
           }),
         };
-      case "FORCE_STOP_RECORDING":
-        hideRecordingOverlay();
-        return { stopped: pushToTalk.reset() };
       default:
         return {};
     }

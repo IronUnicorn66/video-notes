@@ -1,4 +1,3 @@
-import { getWhisperModel } from "./model-config.js";
 import { localizeRuntimeMessage, translate } from "./i18n.js";
 
 function pad(value, width = 2) {
@@ -42,14 +41,6 @@ function escapeHeading(value, language) {
 
 function escapeLinkLabel(value) {
   return String(value).replace(/([\\\[\]])/g, "\\$1");
-}
-
-function whisperModelLabel(modelId, language) {
-  try {
-    return getWhisperModel(modelId).label;
-  } catch {
-    return String(modelId ?? translate(language, "unknownModel"));
-  }
 }
 
 function escapeTranscriptText(value) {
@@ -100,7 +91,7 @@ export function buildMarkdown(session, entries, { language = "zh_CN" } = {}) {
       );
       for (const run of transcriptionRuns) {
         const separator = language === "en" ? ": " : "：";
-        lines.push(`- ${whisperModelLabel(run.modelId, language)}${separator}${formatTranscriptListItem(run.text)}`);
+        lines.push(`- ${escapeTranscriptText(run.modelId ?? translate(language, "unknownModel"))}${separator}${formatTranscriptListItem(run.text)}`);
       }
       lines.push("", "</details>", "");
     } else if (entry.transcriptCandidate?.trim()) {

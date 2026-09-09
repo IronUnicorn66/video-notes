@@ -47,8 +47,8 @@ test("Markdown 以个人内容优先并使用相对资产链接", () => {
   assert.match(markdown, /\[原始录音\]\(audio\/001_00-00-12\.webm\)/);
   assert.ok(markdown.indexOf("我的 **重点**") < markdown.indexOf("本地转写结果"));
   assert.match(markdown, /<details>\n<summary>本地转写结果（2 次转写）<\/summary>/);
-  assert.match(markdown, /- Base · 57 MiB：第一版文本/);
-  assert.match(markdown, /- Small · 181 MiB：第二版文本/);
+  assert.match(markdown, /- base-q5_1：第一版文本/);
+  assert.match(markdown, /- small-q5_1：第二版文本/);
   assert.doesNotMatch(markdown, /语音转写候选/);
   assert.doesNotMatch(markdown, /候选文本/);
 });
@@ -85,7 +85,7 @@ test("转写历史的多行文本不会破坏 details 结构", () => {
     }],
   );
 
-  assert.match(markdown, /- Base · 57 MiB：第一行\n  - 列表项\n  &lt;\/details&gt;\n  最后一行/);
+  assert.match(markdown, /- base-q5_1：第一行\n  - 列表项\n  &lt;\/details&gt;\n  最后一行/);
   assert.equal((markdown.match(/<\/details>/g) ?? []).length, 1);
 });
 

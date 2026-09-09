@@ -27,7 +27,7 @@ test("双语主页按首屏、用法和当前功能组织核心信息", async ()
     assert.match(html, /microsoftedge\.microsoft\.com\/addons\/detail\/cndejflmchbjejlflldlmfplcadnpjkj/);
     assert.match(
       html,
-      /releases\/download\/v1\.0\.39\/video-notes-edge-1\.0\.39\.zip/,
+      /releases\/download\/v1\.0\.41\/video-notes-edge-1\.0\.41\.zip/,
     );
     assert.match(html, /YouTube/);
     assert.match(html, /Bilibili|哔哩哔哩/);
@@ -39,7 +39,7 @@ test("双语主页按首屏、用法和当前功能组织核心信息", async ()
   assert.match(enHome, /href="privacy\/"/);
 });
 
-test("隐私页覆盖本地存储、本地翻译、模型下载和删除", async () => {
+test("隐私页覆盖本地存储、本地翻译、系统输入法和删除", async () => {
   const [html, englishHtml] = await Promise.all([
     read("docs/privacy/index.html"),
     read("docs/en/privacy/index.html"),
@@ -47,16 +47,13 @@ test("隐私页覆盖本地存储、本地翻译、模型下载和删除", async
 
   for (const term of [
     "IndexedDB",
-    "Cache Storage",
-    "Hugging Face",
-    "连接元数据",
     "麦克风",
     "播放器截图",
     "删除",
   ]) {
     assert.ok(html.includes(term), `隐私页缺少 ${term}`);
   }
-  assert.match(html, /https:\/\/huggingface\.co\/privacy/);
+  assert.doesNotMatch(html, /huggingface\.co/);
   assert.match(html, /github\.com\/IronUnicorn66\/video-notes\/issues/);
   assert.match(html, /全文翻译/);
   assert.match(html, /Translator API/);
@@ -92,7 +89,7 @@ test("官网提供可切换的中英文主页与隐私页", async () => {
   assert.match(zhHome, /简体中文、英语、日语、韩语或西班牙语/);
   assert.match(enHome, /Local browser translation/);
   assert.match(enHome, /built-in Edge \/ Chrome Translator API/);
-  assert.match(enPrivacy, /Connection metadata/);
+  assert.match(enPrivacy, /system input method/);
   assert.match(enPrivacy, /delete your data/i);
   assert.match(zhPrivacy, /data-language="en"/);
   for (const html of [zhHome, enHome, zhPrivacy, enPrivacy]) {

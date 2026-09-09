@@ -12,7 +12,6 @@ import {
   normalizeNoteFontSize,
   noteFontSizeAfterStep,
 } from "./core/note-font-size.js";
-import { WHISPER_ORIGINS } from "./core/model-config.js";
 import { SCREENSHOT_ORIGINS } from "./core/media-permissions.js";
 import {
   createAssetUrlRegistry,
@@ -84,8 +83,6 @@ import {
   writeInterfaceLanguage,
 } from "./core/extension-language.js";
 import {
-  isReservedVideoPlaybackCode,
-  normalizePushToTalkShortcut,
   playbackCommandForKeyEvent,
   shouldExecutePlaybackCommand,
 } from "./core/video-playback-shortcuts.js";
@@ -106,10 +103,6 @@ const elements = {
   standaloneWindowButton: document.querySelector("#standalone-window-button"),
   input: document.querySelector("#note-input"),
   markerTime: document.querySelector("#marker-time"),
-  voiceButton: document.querySelector("#voice-button"),
-  voiceLabel: document.querySelector("#voice-button-label"),
-  recordingStatus: document.querySelector("#recording-status"),
-  recordingTimer: document.querySelector("#recording-timer"),
   fullTranscriptPanel: document.querySelector("#full-transcript-panel"),
   fullTranscriptStatus: document.querySelector("#full-transcript-status"),
   fullTranscriptTranslate: document.querySelector("#full-transcript-translate"),
@@ -132,15 +125,9 @@ const elements = {
   redoButton: document.querySelector("#redo-button"),
   clearButton: document.querySelector("#clear-button"),
   exportButton: document.querySelector("#export-button"),
-  whisperDetail: document.querySelector("#whisper-detail"),
-  whisperModelSelect: document.querySelector("#whisper-model-select"),
-  whisperModelAction: document.querySelector("#whisper-model-action"),
-  whisperModelWarning: document.querySelector("#whisper-model-warning"),
   settings: document.querySelector("#permission-settings"),
   screenshotPermissionButton: document.querySelector("#screenshot-permission-button"),
   screenshotPermissionDetail: document.querySelector("#screenshot-permission-detail"),
-  microphonePermissionButton: document.querySelector("#microphone-permission-button"),
-  microphonePermissionDetail: document.querySelector("#microphone-permission-detail"),
   subtitleEnabled: document.querySelector("#subtitle-enabled"),
   subtitleWindowSeconds: document.querySelector("#subtitle-window-seconds"),
   browserTranslationDetectedSource: document.querySelector("#browser-translation-detected-source"),
@@ -149,7 +136,6 @@ const elements = {
   browserTranslationLanguagePackStatus: document.querySelector("#browser-translation-language-pack-status"),
   browserTranslationLanguagePackAction: document.querySelector("#browser-translation-language-pack-action"),
   fullTranscriptGroupButtons: document.querySelectorAll("[data-full-transcript-group-size]"),
-  keyButton: document.querySelector("#key-button"),
   toast: document.querySelector("#toast"),
   screenshotDialog: document.querySelector("#screenshot-dialog"),
   screenshotDialogClose: document.querySelector("#screenshot-dialog-close"),
@@ -175,22 +161,10 @@ let draftPromise = null;
 let typedDraftSaving = false;
 let isComposing = false;
 let commitAfterComposition = false;
-let recording = false;
-let ownedVoiceNoteId = null;
-let voiceStarting = false;
-let voiceStopping = false;
-let pendingVoiceStopReason = null;
-let recordingStartedAt = 0;
-let recordingInterval = null;
-let recordingTimeout = null;
 let toastTimeout = null;
 let refreshAfterEdit = false;
 let inlineEditController = null;
 let refreshRunner = null;
-let microphoneReady = false;
-let microphonePermissionStatus = null;
-let pendingWhisperModelId = null;
-let whisperStatus = null;
 let renderGeneration = 0;
 let currentNotes = [];
 let canUndo = false;
@@ -281,12 +255,6 @@ const sidePanelRefresh = createSidePanelRefreshController(() => {
       closeStaleHistoryConfirmation();
       resetFullTranscript();
     }
-    if (message.type === "VOICE_STATE_CHANGED") {
-      setRecordingUi(message.recording, message.noteId);
-    }
-  },
-  shouldRefresh(message) {
-    return message.type !== "VOICE_STATE_CHANGED" || message.recording === false;
   },
   shouldDeferRefresh(message) {
     if (!inlineEditController?.blocked) return false;
@@ -370,11 +338,8 @@ function historyInteractionBlocked() {
   return Boolean(
     currentDraft
     || draftPromise
-    || recording
-    || voiceStarting
     || inlineEditController.blocked
     || typedDraftSaving
-    || voiceStopping
     || historyOperationController?.pending
   );
 }
@@ -452,21 +417,6 @@ function confirmHistoryAction({ title, description }, action) {
   elements.historyConfirmDialog.showModal();
 }
 
-function whisperModelLabel(modelId) {
-  return whisperStatus?.models.find((model) => model.id === modelId)?.label ?? t("currentModel");
-}
-
-function retranscriptionUnavailableReason(note) {
-  if (!note.audioKey) return t("originalAudioUnavailable");
-  if (!whisperStatus) return t("readingModelStatus");
-  const selectedModelId = whisperStatus.selectedModelId;
-  if (!whisperStatus.cachedModelIds.includes(selectedModelId)) return t("currentModelNotCached");
-  if (["downloading", "recording", "transcribing"].includes(whisperStatus.whisperState)) {
-    return t("voiceTaskInProgress");
-  }
-  return "";
-}
-
 function formatTranscriptionTime(createdAt) {
   return new Date(createdAt).toLocaleString(interfaceLanguage === "en" ? "en" : "zh-CN", {
     month: "numeric",
@@ -478,6 +428,7 @@ function formatTranscriptionTime(createdAt) {
 
 const PAGE_SCOPED_REQUESTS = new Set([
   "GET_ACTIVE_STATE",
+  "EXPORT_SESSION",
   "GET_FULL_YOUTUBE_TRANSCRIPT",
   "GET_VIDEO_POSITION",
   "CONTROL_VIDEO_PLAYBACK",
@@ -485,11 +436,6 @@ const PAGE_SCOPED_REQUESTS = new Set([
   "SYNC_LOCAL_TRANSCRIPT_NOTE_SOURCE",
   "BEGIN_TYPED_NOTE",
   "CANCEL_NOTE",
-  "VOICE_START_REQUEST",
-  "VOICE_STOP_REQUEST",
-  "CANCEL_PENDING_VOICE",
-  "GET_VOICE_STATE",
-  "OPEN_MICROPHONE_PERMISSION_PAGE",
   "OPEN_STANDALONE_WINDOW",
   "FOCUS_BOUND_VIDEO",
   "COMMIT_TYPED_NOTE",
@@ -1410,58 +1356,17 @@ function syncFullTranscriptContext() {
   void loadFullTranscript();
 }
 
-async function readMicrophonePermission() {
-  const { microphoneReady: savedReady = false } = await chrome.storage.local.get({
-    microphoneReady: false,
-  });
-  try {
-    const status = await navigator.permissions.query({ name: "microphone" });
-    if (microphonePermissionStatus !== status) {
-      if (microphonePermissionStatus) microphonePermissionStatus.onchange = null;
-      microphonePermissionStatus = status;
-      microphonePermissionStatus.onchange = () => {
-        microphoneReady = microphonePermissionStatus.state === "granted";
-        void chrome.storage.local
-          .set({ microphoneReady })
-          .then(() => renderPermissionStatus());
-      };
-    }
-    const ready = status.state === "granted";
-    if (ready !== savedReady) await chrome.storage.local.set({ microphoneReady: ready });
-    return { ready, state: status.state };
-  } catch {
-    return { ready: savedReady, state: savedReady ? "granted" : "prompt" };
-  }
-}
-
 async function renderPermissionStatus({ expandIfNeeded = false } = {}) {
-  const [screenshotGranted, microphone] = await Promise.all([
-    chrome.permissions.contains({ origins: SCREENSHOT_ORIGINS }),
-    readMicrophonePermission(),
-  ]);
-  microphoneReady = microphone.ready;
-
+  const screenshotGranted = await chrome.permissions.contains({ origins: SCREENSHOT_ORIGINS });
   elements.screenshotPermissionDetail.textContent = screenshotGranted
     ? t("screenshotPermissionGranted")
     : t("screenshotPermissionNeeded");
   elements.screenshotPermissionButton.textContent = screenshotGranted ? t("enabled") : t("enable");
   elements.screenshotPermissionButton.disabled = screenshotGranted;
 
-  elements.microphonePermissionDetail.textContent = microphone.ready
-    ? t("microphonePermissionGranted")
-    : microphone.state === "denied"
-      ? t("microphonePermissionDenied")
-      : t("microphonePermissionNeeded");
-  elements.microphonePermissionButton.textContent = microphone.ready ? t("authorized") : t("authorize");
-  elements.microphonePermissionButton.disabled = microphone.ready;
-
-  if (expandIfNeeded && (!screenshotGranted || !microphone.ready)) {
+  if (expandIfNeeded && !screenshotGranted) {
     elements.settings.open = true;
   }
-}
-
-async function openMicrophonePermissionPage() {
-  await request({ type: "OPEN_MICROPHONE_PERMISSION_PAGE" });
 }
 
 function autoGrow() {
@@ -1548,7 +1453,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
   );
   elements.noteList.replaceChildren();
   elements.emptyNotes.hidden = saved.length > 0;
-  elements.exportButton.disabled = saved.length === 0;
+  elements.exportButton.disabled = !activeContext;
 
   for (const note of saved) {
     const item = document.createElement("li");
@@ -1708,42 +1613,6 @@ function renderNotes(notes, order = noteSortBinding.order) {
         },
       });
     }
-    if (note.transcriptionStatus === "transcribing" || note.transcriptionStatus === "pending") {
-      const pending = document.createElement("span");
-      pending.className = "note-pending";
-      pending.textContent = note.pendingTranscription
-        ? t("transcribingWithModel", {
-          model: whisperModelLabel(note.pendingTranscription.modelId),
-        })
-        : t("localTranscribing");
-      item.append(pending);
-    }
-    if (note.inputType === "voice") {
-      const retranscribe = document.createElement("button");
-      retranscribe.className = "note-retranscribe-button";
-      retranscribe.type = "button";
-      retranscribe.textContent = t("retranscribe");
-      const unavailableReason = retranscriptionUnavailableReason(note);
-      retranscribe.disabled = Boolean(unavailableReason);
-      retranscribe.title = unavailableReason;
-      retranscribe.addEventListener("click", async () => {
-        retranscribe.disabled = true;
-        try {
-          await request({ type: "RETRANSCRIBE_NOTE", noteId: note.id });
-          await refresh();
-        } catch (error) {
-          showToast(error.message);
-          await refresh();
-        }
-      });
-      item.append(retranscribe);
-      if (unavailableReason) {
-        const reason = document.createElement("span");
-        reason.className = "note-retranscribe-reason";
-        reason.textContent = unavailableReason;
-        item.append(reason);
-      }
-    }
     if ((note.transcriptionRuns?.length ?? 0) > 1) {
       const results = document.createElement("details");
       results.className = "note-transcription-results";
@@ -1755,7 +1624,7 @@ function renderNotes(notes, order = noteSortBinding.order) {
         result.className = "note-transcription-result";
         const metadata = document.createElement("span");
         metadata.className = "note-transcription-meta";
-        metadata.textContent = `${whisperModelLabel(run.modelId)} · ${formatTranscriptionTime(run.createdAt)}`;
+        metadata.textContent = `${String(run.modelId ?? "")} · ${formatTranscriptionTime(run.createdAt)}`;
         const text = document.createElement("p");
         text.textContent = run.text || t("noRecognizedText");
         result.append(metadata, text);
@@ -1789,11 +1658,9 @@ async function refreshNow() {
 refreshRunner = createSidePanelRefreshRunner({
   async load() {
     const response = await request({ type: "GET_ACTIVE_STATE" });
-    const nextWhisperStatus = await request({ type: "GET_WHISPER_STATUS" })
-      .catch(() => whisperStatus);
-    return { nextWhisperStatus, response };
+    return { response };
   },
-  async apply({ nextWhisperStatus, response }, isCurrent) {
+  async apply({ response }, isCurrent) {
     if (!response.context) throw new Error(t("openSupportedVideo"));
     const contextToken = historyContextToken;
     const tabId = sidePanelRefresh.tabId;
@@ -1803,7 +1670,6 @@ refreshRunner = createSidePanelRefreshRunner({
       || historyContextToken !== contextToken
       || sidePanelRefresh.tabId !== tabId
     ) return;
-    whisperStatus = nextWhisperStatus;
     if (
       activeContext?.sessionId !== response.context?.sessionId
       || activeContextTabId !== sidePanelRefresh.tabId
@@ -1819,7 +1685,6 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.videoUrl.hidden = false;
     elements.input.disabled = false;
     elements.standaloneWindowButton.disabled = false;
-    syncVoiceButtonAvailability();
     renderNotes(response.notes);
     syncFullTranscriptContext();
     void sidePanelViewPosition.restorePage({
@@ -1837,7 +1702,6 @@ refreshRunner = createSidePanelRefreshRunner({
     elements.videoUrl.hidden = true;
     elements.input.disabled = true;
     elements.standaloneWindowButton.disabled = true;
-    syncVoiceButtonAvailability();
     elements.exportButton.disabled = true;
     renderNotes([]);
     resetFullTranscript({ hide: true });
@@ -1908,151 +1772,6 @@ async function cancelTypedDraft() {
     typedDraftSaving = false;
     syncHistoryControls();
   }
-}
-
-function syncVoiceButtonAvailability() {
-  elements.voiceButton.disabled = !activeContext
-    || voiceStarting
-    || voiceStopping
-    || (recording && !ownedVoiceNoteId);
-}
-
-function setRecordingUi(active, noteId = null) {
-  recording = active;
-  if (!active) ownedVoiceNoteId = null;
-  syncHistoryControls();
-  syncVoiceButtonAvailability();
-  elements.recordingStatus.hidden = !active;
-  elements.voiceButton.classList.toggle("is-recording", active);
-  elements.voiceLabel.textContent = active ? t("releaseToStop") : t("holdToTalk");
-  clearInterval(recordingInterval);
-  clearTimeout(recordingTimeout);
-  if (!active) return;
-  if (!ownedVoiceNoteId || ownedVoiceNoteId !== noteId) {
-    elements.recordingTimer.textContent = "--:--";
-    return;
-  }
-  recordingStartedAt = Date.now();
-  const update = () => {
-    const seconds = Math.floor((Date.now() - recordingStartedAt) / 1000);
-    elements.recordingTimer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  };
-  update();
-  recordingInterval = setInterval(update, 250);
-  recordingTimeout = setTimeout(() => void stopVoice("timeout"), 60_000);
-}
-
-async function startVoice() {
-  if (recording || voiceStarting || !activeContext) return;
-  voiceStarting = true;
-  syncVoiceButtonAvailability();
-  syncHistoryControls();
-  try {
-    if (!microphoneReady) {
-      await openMicrophonePermissionPage();
-      pendingVoiceStopReason = null;
-      showToast(t("completeMicrophonePermission"));
-      return;
-    }
-    const response = await request({
-      type: "VOICE_START_REQUEST",
-      localTranscriptNoteSource: currentLocalTranscriptNoteSource(),
-    });
-    if (response.canceled) return;
-    ownedVoiceNoteId = response.note.id;
-    setRecordingUi(true, response.note.id);
-    if (pendingVoiceStopReason) {
-      const reason = pendingVoiceStopReason;
-      pendingVoiceStopReason = null;
-      await stopVoice(reason);
-    }
-  } catch (error) {
-    pendingVoiceStopReason = null;
-    showToast(error.message);
-  } finally {
-    voiceStarting = false;
-    syncVoiceButtonAvailability();
-    syncHistoryControls();
-  }
-}
-
-async function stopVoice(reason = "button-release") {
-  if (voiceStarting && !ownedVoiceNoteId) {
-    pendingVoiceStopReason = reason;
-    return;
-  }
-  if (!recording || !ownedVoiceNoteId) return;
-  setRecordingUi(false);
-  voiceStopping = true;
-  syncVoiceButtonAvailability();
-  syncHistoryControls();
-  try {
-    await request({ type: "VOICE_STOP_REQUEST", reason });
-    await refresh();
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    voiceStopping = false;
-    syncVoiceButtonAvailability();
-    syncHistoryControls();
-  }
-}
-
-function shortcutLabel(code) {
-  const labels = {
-    AltRight: t("shortcutRightAlt"),
-    AltLeft: t("shortcutLeftAlt"),
-    Space: t("shortcutSpace"),
-  };
-  return labels[code] ?? code;
-}
-
-async function renderWhisperStatus() {
-  const status = await request({ type: "GET_WHISPER_STATUS" });
-  whisperStatus = status;
-  const labels = {
-    disabled: t("whisperDisabled"),
-    downloading: t("whisperDownloading"),
-    ready: t("whisperReady"),
-    recording: t("whisperRecording"),
-    transcribing: t("whisperTranscribing"),
-    error: t("whisperError", {
-      error: localizeRuntimeMessage(
-        interfaceLanguage,
-        status.whisperError || t("unknownError"),
-      ),
-    }),
-  };
-  const selectedModelId = pendingWhisperModelId ?? status.selectedModelId;
-  if (elements.whisperModelSelect.options.length !== status.models.length) {
-    elements.whisperModelSelect.replaceChildren(...status.models.map((model) => {
-      const option = document.createElement("option");
-      option.value = model.id;
-      option.textContent = `${model.label}${model.recommended ? t("recommended") : ""}`;
-      return option;
-    }));
-  }
-  elements.whisperModelSelect.value = selectedModelId;
-  const selectedModel = status.models.find(({ id }) => id === selectedModelId);
-  const downloadingModel = status.models.find(({ id }) => id === status.download?.modelId);
-  const busy = ["downloading", "recording", "transcribing"].includes(status.whisperState)
-    || Boolean(status.download);
-  const cached = status.cachedModelIds.includes(selectedModelId);
-  elements.whisperDetail.textContent = downloadingModel
-    ? t("modelDownloading", {
-      model: downloadingModel.label,
-      progress: `${Math.round((status.download.downloadedBytes ?? 0) / 1024 / 1024)} / ${Math.round(
-        downloadingModel.size / 1024 / 1024,
-      )} MiB`,
-    })
-    : labels[status.whisperState] ?? labels.disabled;
-  elements.whisperModelAction.textContent = cached ? t("useThisModel") : t("downloadAndUse");
-  elements.whisperModelSelect.disabled = busy;
-  elements.whisperModelAction.disabled = busy;
-  elements.whisperModelWarning.hidden = selectedModel?.experimental !== true;
-  elements.whisperModelWarning.textContent = selectedModel?.experimental
-    ? t("experimentalModelWarning")
-    : "";
 }
 
 for (const button of elements.languageButtons) {
@@ -2165,35 +1884,12 @@ window.addEventListener("scroll", () => {
   sidePanelViewPosition.scheduleSave();
 }, { passive: true });
 
-elements.voiceButton.addEventListener("pointerdown", (event) => {
-  event.preventDefault();
-  elements.voiceButton.setPointerCapture(event.pointerId);
-  void startVoice();
-});
-elements.voiceButton.addEventListener("pointerup", (event) => {
-  event.preventDefault();
-  void stopVoice();
-});
-elements.voiceButton.addEventListener("pointercancel", () => void stopVoice("pointer-cancel"));
-
 elements.screenshotPermissionButton.addEventListener("click", async () => {
   elements.screenshotPermissionButton.disabled = true;
   try {
     const granted = await chrome.permissions.request({ origins: SCREENSHOT_ORIGINS });
     if (!granted) throw new Error(t("screenshotPermissionCanceled"));
     showToast(t("screenshotEnabled"));
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    await renderPermissionStatus();
-  }
-});
-
-elements.microphonePermissionButton.addEventListener("click", async () => {
-  elements.microphonePermissionButton.disabled = true;
-  try {
-    await openMicrophonePermissionPage();
-    showToast(t("completeMicrophonePermission"));
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -2353,73 +2049,14 @@ elements.exportButton.addEventListener("click", async () => {
     const result = await request({
       type: "EXPORT_SESSION",
       sessionId: activeContext.sessionId,
+      transcript: fullTranscript,
       language: interfaceLanguage,
     });
-    showToast(t("exportComplete", { count: result.noteCount }));
+    showToast(t(result.transcriptCueCount > 0 ? "exportCompleteWithTranscript" : "exportCompleteWithoutTranscript", { count: result.noteCount, cues: result.transcriptCueCount }));
   } catch (error) {
     showToast(error.message);
   } finally {
     elements.exportButton.disabled = false;
-  }
-});
-
-elements.whisperModelSelect.addEventListener("change", () => {
-  pendingWhisperModelId = elements.whisperModelSelect.value;
-  void renderWhisperStatus();
-});
-
-elements.whisperModelAction.addEventListener("click", async () => {
-  elements.whisperModelAction.disabled = true;
-  try {
-    const status = await request({ type: "GET_WHISPER_STATUS" });
-    const modelId = elements.whisperModelSelect.value;
-    if (status.cachedModelIds.includes(modelId)) {
-      await request({ type: "SELECT_WHISPER_MODEL", modelId });
-      showToast(t("whisperModelChanged"));
-    } else {
-      const source = modelId === "base-q5_1"
-        ? await request({ type: "CHECK_BUNDLED_MODEL" })
-        : { bundled: false };
-      if (!source.bundled) {
-        const granted = await chrome.permissions.request({ origins: WHISPER_ORIGINS });
-        if (!granted) throw new Error(t("modelDownloadPermissionDenied"));
-      }
-      await request({ type: "ENABLE_WHISPER", modelId });
-      showToast(t("whisperEnabled"));
-    }
-    pendingWhisperModelId = null;
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    await renderWhisperStatus();
-  }
-});
-
-elements.keyButton.addEventListener("click", () => {
-  elements.keyButton.classList.add("is-listening");
-  elements.keyButton.textContent = t("pressAKey");
-  elements.keyButton.focus();
-});
-elements.keyButton.addEventListener("keydown", async (event) => {
-  if (!elements.keyButton.classList.contains("is-listening")) return;
-  event.preventDefault();
-  if (event.code === "Escape") {
-    elements.keyButton.classList.remove("is-listening");
-    const { shortcutCode = "AltRight" } = await chrome.storage.local.get("shortcutCode");
-    elements.keyButton.textContent = shortcutLabel(shortcutCode);
-    return;
-  }
-  try {
-    if (isReservedVideoPlaybackCode(event.code)) {
-      throw new Error(t("shortcutReservedForPlayback"));
-    }
-    await request({ type: "SET_SHORTCUT", code: event.code });
-    elements.keyButton.textContent = shortcutLabel(event.code);
-    showToast(t("shortcutChanged", { shortcut: shortcutLabel(event.code) }));
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    elements.keyButton.classList.remove("is-listening");
   }
 });
 
@@ -2493,25 +2130,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
     location.reload();
     return;
   }
-  if (area === "local" && (
-    changes.whisperState
-    || changes.whisperSelectedModel
-    || changes.whisperDownloadModel
-    || changes.whisperDownloadedBytes
-  )) {
-    void renderWhisperStatus();
-  }
-  if (area === "local" && changes.shortcutCode?.newValue) {
-    elements.keyButton.textContent = shortcutLabel(
-      normalizePushToTalkShortcut(changes.shortcutCode.newValue),
-    );
-  }
   if (area === "local" && changes.noteSortOrder) {
     noteSortBinding.sync(changes.noteSortOrder.newValue);
-  }
-  if (area === "local" && changes.microphoneReady) {
-    microphoneReady = changes.microphoneReady.newValue === true;
-    void renderPermissionStatus();
   }
   if (area === "local" && (
     changes.subtitleEnabled
@@ -2592,9 +2212,6 @@ window.addEventListener("pagehide", () => {
   closeScreenshotDialog();
   stopNoteMedia(elements.noteList);
   assetUrls.revokeAll();
-  if (ownedVoiceNoteId || voiceStarting) {
-    void request({ type: "CANCEL_PENDING_VOICE", reason: "sidepanel-closed" });
-  }
   if (currentDraft) {
     void request({ type: "CANCEL_NOTE", noteId: currentDraft.id });
   } else if (draftPromise) {
@@ -2650,9 +2267,6 @@ void refreshBrowserTranslationLanguagePackAvailability();
 
 await initializeSidepanel({
   storage: chrome.storage,
-  onShortcutCode: (shortcutCode) => {
-    elements.keyButton.textContent = shortcutLabel(normalizePushToTalkShortcut(shortcutCode));
-  },
   noteSortBinding,
   sidepanelZoomBinding,
   setPanelContext: async () => {
@@ -2665,10 +2279,7 @@ await initializeSidepanel({
       document.title = t("standaloneWindowTitle");
       document.documentElement.dataset.panelMode = "standalone";
     }
-    const voiceState = await request({ type: "GET_VOICE_STATE" }).catch(() => null);
-    if (voiceState) setRecordingUi(voiceState.recording, voiceState.noteId);
   },
   refresh,
-  renderWhisperStatus,
   renderPermissionStatus: () => renderPermissionStatus({ expandIfNeeded: true }),
 });

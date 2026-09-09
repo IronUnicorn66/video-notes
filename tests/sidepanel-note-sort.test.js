@@ -157,14 +157,12 @@ test("侧栏启动时读取并恢复保存的缩放比例", async () => {
         async get(defaults) {
           requestedDefaults.push(defaults);
           return {
-            shortcutCode: "AltRight",
             noteSortOrder: "newest",
             sidepanelZoom: 130,
           };
         },
       },
     },
-    onShortcutCode: () => {},
     noteSortBinding: fixture.binding,
     sidepanelZoomBinding: {
       initialize(value) {
@@ -173,12 +171,10 @@ test("侧栏启动时读取并恢复保存的缩放比例", async () => {
     },
     setPanelContext: async () => {},
     refresh: async () => {},
-    renderWhisperStatus: async () => {},
     renderPermissionStatus: async () => {},
   });
 
   assert.deepEqual(requestedDefaults, [{
-    shortcutCode: "AltRight",
     noteSortOrder: "newest",
     sidepanelZoom: 100,
   }]);
@@ -196,14 +192,12 @@ test("读取偏好失败时仍用默认值完成侧栏启动", async () => {
     isEditing: () => false,
     showToast: () => {},
   });
-  const shortcuts = [];
   const tabIds = [];
   const zooms = [];
   let refreshes = 0;
 
   await sidepanelSort.initializeSidepanel({
     storage: { local: { get: async () => { throw new Error("存储不可用"); } } },
-    onShortcutCode: (code) => shortcuts.push(code),
     noteSortBinding: binding,
     sidepanelZoomBinding: {
       initialize(value) {
@@ -212,11 +206,9 @@ test("读取偏好失败时仍用默认值完成侧栏启动", async () => {
     },
     setPanelContext: async () => tabIds.push(7),
     refresh: async () => { refreshes += 1; },
-    renderWhisperStatus: async () => {},
     renderPermissionStatus: async () => {},
   });
 
-  assert.deepEqual(shortcuts, ["AltRight"]);
   assert.equal(newest.getAttribute("aria-pressed"), "true");
   assert.equal(oldest.getAttribute("aria-pressed"), "false");
   assert.deepEqual(tabIds, [7]);

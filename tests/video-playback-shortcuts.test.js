@@ -6,8 +6,6 @@ import {
   PLAYBACK_COMMAND,
   controlVideoPlayback,
   findPrimaryVideo,
-  isReservedVideoPlaybackCode,
-  normalizePushToTalkShortcut,
   playbackCommandForKeyEvent,
   shouldExecutePlaybackCommand,
 } from "../src/core/video-playback-shortcuts.js";
@@ -213,16 +211,6 @@ test("播放器命令拒绝缺少播放器、旧会话、非法命令和播放�
     context: context(),
     command: PLAYBACK_COMMAND.TOGGLE_PLAYBACK,
   }), /autoplay blocked/);
-});
-
-test("空格和左右方向键保留给播放器，冲突的录音键回退到右 Alt", () => {
-  for (const code of ["Space", "ArrowLeft", "ArrowRight"]) {
-    assert.equal(isReservedVideoPlaybackCode(code), true);
-    assert.equal(normalizePushToTalkShortcut(code), "AltRight");
-  }
-  assert.equal(isReservedVideoPlaybackCode("AltRight"), false);
-  assert.equal(normalizePushToTalkShortcut("AltLeft"), "AltLeft");
-  assert.equal(normalizePushToTalkShortcut(undefined), "AltRight");
 });
 
 test("页面快捷键提前拦截网站处理器且重复安装保持幂等", async () => {
