@@ -11,7 +11,6 @@ const COMMAND_BY_CODE = new Map([
   ["ArrowLeft", PLAYBACK_COMMAND.SEEK_BACKWARD],
   ["ArrowRight", PLAYBACK_COMMAND.SEEK_FORWARD],
 ]);
-const RESERVED_VIDEO_PLAYBACK_CODES = new Set(COMMAND_BY_CODE.keys());
 const TEXT_INPUT_TYPES = new Set([
   "",
   "email",
@@ -55,14 +54,6 @@ export function playbackCommandForKeyEvent(event) {
 
 export function shouldExecutePlaybackCommand(event, command) {
   return command !== PLAYBACK_COMMAND.TOGGLE_PLAYBACK || event.repeat !== true;
-}
-
-export function isReservedVideoPlaybackCode(code) {
-  return RESERVED_VIDEO_PLAYBACK_CODES.has(code);
-}
-
-export function normalizePushToTalkShortcut(code) {
-  return !code || isReservedVideoPlaybackCode(code) ? "AltRight" : code;
 }
 
 function visibleArea(element, { width, height }) {

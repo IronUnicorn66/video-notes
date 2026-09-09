@@ -165,19 +165,6 @@ export class VideoNotesRepository {
       .sort((left, right) => left.createdAt - right.createdAt);
   }
 
-  async listPendingTranscriptions() {
-    const database = await this.dbPromise;
-    const notes = await requestResult(
-      database.transaction("notes").objectStore("notes").getAll(),
-    );
-    return notes.filter((note) => (
-      note.status === "saved" &&
-      note.deletedAt === undefined &&
-      Boolean(note.audioKey) &&
-      ["pending", "transcribing"].includes(note.transcriptionStatus)
-    ));
-  }
-
   putAsset(key, blob) {
     return this.write("assets", {
       key,

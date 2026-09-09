@@ -70,7 +70,7 @@ test("侧栏重开和切换合并档位后恢复完整字幕列表位置", () =>
   );
   assert.match(source, /sidePanelViewPosition\.prepareTranscriptGroupChange\(\)/);
   assert.match(source, /renderFullTranscript\(\);\s*void sidePanelViewPosition\.restoreTranscript\(\);/);
-  const applyStart = source.indexOf("  async apply({ nextWhisperStatus, response }, isCurrent) {");
+  const applyStart = source.indexOf("  async apply({ response }, isCurrent) {");
   const applyEnd = source.indexOf("\n  applyError(error) {", applyStart);
   const refreshApply = source.slice(applyStart, applyEnd);
   assert.ok(applyStart >= 0 && applyEnd > applyStart);
@@ -275,7 +275,6 @@ test("当前完整字幕和译文同步给所有记笔记入口", () => {
   assert.match(content, /renderedText: subtitleCapture\.before\(seconds\)/);
   assert.match(background, /subtitleTranslation: String\(snapshot\.subtitleTranslation \?\? ""\)\.trim\(\)/);
   assert.match(source, /type: "BEGIN_TYPED_NOTE",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
-  assert.match(source, /type: "VOICE_START_REQUEST",\s*localTranscriptNoteSource: currentLocalTranscriptNoteSource\(\)/);
   assert.match(background, /type: "PREPARE_MARKER",[\s\S]*localTranscriptNoteSource/);
   assert.match(content, /source: context\.platform === "bilibili" \? bilibiliSource : localTranscriptNoteSource/);
   assert.match(content, /preferredSource: context\.platform === "youtube" \? preferredSource : null/);

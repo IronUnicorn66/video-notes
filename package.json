@@ -1,18 +1,15 @@
 {
   "name": "video-notes-edge",
-  "version": "1.0.39",
+  "version": "1.0.41",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node scripts/build-extension.mjs",
     "build:store-assets": "node scripts/render-store-assets.mjs",
     "test": "node --test --test-concurrency=1",
+    "test:skill": "node --test --test-concurrency=1 tests/video-notes-skill.test.js",
     "test:watch": "node --test --test-concurrency=1 --watch",
     "package": "node scripts/package-extension.mjs"
-  },
-  "dependencies": {
-    "@transcribe/shout": "1.0.7",
-    "@transcribe/transcriber": "3.0.1"
   },
   "devDependencies": {
     "esbuild": "0.25.6",

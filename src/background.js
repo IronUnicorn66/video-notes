@@ -1,3 +1,5 @@
+import { createFullTranscriptCacheLoader, cachedFullTranscriptForContext } from "./core/full-transcript-cache.js";
+import { friendlyCaptureError } from "./core/media-permissions.js";
 import { computeScreenshotCrop } from "./core/screenshot.js";
 import { VideoNotesRepository } from "./core/storage.js";
 import { captureYoutubePlayerTranscript } from "./core/youtube-transcript-capture.js";
@@ -9,29 +11,6 @@ import {
   createNoteHistoryCommandRouter,
   isNoteHistoryCommand,
 } from "./core/note-history-commands.js";
-import {
-  STUDY_SOUND_EXTENSION_ID,
-  noteHoldMessage,
-} from "./core/study-sound-protocol.js";
-import {
-  DEFAULT_WHISPER_MODEL_ID,
-  WHISPER_MODELS,
-  WHISPER_ORIGINS,
-  getWhisperModel,
-} from "./core/model-config.js";
-import {
-  assertModelSwitchAllowed,
-  createNoteTaskCoordinator,
-} from "./core/whisper-state.js";
-import { recoverWhisperState } from "./core/whisper-recovery.js";
-import { createWhisperOperationLock } from "./core/whisper-operation.js";
-import { createMicrophoneNavigation } from "./core/microphone-navigation.js";
-import {
-  canUseMicrophone,
-  friendlyCaptureError,
-  friendlyMicrophoneError,
-  isMicrophonePermissionError,
-} from "./core/media-permissions.js";
 import {
   activeSidePanelRequestTabId,
   activeContextChangedMessage,
@@ -50,33 +29,13 @@ import {
 import { createStandaloneWindowManager } from "./core/standalone-window.js";
 import { createTabMessenger } from "./core/tab-messaging.js";
 import { clearLegacyCloudTranslationSettings } from "./core/local-only-migration.js";
-import {
-  isReservedVideoPlaybackCode,
-  normalizePushToTalkShortcut,
-} from "./core/video-playback-shortcuts.js";
 
 const repository = new VideoNotesRepository();
 const tabMessenger = createTabMessenger({
   tabs: chrome.tabs,
   scripting: chrome.scripting,
 });
-const microphoneNavigation = createMicrophoneNavigation({
-  storageSession: chrome.storage.session,
-  tabs: chrome.tabs,
-  windows: chrome.windows,
-});
-const heartbeatTimers = new Map();
-let cancelPendingVoice = false;
 let offscreenCreationPromise = null;
-let voiceStartPromise = null;
-let voiceStopPromise = null;
-let activeVoiceNote = null;
-let activeVoiceOwner = null;
-let whisperRecoveryPromise = Promise.resolve();
-let microphonePermissionPagePromise = null;
-let microphonePermissionTabId = null;
-const whisperModelOperationLock = createWhisperOperationLock();
-const coordinateNoteTranscription = createNoteTaskCoordinator();
 const noteHistoryCommandRouter = createNoteHistoryCommandRouter({
   repository,
   getCurrentContext: currentPageContext,
@@ -94,7 +53,6 @@ const standaloneWindowManager = createStandaloneWindowManager({
   tabs: chrome.tabs,
   windows: chrome.windows,
 });
-const ACTIVE_VOICE_OWNER_KEY = "activeVoiceOwner";
 const handleActiveTabActivation = createActiveTabActivationHandler({
   runtime: chrome.runtime,
   tabs: chrome.tabs,
@@ -136,19 +94,6 @@ void configureExistingSidePanelOptions();
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
     try {
-      const settings = await chrome.storage.local.get([
-        "shortcutCode",
-        "whisperState",
-        "whisperSelectedModel",
-        "whisperModel",
-      ]);
-      await chrome.storage.local.set({
-        shortcutCode: normalizePushToTalkShortcut(settings.shortcutCode),
-        whisperState: settings.whisperState ?? "disabled",
-        whisperSelectedModel: getWhisperModel(
-          settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
-        ).id,
-      });
       await clearLegacyCloudTranslationSettings(chrome.storage.local);
     } catch (error) {
       console.warn("初始化扩展设置失败", error);
@@ -209,44 +154,6 @@ async function targetTab(sender, requestedTabId, {
   return activeSupportedTab();
 }
 
-async function openMicrophonePermissionPage(returnTab) {
-  await microphoneNavigation.rememberSource(returnTab);
-  if (!microphonePermissionPagePromise) {
-    microphonePermissionPagePromise = (async () => {
-      const url = chrome.runtime.getURL("microphone-permission.html");
-      if (microphonePermissionTabId !== null) {
-        try {
-          return await chrome.tabs.update(microphonePermissionTabId, { active: true });
-        } catch {
-          microphonePermissionTabId = null;
-        }
-      }
-      const [existing] = await chrome.runtime.getContexts({
-        contextTypes: ["TAB"],
-        documentUrls: [url],
-      });
-      if (existing?.tabId >= 0) {
-        microphonePermissionTabId = existing.tabId;
-        await chrome.tabs.update(existing.tabId, { active: true });
-        if (existing.windowId >= 0) {
-          await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
-        }
-        return { tabId: existing.tabId };
-      }
-      const tab = await chrome.tabs.create({
-        url,
-        active: true,
-        windowId: returnTab.windowId,
-      });
-      microphonePermissionTabId = tab.id ?? null;
-      return tab;
-    })().finally(() => {
-      microphonePermissionPagePromise = null;
-    });
-  }
-  return microphonePermissionPagePromise;
-}
-
 async function sendToTab(tabId, message) {
   const response = await tabMessenger.send(tabId, message);
   if (!response?.ok) throw new Error(response?.error ?? "视频页面没有响应");
@@ -258,8 +165,8 @@ async function ensureOffscreenDocument() {
   if (!offscreenCreationPromise) {
     offscreenCreationPromise = chrome.offscreen.createDocument({
       url: "offscreen.html",
-      reasons: ["USER_MEDIA", "WORKERS", "BLOBS"],
-      justification: "在本机录音、运行 Whisper Worker，并生成可下载的 ZIP 文件",
+      reasons: ["BLOBS"],
+      justification: "生成可下载的笔记与字幕 ZIP 文件",
     }).finally(() => {
       offscreenCreationPromise = null;
     });
@@ -273,111 +180,6 @@ async function sendToOffscreen(message) {
   if (!response?.ok) throw new Error(response?.error ?? "本地处理页面没有响应");
   return response;
 }
-
-async function enqueueTranscription(noteId, modelId, source) {
-  getWhisperModel(modelId);
-  if (!["automatic", "manual"].includes(source)) throw new Error("未知转写来源");
-  await sendToOffscreen({
-    type: "TRANSCRIBE_NOTE",
-    noteId,
-    modelId,
-    source,
-  });
-}
-
-async function markTranscriptionFailure(noteId, error) {
-  const warning = `转写失败：${error.message}`;
-  await repository.updateNote(noteId, (note) => ({
-    ...note,
-    pendingTranscription: null,
-    transcriptionStatus: "error",
-    warnings: note.warnings?.includes(warning)
-      ? note.warnings
-      : [...(note.warnings ?? []), warning],
-    updatedAt: Date.now(),
-  })).catch(() => {});
-}
-
-async function queueTranscription(noteId, modelId, source) {
-  getWhisperModel(modelId);
-  if (!["automatic", "manual"].includes(source)) throw new Error("未知转写来源");
-  const pendingTranscription = { modelId, source, queuedAt: Date.now() };
-  await repository.updateNote(noteId, (note) => ({
-    ...note,
-    transcriptionStatus: "pending",
-    pendingTranscription,
-    updatedAt: Date.now(),
-  }));
-  void enqueueTranscription(noteId, modelId, source).catch((error) => (
-    markTranscriptionFailure(noteId, error)
-  ));
-}
-
-async function recoverTransientWhisperState() {
-  const settings = await chrome.storage.local.get({
-    whisperState: "disabled",
-    whisperSelectedModel: "",
-    whisperModel: "",
-  });
-  let processing = null;
-  if (await chrome.offscreen.hasDocument()) {
-    processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" }).catch(() => null);
-  }
-  const cacheStatus = await sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" });
-  const cachedModelIds = cacheStatus.cachedModelIds;
-  const selectedModelId = getWhisperModel(
-    settings.whisperSelectedModel || settings.whisperModel || DEFAULT_WHISPER_MODEL_ID,
-  ).id;
-  const { whisperState, whisperError } = recoverWhisperState({
-    whisperState: settings.whisperState,
-    cachedModelIds,
-    selectedModelId,
-    processing,
-  });
-
-  const recovered = {
-    whisperState,
-    whisperSelectedModel: selectedModelId,
-  };
-  if (whisperError !== undefined) recovered.whisperError = whisperError;
-  await chrome.storage.local.set(recovered);
-
-  if (processing?.downloading) return;
-  await chrome.permissions.remove({ origins: WHISPER_ORIGINS }).catch(() => false);
-  const activeNoteIds = new Set(processing?.transcriptionNoteIds ?? []);
-  const pending = (await repository.listPendingTranscriptions())
-    .filter((note) => !activeNoteIds.has(note.id));
-  if (pending.length === 0) return;
-  for (const note of pending) {
-    let pendingTranscription = note.pendingTranscription;
-    if (!pendingTranscription) {
-      pendingTranscription = {
-        modelId: selectedModelId,
-        source: (note.transcriptionRuns?.length ?? 0) > 0 ? "manual" : "automatic",
-        queuedAt: Date.now(),
-      };
-      await repository.updateNote(note.id, (current) => ({
-        ...current,
-        transcriptionStatus: "pending",
-        pendingTranscription,
-        updatedAt: Date.now(),
-      }));
-    }
-    if (!cachedModelIds.includes(pendingTranscription.modelId)) {
-      await markTranscriptionFailure(note.id, new Error("待转写模型缓存已丢失，请重新下载"));
-      continue;
-    }
-    void enqueueTranscription(
-      note.id,
-      pendingTranscription.modelId,
-      pendingTranscription.source,
-    ).catch((error) => markTranscriptionFailure(note.id, error));
-  }
-}
-
-whisperRecoveryPromise = recoverTransientWhisperState().catch(async (error) => {
-  await chrome.storage.local.set({ whisperState: "error", whisperError: error.message });
-});
 
 async function cropVisiblePlayer(tab, snapshot) {
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
@@ -411,14 +213,12 @@ async function cropVisiblePlayer(tab, snapshot) {
 
 async function beginMarker(
   tab,
-  inputType,
-  { beforePause, onPrepared, localTranscriptNoteSource } = {},
+  { localTranscriptNoteSource } = {},
 ) {
   const markerId = crypto.randomUUID();
   const snapshot = await sendToTab(tab.id, {
     type: "PREPARE_MARKER",
     markerId,
-    deferPause: Boolean(beforePause),
     localTranscriptNoteSource,
   });
   const now = Date.now();
@@ -438,35 +238,19 @@ async function beginMarker(
     tabId: tab.id,
     seconds: snapshot.seconds,
     jumpUrl: snapshot.jumpUrl,
-    inputType,
+    inputType: "typed",
     body: "",
-    transcriptionStatus: inputType === "voice" ? "pending" : "none",
-    transcriptCandidate: "",
-    transcriptionModelId: "",
-    transcriptionRuns: [],
-    pendingTranscription: null,
     subtitleContext: snapshot.subtitleContext,
     screenshotKey: "",
-    audioKey: "",
     warnings: [],
     wasPlaying: snapshot.wasPlaying,
-    studySoundLinked: false,
     userEditVersion: 0,
-    status: inputType === "voice" ? "recording" : "draft",
+    status: "draft",
     subtitleTranslation: String(snapshot.subtitleTranslation ?? "").trim(),
     createdAt: now,
     updatedAt: now,
   };
 
-  if (beforePause) {
-    await beforePause(note);
-    await sendToTab(tab.id, {
-      type: "ACTIVATE_MARKER",
-      markerId,
-      wasPlaying: note.wasPlaying,
-    });
-  }
-  const preparedTask = onPrepared ? Promise.resolve(onPrepared(note)) : Promise.resolve();
   const existingSession = await repository.getSession(session.id);
   if (existingSession) session.createdAt = existingSession.createdAt;
   await repository.putSession(session);
@@ -479,31 +263,15 @@ async function beginMarker(
     note.warnings.push(`截图失败：${friendlyCaptureError(error)}`);
   }
   await repository.putNote(note);
-  await preparedTask;
   return { session, note };
 }
 
-async function releaseMarker(note, shouldNotifyStudySound = false) {
-  const shouldCoordinate = shouldNotifyStudySound && note.studySoundLinked === true;
-  let externalReleased = false;
-  if (shouldCoordinate) {
-    let shouldResumeMain = false;
-    try {
-      const eligibility = await sendToTab(note.tabId, {
-        type: "GET_MARKER_RESUME_ELIGIBILITY",
-        markerId: note.id,
-      });
-      shouldResumeMain = eligibility.shouldResume === true;
-    } catch {
-      shouldResumeMain = false;
-    }
-    externalReleased = await releaseStudySoundHold(note, shouldResumeMain);
-  }
+async function releaseMarker(note) {
   try {
     const response = await sendToTab(note.tabId, {
       type: "RELEASE_MARKER",
       markerId: note.id,
-      allowResume: !externalReleased,
+      allowResume: true,
     });
     return response.resumed;
   } catch {
@@ -525,300 +293,15 @@ async function cancelNote(noteId, fallbackNote = null) {
   if (storedNote) await repository.deleteNote(note.id);
   if (note.screenshotKey) await repository.deleteAsset(note.screenshotKey);
   if (note.audioKey) await repository.deleteAsset(note.audioKey);
-  await releaseMarker(note, note.inputType === "voice");
-}
-
-async function externalStudySound(message) {
-  return chrome.runtime.sendMessage(STUDY_SOUND_EXTENSION_ID, message);
-}
-
-async function acquireStudySoundHold(note) {
-  try {
-    const response = await externalStudySound(
-      noteHoldMessage("NOTE_HOLD_ACQUIRE", {
-        leaseId: note.id,
-        tabId: note.tabId,
-        shouldResumeMain: note.wasPlaying,
-      }),
-    );
-    if (!response?.ok || response.protocolVersion !== 1) throw new Error("协议不兼容");
-    const timer = setInterval(() => {
-      void externalStudySound(
-        noteHoldMessage("NOTE_HOLD_HEARTBEAT", { leaseId: note.id, tabId: note.tabId }),
-      ).catch(() => {});
-    }, 30_000);
-    heartbeatTimers.set(note.id, timer);
-    note.studySoundLinked = true;
-    return true;
-  } catch {
-    note.studySoundLinked = false;
-    const { studySoundWarningShown = false } = await chrome.storage.local.get(
-      "studySoundWarningShown",
-    );
-    if (!studySoundWarningShown) {
-      note.warnings.push("背景音未联动静音");
-      await chrome.storage.local.set({ studySoundWarningShown: true });
-    }
-    return false;
-  }
-}
-
-async function releaseStudySoundHold(note, shouldResumeMain) {
-  clearInterval(heartbeatTimers.get(note.id));
-  heartbeatTimers.delete(note.id);
-  try {
-    const response = await externalStudySound(
-      noteHoldMessage("NOTE_HOLD_RELEASE", {
-        leaseId: note.id,
-        tabId: note.tabId,
-        shouldResumeMain,
-      }),
-    );
-    return response?.ok === true && response.protocolVersion === 1;
-  } catch {
-    // StudySound 缺失时视频笔记仍应完成自己的恢复流程。
-    return false;
-  }
-}
-
-async function currentVoiceOwner() {
-  if (activeVoiceOwner) return activeVoiceOwner;
-  const stored = await chrome.storage.session.get(ACTIVE_VOICE_OWNER_KEY);
-  const owner = stored[ACTIVE_VOICE_OWNER_KEY];
-  if (!Number.isInteger(owner?.tabId)) return null;
-  activeVoiceOwner = owner;
-  return owner;
-}
-
-async function clearVoiceOwner() {
-  activeVoiceOwner = null;
-  await chrome.storage.session.remove(ACTIVE_VOICE_OWNER_KEY);
-}
-
-async function startVoice(tab, localTranscriptNoteSource, ownerDocumentId = null) {
-  if (voiceStartPromise || voiceStopPromise) throw new Error("录音正在启动或保存，请稍候");
-  activeVoiceOwner = { documentId: ownerDocumentId, tabId: tab.id };
-  voiceStartPromise = (async () => {
-    await chrome.storage.session.set({ [ACTIVE_VOICE_OWNER_KEY]: activeVoiceOwner });
-    return startVoiceUnlocked(tab, localTranscriptNoteSource);
-  })();
-  try {
-    return await voiceStartPromise;
-  } catch (error) {
-    if (!activeVoiceNote) await clearVoiceOwner().catch(() => {});
-    throw error;
-  } finally {
-    voiceStartPromise = null;
-  }
-}
-
-async function startVoiceUnlocked(tab, localTranscriptNoteSource) {
-  cancelPendingVoice = false;
-  const { microphoneReady = false } = await chrome.storage.local.get({ microphoneReady: false });
-  if (!microphoneReady) {
-    await openMicrophonePermissionPage(tab);
-    throw new Error("请在新页面完成麦克风授权");
-  }
-  const microphonePermission = await sendToOffscreen({ type: "GET_MICROPHONE_PERMISSION" });
-  if (!canUseMicrophone(microphoneReady, microphonePermission.state)) {
-    await chrome.storage.local.set({ microphoneReady: false });
-    await openMicrophonePermissionPage(tab);
-    throw new Error("请在新页面完成麦克风授权");
-  }
-  const recording = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
-  if (recording.recording) throw new Error("已有录音正在进行");
-  let preparedNote = null;
-  try {
-    const { note, session } = await beginMarker(tab, "voice", {
-      localTranscriptNoteSource,
-      beforePause(noteToPrepare) {
-        preparedNote = noteToPrepare;
-        activeVoiceNote = noteToPrepare;
-        return acquireStudySoundHold(noteToPrepare);
-      },
-      onPrepared(noteToPrepare) {
-        preparedNote = noteToPrepare;
-        return sendToOffscreen({ type: "START_RECORDING", noteId: noteToPrepare.id });
-      },
-    });
-    if (cancelPendingVoice) {
-      cancelPendingVoice = false;
-      await stopVoice("sidepanel-closed");
-      return { note, session, canceled: true };
-    }
-    void chrome.runtime.sendMessage({
-      type: "VOICE_STATE_CHANGED",
-      recording: true,
-      noteId: note.id,
-      tabId: note.tabId,
-    }).catch(() => {});
-    return { note, session };
-  } catch (error) {
-    const permissionError = isMicrophonePermissionError(error);
-    if (permissionError) {
-      await chrome.storage.local.set({ microphoneReady: false });
-    }
-    const state = await sendToOffscreen({ type: "GET_RECORDING_STATE" }).catch(() => ({}));
-    const noteId = state.noteId ?? preparedNote?.id;
-    if (state.recording) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
-    if (noteId) await cancelNote(noteId, preparedNote);
-    activeVoiceNote = null;
-    await clearVoiceOwner().catch(() => {});
-    if (permissionError) await openMicrophonePermissionPage(tab).catch(() => {});
-    throw new Error(friendlyMicrophoneError(error));
-  }
-}
-
-async function stopVoice(reason) {
-  if (voiceStopPromise) return voiceStopPromise;
-  voiceStopPromise = stopVoiceUnlocked(reason);
-  try {
-    return await voiceStopPromise;
-  } finally {
-    voiceStopPromise = null;
-  }
-}
-
-async function stopVoiceUnlocked(reason) {
-  const fallbackNote = activeVoiceNote;
-  let result;
-  try {
-    result = await sendToOffscreen({ type: "STOP_RECORDING", reason });
-  } catch (error) {
-    if (fallbackNote) {
-      const note = await repository.getNote(fallbackNote.id) ?? fallbackNote;
-      const warning = `录音保存失败：${error.message}`;
-      const savedNote = await repository.commitSavedNote(note.id, {
-        status: "saved",
-        transcriptionStatus: "error",
-        warnings: [...(note.warnings ?? []), warning],
-      });
-      await releaseMarker(savedNote, true);
-      await finishVoiceUi(savedNote);
-    }
-    activeVoiceNote = null;
-    await clearVoiceOwner().catch(() => {});
-    throw error;
-  }
-  const note = await repository.getNote(result.noteId);
-  if (!note) {
-    activeVoiceNote = null;
-    await clearVoiceOwner().catch(() => {});
-    throw new Error("录音对应的标记已丢失");
-  }
-  await releaseMarker(note, true);
-  activeVoiceNote = null;
-  await clearVoiceOwner().catch(() => {});
-  await finishVoiceUi(note);
-
-  if (result.whisperReady) {
-    const { whisperSelectedModel = "" } = await chrome.storage.local.get({
-      whisperSelectedModel: "",
-    });
-    await queueTranscription(
-      note.id,
-      getWhisperModel(whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID).id,
-      "automatic",
-    );
-  }
-  return { noteId: note.id };
-}
-
-async function finishVoiceUi(note) {
-  void sendToTab(note.tabId, {
-    type: "FORCE_STOP_RECORDING",
-    reason: "recording-ended",
-  }).catch(() => {});
-  void chrome.runtime.sendMessage({
-    type: "VOICE_STATE_CHANGED",
-    recording: false,
-    noteId: note.id,
-    tabId: note.tabId,
-  }).catch(() => {});
+  await releaseMarker(note);
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   void chrome.runtime.sendMessage({ type: "BOUND_TAB_REMOVED", tabId }).catch(() => {});
-  void (async () => {
-    const exists = await chrome.offscreen.hasDocument();
-    const recording = exists
-      ? await sendToOffscreen({ type: "GET_RECORDING_STATE" }).catch(() => null)
-      : null;
-    let note = activeVoiceNote?.tabId === tabId ? activeVoiceNote : null;
-    if (!note && recording?.noteId) {
-      const stored = await repository.getNote(recording.noteId);
-      if (stored?.tabId === tabId) note = stored;
-    }
-    if (!note) return;
-    if (recording?.recording || recording?.stopping) {
-      await stopVoice("tab-closed");
-      return;
-    }
-    if (recording?.starting) await sendToOffscreen({ type: "ABORT_RECORDING" }).catch(() => {});
-    await cancelNote(note.id, note);
-    activeVoiceNote = null;
-    await clearVoiceOwner().catch(() => {});
-  })().catch(() => {});
 });
 
 async function currentPageContext({ sender, tabId }) {
   return readCurrentPageContext({ sender, tabId });
-}
-
-async function enableWhisper(modelId = DEFAULT_WHISPER_MODEL_ID) {
-  return whisperModelOperationLock.run(() => enableWhisperCore(modelId));
-}
-
-async function enableWhisperCore(modelId) {
-  await whisperRecoveryPromise;
-  const model = getWhisperModel(modelId);
-  const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
-  assertModelSwitchAllowed({
-    whisperState: processing.downloading
-      ? "downloading"
-      : processing.recording || processing.starting || processing.stopping
-        ? "recording"
-        : processing.transcriptionNoteIds.length > 0
-          ? "transcribing"
-          : "ready",
-    modelDownloading: processing.downloading,
-    transcriptionCount: processing.transcriptionNoteIds.length,
-    recording: processing.recording || processing.starting || processing.stopping,
-  });
-  try {
-    await chrome.storage.local.set({ whisperState: "downloading", whisperError: "" });
-    const result = await sendToOffscreen({ type: "DOWNLOAD_MODEL", modelId: model.id });
-    await chrome.storage.local.set({ whisperState: "ready", whisperSelectedModel: result.model });
-    return result;
-  } catch (error) {
-    await chrome.storage.local.set({ whisperState: "error", whisperError: error.message });
-    throw error;
-  } finally {
-    await chrome.permissions.remove({ origins: WHISPER_ORIGINS }).catch(() => false);
-  }
-}
-
-async function selectWhisperModel(modelId) {
-  return whisperModelOperationLock.run(() => selectWhisperModelCore(modelId));
-}
-
-async function selectWhisperModelCore(modelId) {
-  await whisperRecoveryPromise;
-  getWhisperModel(modelId);
-  const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
-  assertModelSwitchAllowed({
-    whisperState: processing.downloading
-      ? "downloading"
-      : processing.recording || processing.starting || processing.stopping
-        ? "recording"
-        : processing.transcriptionNoteIds.length > 0
-          ? "transcribing"
-          : "ready",
-    modelDownloading: processing.downloading,
-    transcriptionCount: processing.transcriptionNoteIds.length,
-    recording: processing.recording || processing.starting || processing.stopping,
-  });
-  return sendToOffscreen({ type: "SELECT_WHISPER_MODEL", modelId });
 }
 
 const NOTE_MUTATION_COMMANDS = new Set([
@@ -914,6 +397,41 @@ async function sidePanelTargetTab(sender, requestedTabId, {
   return chrome.tabs.get(targetTabId);
 }
 
+const pendingTranscriptReads = new Map();
+
+async function readFullYoutubeTranscript(tab) {
+  const key = `${tab.id}:${tab.url}`;
+  if (!pendingTranscriptReads.has(key)) {
+    const read = readFullYoutubeTranscriptOnce(tab).finally(() => {
+      if (pendingTranscriptReads.get(key) === read) pendingTranscriptReads.delete(key);
+    });
+    pendingTranscriptReads.set(key, read);
+  }
+  return pendingTranscriptReads.get(key);
+}
+
+async function readFullYoutubeTranscriptOnce(tab) {
+  const response = await sendToTab(tab.id, { type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
+  if (!shouldAttemptYoutubePlayerCapture(response.transcript)) {
+    return { transcript: response.transcript };
+  }
+  let capture;
+  try {
+    const injection = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: "MAIN",
+      func: captureYoutubePlayerTranscript,
+      args: [8000, { videoId: response.transcript.videoId }],
+    });
+    capture = injection[0]?.result;
+  } catch {
+    capture = { ok: false, code: "YOUTUBE_PLAYER_CAPTURE_FAILED" };
+  }
+  return {
+    transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
+  };
+}
+
 async function handleMessage(message, sender) {
   if (isNoteHistoryCommand(message.type)) {
     const request = await noteHistoryRequest(message, sender);
@@ -927,17 +445,6 @@ async function handleMessage(message, sender) {
     return result;
   }
   switch (message.type) {
-    case "OFFSCREEN_STORAGE_GET":
-      assertOffscreenSender(sender);
-      return { values: await chrome.storage.local.get(message.keys) };
-    case "OFFSCREEN_STORAGE_SET":
-      assertOffscreenSender(sender);
-      await chrome.storage.local.set(message.values);
-      return {};
-    case "OFFSCREEN_STORAGE_REMOVE":
-      assertOffscreenSender(sender);
-      await chrome.storage.local.remove(message.keys);
-      return {};
     case "OFFSCREEN_DOWNLOAD":
       assertOffscreenSender(sender);
       return {
@@ -951,30 +458,10 @@ async function handleMessage(message, sender) {
       const { context } = await resolveSidePanelContext(sender);
       return context;
     }
-    case "GET_VOICE_STATE": {
-      const tab = await sidePanelTargetTab(sender, message.tabId, {
-        requireActiveSidePanel: false,
-      });
-      if (!await chrome.offscreen.hasDocument()) {
-        return { recording: false, noteId: null };
-      }
-      const recordingState = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
-      const note = recordingState.noteId
-        ? await repository.getNote(recordingState.noteId)
-        : null;
-      return {
-        recording: Boolean(recordingState.recording && note?.tabId === tab.id),
-        noteId: note?.tabId === tab.id ? recordingState.noteId : null,
-      };
-    }
     case "OPEN_STANDALONE_WINDOW": {
       const tab = await sidePanelTargetTab(sender, message.tabId, {
         requireActiveSidePanel: false,
       });
-      const voiceOwner = await currentVoiceOwner();
-      if (voiceOwner && voiceOwner.tabId !== tab.id) {
-        throw new Error("请先结束当前录音，再切换独立窗口的视频");
-      }
       return standaloneWindowManager.open(tab);
     }
     case "FOCUS_BOUND_VIDEO": {
@@ -987,25 +474,7 @@ async function handleMessage(message, sender) {
     }
     case "GET_FULL_YOUTUBE_TRANSCRIPT": {
       const tab = await targetTab(sender, message.tabId);
-      const response = await sendToTab(tab.id, { type: "GET_FULL_YOUTUBE_TRANSCRIPT" });
-      if (!shouldAttemptYoutubePlayerCapture(response.transcript)) {
-        return { transcript: response.transcript };
-      }
-      let capture;
-      try {
-        const injection = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: "MAIN",
-          func: captureYoutubePlayerTranscript,
-          args: [8000, { videoId: response.transcript.videoId }],
-        });
-        capture = injection[0]?.result;
-      } catch {
-        capture = { ok: false, code: "YOUTUBE_PLAYER_CAPTURE_FAILED" };
-      }
-      return {
-        transcript: transcriptResultAfterPlayerCapture(response.transcript, capture),
-      };
+      return readFullYoutubeTranscript(tab);
     }
     case "GET_VIDEO_POSITION": {
       const tab = await targetTab(sender, message.tabId);
@@ -1055,7 +524,7 @@ async function handleMessage(message, sender) {
         activateStandalone: true,
         requireActiveSidePanel: true,
       });
-      return beginMarker(tab, "typed", {
+      return beginMarker(tab, {
         localTranscriptNoteSource: message.localTranscriptNoteSource,
       });
     }
@@ -1072,155 +541,28 @@ async function handleMessage(message, sender) {
       await cancelNote(message.noteId);
       return {};
     }
-    case "VOICE_START_REQUEST": {
-      const tab = await targetTab(sender, message.tabId, {
-        activateStandalone: true,
-        requireActiveSidePanel: true,
-      });
-      return startVoice(tab, message.localTranscriptNoteSource, sender.documentId ?? null);
-    }
-    case "OPEN_MICROPHONE_PERMISSION_PAGE": {
-      const tab = await targetTab(sender, message.tabId);
-      return openMicrophonePermissionPage(tab);
-    }
-    case "MICROPHONE_PERMISSION_GRANTED":
-      if (sender.url !== chrome.runtime.getURL("microphone-permission.html")) {
-        throw new Error("麦克风授权完成消息来源无效");
-      }
-      return microphoneNavigation.returnToSource();
-    case "VOICE_STOP_REQUEST": {
-      const voiceOwner = await currentVoiceOwner();
-      if (isPanelSender(sender)) {
-        const tab = await sidePanelTargetTab(sender, message.tabId, {
-          requireActiveSidePanel: false,
+    case "EXPORT_SESSION": {
+      const tab = await sidePanelTargetTab(sender, message.tabId, { requireActiveSidePanel: false });
+      const context = await currentPageContext({ sender, tabId: tab.id });
+      if (!context || context.sessionId !== message.sessionId) throw new Error("当前页面会话不匹配");
+      const session = await repository.getSession(context.sessionId) ?? { ...context, id: context.sessionId };
+      // The in-memory track survives a failed cache write, but must belong to this video.
+      let transcript = cachedFullTranscriptForContext({
+        schemaVersion: 1, id: session.id, videoId: session.videoId, transcript: message.transcript,
+      }, { sessionId: session.id, videoId: session.videoId });
+      if (!transcript && context.platform === "youtube") {
+        const loader = createFullTranscriptCacheLoader({
+          repository,
+          fetchTranscript: async () => (await readFullYoutubeTranscript(tab)).transcript,
         });
-        if (voiceOwner && voiceOwner.tabId !== tab.id) {
-          throw new Error("录音不属于当前标签页");
+        try {
+          transcript = (await loader.load({ sessionId: session.id, videoId: session.videoId })).transcript;
+        } catch {
+          // Failed subtitle access must not prevent export of the user's notes.
         }
       }
-      if (
-        voiceOwner?.documentId
-        && sender.documentId !== voiceOwner.documentId
-      ) {
-        throw new Error("录音由另一个界面控制");
-      }
-      return stopVoice(message.reason);
+      return sendToOffscreen({ type: "EXPORT_SESSION", session, transcript, language: message.language });
     }
-    case "CANCEL_PENDING_VOICE": {
-      const voiceOwner = await currentVoiceOwner();
-      if (isPanelSender(sender)) {
-        const tab = await sidePanelTargetTab(sender, message.tabId, {
-          requireActiveSidePanel: false,
-        });
-        if (voiceOwner && voiceOwner.tabId !== tab.id) {
-          return { ignored: true };
-        }
-      }
-      if (
-        voiceOwner?.documentId
-        && sender.documentId !== voiceOwner.documentId
-      ) return { ignored: true };
-      cancelPendingVoice = true;
-      const state = await sendToOffscreen({ type: "GET_RECORDING_STATE" });
-      if (state.recording) await stopVoice(message.reason ?? "sidepanel-closed");
-      else if (state.starting) await sendToOffscreen({ type: "ABORT_RECORDING" });
-      return {};
-    }
-    case "RECORDING_TIMEOUT":
-      if (sender.url !== chrome.runtime.getURL("offscreen.html")) {
-        throw new Error("录音超时消息来源无效");
-      }
-      return stopVoice("timeout");
-    case "RETRANSCRIBE_NOTE": {
-      await whisperRecoveryPromise;
-      return coordinateNoteTranscription(message.noteId, async () => {
-        const note = await repository.getNote(message.noteId);
-        if (note?.inputType !== "voice" || !note.audioKey) {
-          throw new Error("该标记没有可重新转写的原始录音");
-        }
-        if (note.pendingTranscription || ["pending", "transcribing"].includes(note.transcriptionStatus)) {
-          throw new Error("该标记正在转写，请等待完成后再试");
-        }
-        const processing = await sendToOffscreen({ type: "GET_PROCESSING_STATE" });
-        if (
-          processing.downloading
-          || processing.recording
-          || processing.starting
-          || processing.stopping
-          || processing.transcriptionNoteIds.length > 0
-        ) {
-          throw new Error("请等待当前语音任务结束后再重新转写");
-        }
-        const [settings, cacheStatus] = await Promise.all([
-          chrome.storage.local.get({ whisperSelectedModel: "" }),
-          sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
-        ]);
-        const modelId = getWhisperModel(
-          settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
-        ).id;
-        if (!cacheStatus.cachedModelIds.includes(modelId)) {
-          throw new Error("当前模型尚未缓存，请先下载并启用");
-        }
-        await queueTranscription(note.id, modelId, "manual");
-        return {};
-      });
-    }
-    case "ENABLE_WHISPER":
-      return enableWhisper(message.modelId);
-    case "SELECT_WHISPER_MODEL":
-      return selectWhisperModel(message.modelId);
-    case "CHECK_BUNDLED_MODEL":
-      return sendToOffscreen({ type: "CHECK_BUNDLED_MODEL" });
-    case "GET_WHISPER_STATUS":
-      await whisperRecoveryPromise;
-      {
-        const [settings, processing, cacheStatus] = await Promise.all([
-          chrome.storage.local.get([
-            "whisperState",
-            "whisperError",
-            "whisperSelectedModel",
-            "whisperDownloadModel",
-            "whisperDownloadedBytes",
-          ]),
-          sendToOffscreen({ type: "GET_PROCESSING_STATE" }),
-          sendToOffscreen({ type: "GET_MODEL_CACHE_STATUS" }),
-        ]);
-        const whisperSelectedModel = getWhisperModel(
-          settings.whisperSelectedModel || DEFAULT_WHISPER_MODEL_ID,
-        ).id;
-        return {
-          whisperState: settings.whisperState,
-          whisperError: settings.whisperError,
-          selectedModelId: whisperSelectedModel,
-          loadedModelId: processing.loadedModelId,
-          cachedModelIds: cacheStatus.cachedModelIds,
-          download: processing.downloading
-            ? {
-                modelId: settings.whisperDownloadModel,
-                downloadedBytes: settings.whisperDownloadedBytes,
-              }
-            : null,
-          models: WHISPER_MODELS.map(({ id, label, size, recommended, experimental }) => ({
-            id,
-            label,
-            size,
-            recommended: Boolean(recommended),
-            experimental: Boolean(experimental),
-          })),
-        };
-      }
-    case "SET_SHORTCUT":
-      if (isReservedVideoPlaybackCode(message.code)) {
-        throw new Error("空格和左右方向键已保留用于视频播放");
-      }
-      await chrome.storage.local.set({ shortcutCode: message.code });
-      return { code: message.code };
-    case "EXPORT_SESSION":
-      return sendToOffscreen({
-        type: "EXPORT_SESSION",
-        sessionId: message.sessionId,
-        language: message.language,
-      });
     case "CONTEXT_CHANGED": {
       const tab = contextChangedSenderTab(sender);
       if (!tab) {

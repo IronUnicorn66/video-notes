@@ -63,20 +63,8 @@ test("发布构建包含双语资源与侧栏切换入口", async () => {
 
   await access(new URL("../dist/_locales/zh_CN/messages.json", import.meta.url));
   await access(new URL("../dist/_locales/en/messages.json", import.meta.url));
-  const [sidepanel, permissionPage] = await Promise.all([
-    read("dist/sidepanel.html"),
-    read("dist/microphone-permission.html"),
-  ]);
+  const sidepanel = await read("dist/sidepanel.html");
   assert.match(sidepanel, /data-interface-language="zh_CN"/);
   assert.match(sidepanel, /data-interface-language="en"/);
   assert.match(sidepanel, /data-i18n="quickNote"/);
-  assert.match(permissionPage, /data-i18n="microphonePermissionTitle"/);
-});
-
-test("麦克风授权页响应已保存的界面语言变化", async () => {
-  const source = await read("src/microphone-permission.js");
-
-  assert.match(source, /chrome\.storage\.onChanged\.addListener/);
-  assert.match(source, /INTERFACE_LANGUAGE_KEY/);
-  assert.match(source, /location\.reload\(\)/);
 });

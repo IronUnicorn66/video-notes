@@ -96,33 +96,6 @@ test("旧版数据库升级后保留笔记并新增完整字幕缓存", async ()
   await repository.destroy();
 });
 
-test("可恢复已经保存音频但尚未完成的转写任务", async () => {
-  const repository = new VideoNotesRepository({
-    databaseName: `video-notes-test-${crypto.randomUUID()}`,
-    indexedDB,
-    IDBKeyRange,
-  });
-  await repository.putNote({
-    id: "pending",
-    sessionId: "youtube:abc",
-    status: "saved",
-    audioKey: "audio/pending",
-    transcriptionStatus: "transcribing",
-  });
-  await repository.putNote({
-    id: "done",
-    sessionId: "youtube:abc",
-    status: "saved",
-    audioKey: "audio/done",
-    transcriptionStatus: "complete",
-  });
-  assert.deepEqual(
-    (await repository.listPendingTranscriptions()).map((note) => note.id),
-    ["pending"],
-  );
-  await repository.destroy();
-});
-
 test("新增、修改、删除和跨实例撤销共享持久历史", async () => {
   const databaseName = `history-${crypto.randomUUID()}`;
   const first = new VideoNotesRepository({ databaseName, indexedDB, IDBKeyRange });
@@ -314,35 +287,6 @@ test("字幕编辑及其撤销反撤销不改变正文编辑版本", async () =>
   });
   await repository.redoNoteAction("youtube:abc", 30);
   assert.equal((await repository.getNote("n1")).userEditVersion, 0);
-  await repository.destroy();
-});
-
-test("待转写扫描忽略已软删除笔记", async () => {
-  const repository = new VideoNotesRepository({
-    databaseName: `history-${crypto.randomUUID()}`,
-    indexedDB,
-    IDBKeyRange,
-  });
-  await repository.putNote({
-    id: "visible",
-    sessionId: "youtube:abc",
-    status: "saved",
-    audioKey: "audio/visible",
-    transcriptionStatus: "pending",
-  });
-  await repository.putNote({
-    id: "deleted",
-    sessionId: "youtube:abc",
-    status: "saved",
-    audioKey: "audio/deleted",
-    transcriptionStatus: "transcribing",
-    deletedAt: 1,
-  });
-
-  assert.deepEqual(
-    (await repository.listPendingTranscriptions()).map((note) => note.id),
-    ["visible"],
-  );
   await repository.destroy();
 });
 

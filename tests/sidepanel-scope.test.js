@@ -548,26 +548,26 @@ test("保存失败后继续延迟刷新直到用户解决未保存编辑", () =>
 test("编辑中录音结束只延后列表刷新，录音 UI 仍立即更新", () => {
   let editing = true;
   let refreshes = 0;
-  let voiceUiEffects = 0;
+  let contextEffects = 0;
   const panel = createSidePanelRefreshController(
     () => { refreshes += 1; },
     {
       onContextEvent(message) {
-        if (message.type === "VOICE_STATE_CHANGED") voiceUiEffects += 1;
+        if (message.type === "NOTES_CHANGED") contextEffects += 1;
       },
       shouldRefresh: (message) => (
-        message.type !== "VOICE_STATE_CHANGED" || message.recording === false
+        message.type !== "NOTES_CHANGED" || message.pending === false
       ),
       shouldDeferRefresh: () => editing,
     },
   );
   panel.setTabId(1);
 
-  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: true });
-  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: false });
+  panel.handleContextChanged({ type: "NOTES_CHANGED", tabId: 1, pending: true });
+  panel.handleContextChanged({ type: "NOTES_CHANGED", tabId: 1, pending: false });
   panel.handleVisibilityChange(true);
   panel.handleContextChanged({ type: "NOTE_TRANSCRIBED", tabId: 1 });
-  assert.equal(voiceUiEffects, 2);
+  assert.equal(contextEffects, 2);
   assert.equal(refreshes, 0);
 
   editing = false;
@@ -575,8 +575,8 @@ test("编辑中录音结束只延后列表刷新，录音 UI 仍立即更新", (
   assert.equal(refreshes, 1);
   assert.equal(panel.flushDeferredRefresh(), false);
 
-  panel.handleContextChanged({ type: "VOICE_STATE_CHANGED", tabId: 1, recording: false });
-  assert.equal(voiceUiEffects, 3);
+  panel.handleContextChanged({ type: "NOTES_CHANGED", tabId: 1, pending: false });
+  assert.equal(contextEffects, 3);
   assert.equal(refreshes, 2);
 });
 

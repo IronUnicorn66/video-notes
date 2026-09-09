@@ -77,24 +77,3 @@ export function createNoteHistoryCommandRouter({
     }
   };
 }
-
-export async function persistRecordedNote({
-  repository,
-  noteId,
-  audio,
-  audioKey,
-  transcriptionStatus,
-  now = Date.now(),
-}) {
-  await repository.putAsset(audioKey, audio);
-  try {
-    return await repository.commitSavedNote(noteId, {
-      audioKey,
-      status: "saved",
-      transcriptionStatus,
-    }, now);
-  } catch (error) {
-    await repository.deleteAsset(audioKey);
-    throw error;
-  }
-}
